@@ -1,0 +1,607 @@
+---
+id: f1app
+topic: F1app — dark-first Jetpack Compose F1 data app
+status: design-locked / build-ready
+lode-cross-refs:
+  - ../summary.md
+  - ../terminology.md
+  - ../practices.md
+  - ../architecture/architecture.md
+  - ../design-system/theme.md
+  - ../release/build-and-signing.md
+  - ../testing/scope.md
+  - ../wayfinder/f1app/map.md
+---
+
+## Problem Statement
+
+An F1 fan wants live and historical F1 data on their personal Android phone:
+the next race countdown, the current season's schedule with full podiums,
+driver and constructor standings, circuit stats, and quick access to their
+favourite drivers and team — surfaced through a dark-first, glanceable
+interface *and* a home-screen Countdown widget. No free offering bundles these
+into one lean native app; the fan currently jumps between web sources to get
+the same picture.
+
+## Solution
+
+A single-module Jetpack Compose Android app (`com.anpurnama.f1_app`) with four
+top-level tabs — Homepage, Schedule, Leaderboard, My Team — plus Driver / Team
+/ Round / Circuit detail pages, and one Jetpack Glance home-screen Countdown
+widget. All F1 data comes from free, zero-auth APIs
+(f1api.dev as primary; OpenF1 for top speed; jolpica for all-time most-wins
+at a circuit), fetched over one Ktor `HttpClient`, cached via HttpCache +
+DataStore for offline-first reads. Favorites (2 drivers + 1 team) persist
+locally and drive the Homepage §1 pager and My Team management view. The
+widget periodically refreshes a cached next-race snapshot and renders a
+render-time countdown + LIVE / COMPLETE / off-season / no-cache states, with
+a custom-scheme deep link into the round detail.
+
+## User Stories
+
+1. As an F1 fan, I want a dark-first app so that staring at race data in the
+   evening doesn't blast me with white.
+2. As a fan, I want four clear top-level tabs so I can move between
+   overview, schedule, standings, and my favorites without hunting.
+3. As a fan, I want the next race countdown on a home-screen widget so I
+   never have to open the app to know how long until lights out.
+4. As a fan, I want the widget to show "LIVE NOW" in a circuit brand colour
+   when a race session is in its window so I notice and open the app.
+5. As a fan, I want the widget to show the GP date and time in my local
+   timezone so I know exactly when to tune in.
+6. As a fan, I want to tap the widget and land on that race's Round detail
+   so I can read the result without navigating.
+7. As a fan, I want the widget to keep showing the last good countdown when
+   the network fails so it never blanks mid-season.
+8. As a fan, I want to see "Season over" on the widget during the off-season
+   rather than a stale or missing countdown.
+9. As a fan, I want the Homepage to surface, in one scroll: my favourite
+   drivers and team plus the nearest GP (§1), the season progress
+   aggregates (§2), and the nearest GP's circuit stats including top speed
+   (§3), so I get the whole weekend picture at a glance.
+10. As a fan, I want the Schedule tab to show upcoming rounds with session
+    times and past rounds with full podiums (P1/P2/P3), so I can see what's
+    next and what just happened.
+11. As a fan, I want the Leaderboard tab to show current driver and
+    constructor standings with wins and points, with rows that drill into
+    driver or team detail.
+12. As a fan, I want My Team to hold my two favourite drivers and one
+    favourite constructor, with an easy replace interaction, so the
+    Homepage reflects who I care about.
+13. As a fan, I want the favorite-driving picks to be decoupled from my
+    favorite constructor (drivers need not be from that team), so I can
+    follow whoever I actually root for.
+14. As a fan, I want first launch to seed sensible defaults (the current
+    championship-leading constructor plus its two drivers) so neither the
+    Homepage nor My Team is empty before I pick anything.
+15. As a fan, I want a Round detail page showing race and qualifying results
+    with a circuit block that links to Circuit detail, so I can dig into a
+    specific weekend.
+16. As a fan, I want a Circuit detail page showing the top speed recorded
+    there and the all-time most-winning driver and team at that circuit, so
+    a track has identity beyond one race.
+17. As a fan, I want Driver detail to show a headshot, team, number, and
+    standings snapshot; Team detail to show a car render, wordmark, and
+    standings snapshot, so a driver or team I follow has a rich surface.
+18. As a fan, I want the app to keep working offline (last good cached data)
+    rather than throwing connection errors when I'm on a patchy network.
+19. As a fan, I want pull-to-refresh on list screens to force-fetch fresh
+    data ignoring the cache, so I'm never looking at a stale table right
+    after a session.
+20. As a fan, I want per-section failure independence on the Homepage so a
+    single source failing doesn't blank the whole screen.
+21. As a fan, I want a release-signed APK I can sideload on my personal
+    Android device, without needing the Play Store.
+
+## Implementation Decisions
+
+### Module & architecture
+
+- Single `:app` module. No multi-module split; a future KMP `:shared` port is
+  a `git mv` of `f1/`, not a refactor — guarded by the domain-purity invariant
+  below, not by premature module extraction.
+- **Manual `Wiring(context)` service locator** held by a custom `Application`
+  subclass (`app.wiring`). No Hilt. The widget shares the same instance —
+  one service locator across entry points.
+- **MVVM:** `ViewModel` + sealed `UiState` + `StateFlow`. State derived via
+  `combine` of small `MutableStateFlow` atoms + `stateIn(WhileSubscribed(5_000))`.
+- **Init-less loading:** first load fires from `Flow.onStart { load() }`, not
+  an `init {}` block; re-fires on `ON_START`.
+- **Result type:** sealed `Outcome<T>` (`Success` / `Failure` / `Loading`) at
+  `core/Outcome.kt`.
+- **Domain seam:** UseCase classes; ViewModels take them as function
+  references (`useCase::invoke`). No direct repository access from
+  ViewModels.
+- **Navigation 3:** `NavKey` + `@Serializable` route objects + custom
+  `Navigator` / `NavigationState` in `core/navigation/`; flat graph, no
+  nested subgraphs.
+
+### Domain-purity invariant (hard)
+
+`f1/` — domain models, DTOs, Ktor API extensions, and use cases — must
+contain zero `android.*` imports. Platform concerns (`Context`,
+`android.util.Log`, dispatchers) are injected as interfaces from `core/`.
+This is the hedge that makes a future KMP port a move instead of a rewrite.
+
+### Data sources & API client
+
+- One `HttpClient` in `Wiring`, with **no default base URL**; full URLs are
+  built per request. Three base URL constants live in `f1/data/F1Api.kt`:
+
+  ```kotlin
+  const val F1API_BASE   = "https://f1api.dev/api"
+  const val JOLPICA_BASE  = "https://api.jolpi.ca/ergast/f1"
+  const val OPENF1_BASE   = "https://api.openf1.org/v1"
+  ```
+
+  No `openf1/` or `jolpica/` package — second/third sources are `suspend fun
+  HttpClient.*` extensions in the same file. The API definition itself is
+  pure Kotlin and satisfies the domain-purity invariant.
+
+- **Ktor CIO engine** (KMP-safe) + `ContentNegotiation` with
+  `kotlinx.serialization` JSON
+  (`{ ignoreUnknownKeys = true; coerceInputValues = true }`). Replaces
+  Retrofit+OkHttp deliberately — Retrofit `@GET` interfaces are JVM-tied.
+
+- f1api.dev endpoints wired (all zero auth):
+  - `GET /current` — full-season schedule + sessions (Homepage §2 aggregates;
+    Schedule both tabs)
+  - `GET /current/next` — next race (Homepage §1+§3, Countdown worker)
+  - `GET /current/drivers`, `GET /current/teams` — Driver / Team detail
+  - `GET /current/drivers-championship`, `GET /current/constructors-championship`
+    — Leaderboard, Homepage fav-driver / fav-team, detail pages
+  - `GET /{year}/{round}/race`, `GET /{year}/{round}/qualy` — Round detail,
+    past-list podium (slices `[0..2]` from race results)
+  - `GET /circuits/{circuitId}` — Circuit metadata (cheap; inlined elsewhere
+    but called directly for `CircuitDetail`)
+
+- OpenF1 extensions (for top speed only in v1):
+  - `getOpenF1Sessions(year, countryName, sessionName)` —
+    `GET /v1/sessions`
+  - `getOpenF1Laps(sessionKey)` — `GET /v1/laps?session_key=...` (the
+    `st_speed` field is natively kph; never pass `speed_unit`, it 404s)
+
+- jolpica extension (all-time most-wins at circuit):
+  - `getCircuitWinners(f1apiCircuitId)` —
+    `GET /circuits/{id}/results/1.json`; client-aggregates the top driver +
+    top team. `driverId` / `constructorId` match f1api.dev's namespace; only
+    `circuitId` needs a translation (5-entry map below).
+
+- **ID translation maps** (private vals in `F1Api.kt`):
+
+  ```kotlin
+  private val F1API_TO_JOLPICA_CIRCUIT = mapOf(
+      "austin" to "americas",
+      "gilles_villeneuve" to "villeneuve",
+      "hermanos_rodriguez" to "rodriguez",
+      "lusail" to "losail",
+      "montmelo" to "catalunya",
+  )
+  // Used when joining OpenF1 by country_name+year+race-date
+  private val F1API_TO_OPENF1_COUNTRY = mapOf(
+      "Great Britain" to "United Kingdom",
+  )
+  ```
+
+### Use cases (11 — screen-driven, no use case without a caller)
+
+| Use case | Source(s) | Callers |
+|---|---|---|
+| `GetNextRaceUseCase` | f1api.dev `/current/next` | Homepage §1+§3, Countdown worker |
+| `GetSeasonUseCase` | f1api.dev `/current` | Homepage §2, Schedule, Schedule-upcoming |
+| `GetDriversStandingsUseCase` | f1api.dev `/current/drivers-championship` | Leaderboard, Homepage fav-driver, Driver detail |
+| `GetConstructorsStandingsUseCase` | f1api.dev `/current/constructors-championship` | Leaderboard, Homepage fav-team, Team detail, first-launch seed |
+| `GetDriverDetailUseCase(id)` | f1api.dev `/current/drivers` + `/drivers-championship` | Driver detail |
+| `GetTeamDetailUseCase(id)` | f1api.dev `/current/teams` + `/constructors-championship` | Team detail |
+| `GetRoundResultsUseCase(year, round)` | f1api.dev `/{y}/{r}/race` | Round detail, Past-list podium |
+| `GetRoundQualifyingUseCase(year, round)` | f1api.dev `/{y}/{r}/qualy` | Round detail |
+| `GetRoundPodiumUseCase(year, round)` | reuses `getRoundResults`, slices `[0..2]` | Schedule > Past list |
+| `GetCircuitTopSpeedUseCase(circuitId, year?)` | OpenF1 `/v1/sessions` + `/v1/laps` (`max(st_speed)`) | Homepage §3, Round detail |
+| `GetCircuitMostWinsUseCase(f1apiCircuitId)` | jolpica `/circuits/{id}/results/1.json` | Round detail, Circuit detail |
+
+Homepage ViewModel combines five use cases (the four f1api.dev ones plus
+`GetCircuitTopSpeed`); each section fails independently — no composite use
+case. `GetSeasonUseCase` pre-computes season aggregates
+(`completedGp`, `totalKm`, `totalLaps`, `progressPercent`) on the `Season`
+model so ViewModels don't recompute.
+
+### OpenF1 top-speed specifics (locked by research)
+
+- **Join** = `country_name + year + race-date match` (one `/v1/sessions`
+  call). `country_name` alone is insufficient for US (3 circuits), Spain (2
+  circuits 2026+), Italy (2 circuits 2023–2025); the race date is the unique
+  disambiguator. The 1-entry `F1API_TO_OPENF1_COUNTRY` fallback is applied
+  only when the literal country returns 0.
+- **Session filter** = `session_name = Qualifying` (low-fuel push laps produce
+  the weekend's actual peak).
+- **Label** = "Top speed" (not "record"). Latest Qualifying peak.
+- **Pre-2023 rounds:** empty cell — no placeholder, no fake dash.
+- **`is_cancelled` filter not applied** — even cancelled weekends recorded
+  qualifying laps; date match handles disambiguation.
+- **All-time OpenF1 speed scan:** parked, not shipped.
+
+### Caching
+
+- **HttpCache** plugin, ~10MB file cache. Probed live:
+  - f1api.dev — `max-age=600` (10-min) — respected.
+  - jolpica — `max-age=3600` (1-hour) — respected.
+  - OpenF1 — **no cache headers** (nginx, no CDN) — HttpCache skips it;
+    accepted uncached (~0.3s/call, 2 calls per Homepage §3 cold open ≈ 0.6s).
+    `ponytail:` add a default TTL / in-memory layer only if latency becomes a
+    measured complaint.
+- **Pull-to-refresh** = `CacheControl.NO_CACHE` per request, on the same
+  `HttpClient`. Two cache policies by request flag.
+- **Offline cold launch:** `max-stale` tolerance for f1api.dev + jolpica;
+  OpenF1 has no stale layer (fails to network error offline).
+- No Room, no WorkManager-for-sync. Multi-source is additive endpoints on the
+  same client; the caching strategy is unchanged.
+
+### Persistence (DataStore)
+
+Two `DataStore<Preferences>` wrappers in `Wiring`, both using one atomic
+`edit` block with typed keys — no serialized JSON blob:
+
+- **`NextRaceCache`** (`widget/countdown/data/`) —
+  `NEXT_RACE_START_MILLIS: Long`, `NEXT_RACE_NAME: String`,
+  `NEXT_RACE_CIRCUIT: String`, `NEXT_RACE_ROUND: Int`, `NEXT_RACE_SEASON: Int`,
+  plus the full session schedule (FP1/FP2/FP3/qualy/race timestamps — used for
+  the worker's race window). Worker writes; widget reads; same instance.
+- **`FavoritesCache`** —
+  `FAV_DRIVER_1: String`, `FAV_DRIVER_2: String`, `FAV_TEAM: String`. No
+  timestamp keys (explicit replace makes them unnecessary). Written from My
+  Team's picker, read by HomepageViewModel (§1) + MyTeamViewModel.
+
+### Navigation routes (7)
+
+`@Serializable` `NavKey` route objects in `core/navigation/`:
+
+- `data object Homepage : NavKey` — start destination
+- `data object Schedule : NavKey`
+- `data object Leaderboard : NavKey`
+- `data object MyTeam : NavKey` (rightmost)
+- `data class DriverDetail(val driverId: String) : NavKey`
+- `data class TeamDetail(val teamId: String) : NavKey`
+- `data class RoundDetail(val year: Int, val round: Int) : NavKey`
+- `data class CircuitDetail(val circuitId: String) : NavKey` — home for the
+  top-speed + most-wins stats; opened from RoundDetail's circuit block and
+  Homepage §3.
+
+Entry points:
+
+```mermaid
+flowchart LR
+  Homepage -->|favorite driver| DriverDetail
+  Homepage -->|favorite team| TeamDetail
+  Homepage -->|§3 circuit card| CircuitDetail
+  Leaderboard -->|driver row| DriverDetail
+  Leaderboard -->|team row| TeamDetail
+  Leaderboard -->|round row| RoundDetail
+  Schedule -->|round row| RoundDetail
+  RoundDetail -->|circuit block| CircuitDetail
+  Widget["Countdown widget"] ==>|"f1app://round/{y}/{r}"| RoundDetail
+```
+
+### Deep link (custom scheme, widget → RoundDetail)
+
+- Form: `f1app://round/{year}/{round}`.
+- The widget builds an `Intent.ACTION_VIEW` `PendingIntent` (via Glance
+  `clickable(actionStartActivity(intent))`) with args read from
+  `NextRaceCache` (`NEXT_RACE_SEASON` / `NEXT_RACE_ROUND`).
+- `MainActivity` parses `intent.data` — if the host is `round`, it pushes a
+  `RoundDetail` nav key onto Homepage as the backstack root (`[Homepage,
+  RoundDetail]`; back from `RoundDetail` lands on Homepage, not exit). No
+  config activity.
+- Custom scheme only — no App Links / `autoVerify` (no public web domain to
+  verify against).
+- **Suppressed** in off-season (`NEXT_RACE_START_MILLIS == 0L`) and no-cache
+  states — no valid round to open.
+
+### Favorites (My Team / Homepage §1)
+
+- Top-level nav is **4 tabs**: Homepage, Schedule, Leaderboard, My Team.
+- My Team tab holds 3 slots: 2 favorite drivers + 1 favorite constructor
+  team. The nearest-GP card lives on Homepage §3, not here.
+- Homepage §1 = compact pager of the same 2 favorite drivers + favorite team
+  + nearest-date GP. My Team is the management view over the same
+  `FavoritesCache`.
+- **First-launch default:** seed `FavoritesCache` with the #1 constructor in
+  `GetConstructorsStandings` plus that team's two drivers (top two driver
+  rows whose `teamId == favorited team`).
+- **Driver ↔ team decoupled:** the two favorited drivers need not be from the
+  favorited constructor.
+- **Picker UX:** tapping a filled slot opens a `ModalBottomSheet` to choose
+  or replace (variant A — chosen over a full-screen page and an inline
+  expand). No separate onboarding route, no star/pin on Driver/Team detail.
+- **3rd-pin behavior:** explicit user replace. A driver `id` occupies at
+  most one of the two driver slots; a team `id` is unique in the team slot.
+
+### Countdown widget (Glance)
+
+```mermaid
+flowchart LR
+  Tick["Periodic tick (15-min floor)"] --> Gate{"now in race window?
+  OR cache.age >= 60 min?"}
+  Gate -->|yes| Fetch["GetNextRaceUseCase -> write NextRaceCache -> updateAll"]
+  Gate -->|no| Skip["Result.success() (no network)"]
+```
+
+- **Tech:** Jetpack Glance (`androidx.glance:appwidget`); a `GlanceAppWidget`
+  subclass whose `provideGlance` reads `NextRaceCache` and renders
+  `@Composable` content (compiles to `RemoteViews`). RemoteViews interop is
+  an escape hatch only.
+- **Refresh:** one `PeriodicWorkRequest` (`CountdownWorker`, 15-min WorkManager
+  floor, `NETWORK_TYPE_CONNECTED` constraint, exponential backoff). A gate in
+  `doWork` decides whether to fetch:
+  - **Race window** = `[cached FP1_start, cached race_start + 3h]`. Inside
+    the window, fetch every tick; outside, fetch only when cache age ≥ 60 min
+    (effectively hourly between weekends).
+  - **No live chronometer.** The displayed countdown is recomputed from
+    `NEXT_RACE_START_MILLIS` at each worker-driven render; precision is days
+    / hours / minutes; minute drift between renders is accepted. No exact
+    AlarmManager near green flag for v1.
+  - **On fetch failure:** leave the cached value; don't clear. After a
+    successful write, call `CountdownWidget().updateAll(context)`.
+- **Render-time state** (computed in `provideGlance` from `now` vs cached
+  race window, assumed race duration 3h):
+
+  | Condition | Display | Deep link |
+  |---|---|---|
+  | `now < start` | countdown (`Nd Nh Nm`) + GP date/time | on |
+  | `start <= now < start + 3h` | "LIVE NOW" (circuit-accent colour) + GP date/time | on |
+  | `now >= start + 3h` | "RACE COMPLETE" transient (until next worker fetch flips the cache) + GP date/time | on |
+  | Off-season (`NEXT_RACE_START_MILLIS == 0L`) | "Season over" in `OnSurfaceVariant` | suppressed |
+  | No cache + sync failure (first cold launch, no network) | "No race data — tap to retry" (taps enqueue one-shot expedited `OneTimeWork`) | suppressed |
+  | Cache set + sync failure | stale cached countdown/date (never blanks) | on |
+
+- **Visual contract:** dark-only `Surface` body (#0d0d0d, `Spacing.normal`
+  padding) + full-bleed ~6dp `Circuits.forId(circuitId)` accent strip
+  (backgrounds only, never body text on dark). Race name (bold), circuit +
+  country, large countdown (state-replaced in LIVE/COMPLETE), GP date/time
+  formatted device-local (e.g. `Sun 23 Mar · 15:00`) in countdown/LIVE/COMPLETE
+  states; hidden in off-season/no-cache. No icon / launcher-art asset for v1
+  (text-only).
+- **Sizing** (AppWidgetProviderInfo): `minWidth 115dp`, `minHeight 256dp`,
+  `maxResizeWidth 130dp`, `maxResizeHeight 624dp`, `minResizeWidth 56dp`,
+  `minResizeHeight 120dp`, `resizeMode horizontal|vertical`, no `configure`,
+  `updatePeriodMillis 0` (Glance re-render driven by worker `updateAll`, not
+  system poller), Glance preview composables for `previewLayout`.
+
+### Enrichments (Tier 1 only in v1)
+
+- **Driver headshots** — on `DriverDetail`, Homepage §1 favorite-driver
+  cards, My Team favorite-driver cards. Source: OpenF1
+  `/v1/drivers?driver_number=<n>&session_key=<latest>` `headshot_url`.
+  Cached in-memory (`Map<driverId, String>`); Coil for image load. Fallback
+  chain: OpenF1 `headshot_url` → Cloudinary
+  `common/f1/{year}/{team}/{driverRef}/` portrait → `team_colour` swatch.
+- **Team / car imagery** — on `TeamDetail` (hero car render), Homepage §1
+  favorite-team card, My Team favorite-team card. Source: formula1.com
+  Cloudinary `media.formula1.com/.../common/f1/{year}/{team}/...webp`
+  (2026+ only — legacy AEM path dropped for v1). The slug → URL is a
+  compile-time constant (`teamImageUrl()` lives in `f1/data/` next to the
+  other maps; no API call needed). Fallback: `team_colour` swatch.
+- **Weather + race-control flags** — out of scope for v1 (both live-window
+  only; graduate as a fresh ticket when a live-session feature is scoped).
+
+### Design system (already built — ticket 02)
+
+- **`F1appTheme`** — single dark-only `@Composable`, one `content` param.
+  No light scheme, no dynamic color, no `isSystemInDarkTheme`.
+- `darkColorScheme()` built from named `Color` vals. `F1Shapes`
+  (`small 2 / medium 8 / large 14 / extraLarge 16` dp) + 8-rung `Spacing`
+  (4–32dp: xs/sm/md/normal/semiLg/lg/xl/xxl). M3 default typography.
+- `Circuits` `object` — 23 per-circuit brand colours (backgrounds only on
+  dark, never text). `Tyres` `object` — six Pirelli compounds as
+  text+background pairs (always pair the two halves).
+
+### Schema noise locked into DTOs (no decisions, recorded for implementation)
+
+- `position` is a `String` (`"1"` or `"NC"`) — model as String throughout.
+- Race result `time` is messy (`"1:21:06.758"`, `"+1 lap"`, `"DNF (1)"`) —
+  store as String, don't parse.
+- `birthday` is dirty (ISO `2006-08-25` *and* `15/02/1998` mixed across
+  drivers) — store as String, don't parse.
+- `circuitLength: "7004km"` in `/current*` vs `7004` `Int` in
+  `/circuits/{id}` — strip non-digits when computing km aggregates.
+- Envelope shape differs by endpoint: `/current/next` → `race: [...]` array;
+  `/current` → `races: [...]` array; `/{y}/{r}/race` → `races: {...}` object
+  with `results: [...]`. Three different envelope DTOs.
+- `circuit` is an object in `/current*` but a one-element array in
+  `/{y}/{r}/race` — different DTO per endpoint.
+- Three spellings of "firstAppearance" across endpoints
+  (`firstAppareance`, `firstAppearance`, `firstParticipationYear`) —
+  `@SerialName` per DTO.
+- OpenF1 returns lowercase-no-underscore fields
+  (`sessionkey`, `countryname`, `circuitshortname`) — OpenF1 DTOs get their
+  own `@SerialName` mapping, distinct from f1api.dev's snake_case.
+
+### Package layout
+
+```
+com.anpurnama.f1_app/
+  F1App.kt                       # Application — holds `wiring: Wiring`
+  MainActivity.kt
+  core/
+    di/Wiring.kt
+    navigation/{Routes,Navigator,NavigationState,EntryProviders}.kt
+    network/HttpClientFactory.kt
+    Outcome.kt
+    exception/ExceptionExtension.kt
+  f1/                             # DOMAIN — pure Kotlin, zero android.*
+    data/{F1Api, Dtos, ...}.kt
+    model/                        # NextRace, Season (+aggregates), Race, Circuit,
+                                  # Driver, Team, DriverStanding,
+                                  # ConstructorStanding, RaceResult,
+                                  # QualifyingResult
+    {GetNextRaceUseCase, GetSeasonUseCase,
+     GetDriversStandingsUseCase, GetConstructorsStandingsUseCase,
+     GetDriverDetailUseCase, GetTeamDetailUseCase,
+     GetRoundResultsUseCase, GetRoundQualifyingUseCase,
+     GetCircuitTopSpeedUseCase, GetCircuitMostWinsUseCase,
+     GetRoundPodiumUseCase}.kt
+  ui/theme/{Color,Theme,Type}.kt   # [BUILT] dark-only M3 theme
+  feature/
+    homepage/{HomepageScreen,HomepageViewModel,HomepageViewModelFactory}.kt
+    schedule/{ScheduleScreen,ScheduleViewModel,...}.kt
+    leaderboard/{LeaderboardScreen,LeaderboardViewModel,...}.kt
+    myteam/{MyTeamScreen,MyTeamViewModel,...}.kt
+    driver/...
+    team/...
+    round/...
+    circuit/...
+  widget/countdown/
+    CountdownWidget.kt
+    CountdownWorker.kt
+    data/NextRaceCache.kt
+```
+
+### Release, signing & R8 (`[BUILT]` — ticket 15)
+
+- **Output:** release buildType produces a sideload-able APK. No AAB / Play
+  Console.
+- **Signing:** `signingConfigs.register("release")` reads credentials from a
+  git-ignored `keystore.properties` at the repo root; keystore at
+  `~/.android/f1app-release.jks` (PKCS12, RSA-2048).
+- **R8:** `optimization { enable = true }` (AGP 9.x DSL — one flag = R8 code
+  shrinking + optimized resource shrinking + bundled default keep rules) +
+  `android.r8.gradual.support=true` in `gradle.properties`. No app-level
+  keep rules (no reflection; Compose + kotlinx.serialization ship consumer
+  rules). Add `src/<variant>/keepRules/*.keep` only if a release build strips
+  something.
+- **Versioning:** `versionCode 1` / `versionName "1.0.0"`, manual per-release
+  bumps.
+
+### Build floor (`[BUILT]`)
+
+- `compileSdk = release(37)`, `targetSdk = 37` (bumped for AndroidX deps pulled
+  by the Compose BOM 2026.06.01 / Kotlin 2.4.10). `minSdk = 24`.
+- Don't re-declare `androidTestImplementation(platform(compose-bom))` — the
+  `implementation(platform(...))` constraint propagates to androidTest via AGP
+  inheritance.
+
+## Testing Decisions
+
+One guiding principle: test external behavior, not implementation details.
+Reuse existing seams; the fewer, the better. Three seams in the initial
+cut, two deferred until the UI stabilizes.
+
+**Initial cut (JVM unit, `:app` `src/test/`):**
+
+1. **Pure-mapping logic** — highest leverage, lowest cost. `Season` aggregates
+   (`completedGp` / `totalKm` / `totalLaps` / `progressPercent`) on fixture
+   DTOs, including the `circuitLength` digit-strip edge case. DTO→model
+   mappers in the use cases. `Outcome<T>` sealed-type transitions.
+2. **ViewModels** — init-less `Flow.onStart { load() } +
+   stateIn(WhileSubscribed(5_000))` loading → success/failure transitions;
+   section-level independence on Homepage; Ktor `MockEngine` stubs on the
+   `F1Api.kt` extensions for 200 / 4xx / 5xx / empty-body.
+3. **Widget state reducer** — the `CountdownWidget` render-time state
+   computation (countdown / LIVE NOW / RACE COMPLETE / off-season / no-cache)
+   as a pure function. Test the reducer, not Glance rendering.
+
+**Deferred until Homepage + theme stabilize** — `src/androidTest/` is
+reserved for them:
+
+4. Compose UI screen smokes (`Homepage`, `Schedule`, `Leaderboard`, `My
+   Team`, `DriverDetail`, `TeamDetail`, `RoundDetail`, `CircuitDetail`) via
+   `androidx.compose.ui:ui-test-junit4`.
+5. Theme token screenshot tests (`Circuits.forId`, `Tyres.Soft` +
+   `Tyres.SoftBg` pairing).
+
+**Libraries:** `kotlin.test` + JUnit4 (Android default, no new catalog entry)
++ `ktor-client-mock` (transitively present via CIO). No Mockito/MockK — the
+`Wiring` + function-reference use case seam makes hand-written fakes cheaper.
+
+**Module & invariants:** Tests live in `:app` — no `:testing` module (no
+second module to share with yet). Tests for `f1/` are JVM-only — the
+domain-purity invariant applies to tests too (no `android.*` imports), so
+they port to a future KMP `:shared`.
+
+## Out of Scope
+
+- **Feeders (F2 / F3 / F1 Academy)** — no free API.
+- **News + collaborator content screens** (BoxBoxClub, F1StatsGuru,
+  FormulaAddict, FormulaAerodynamics, FormulaDataAnalysis, FormulaNeon,
+  FormulaPlanet, TrackLimits) — served via Firebase Remote Config, no free
+  API.
+- **Firebase Remote Config** as a data source — only the dropped screens /
+  feeders used it.
+- **7 secondary widget types** (Schedule, Drivers Standings, Team Standings,
+  Champion, Season Progress, Favourite Driver, Favourite Team) — user chose
+  Countdown widget only.
+- **Driver Comparison screen** — dropped.
+- **Driver Timeline Graph widget** — dropped (most call-heavy; per-round
+  result fan-out).
+- **Telemetry (RPM / speed / DRS), per-lap times, pit stops** — OpenF1 /
+  jolpica-only data not needed by any in-scope screen or widget.
+- **Weather + race-control flags** enrichments — out of scope for v1
+  (live-window only; graduate as a fresh ticket).
+- **App Links / `autoVerify`** — no public web domain; custom scheme only.
+- **AAB / Play Console upload / store listing** — sideload APK only.
+- **CI/CD pipeline** — separate from the first local signed build.
+- **Cloud sync of favorites** — local DataStore only.
+- **Star / pin on Driver / Team detail** — rejected; My Team is the pick
+  surface.
+- **End-to-end tests hitting live APIs** — manual smoke only; no free-API
+  rate budget for CI.
+- **Historical weather / past race-control** — live window only on first cut.
+- **All-time OpenF1 top-speed scan** — parked; "Top speed" label ships as
+  latest Qualifying peak only.
+- **OpenF1 cache layer** — accepted uncached; revisit only if latency
+  becomes a measured complaint.
+
+## Further Notes
+
+### Two open questions (fog, deliberately not fake-locked)
+
+These are in-scope decisions that the wayfinder map flagged as **not yet
+specifiable** — sharpening either prematurely into the spec would manufacture
+a decision that has no basis yet. Both affect build sequencing.
+
+1. **v1 / MVP slice.** This spec describes the full app, but there's no
+   decision yet on what lands in a first release candidate vs. what stays a
+   follow-up. It interacts with the favorites picker (now closed — favorites
+   are in v1) and the release pipeline (closed — signed APK is the output).
+   The build implementer should treat this as the first cut-line question
+   when picking what to build first; a follow-up wayfinder ticket is the right
+   place to lock it once concrete screens exist to slice against.
+2. **Error / empty / loading UX pattern.** Surfaces implicitly by every
+   screen; never grilled as a cross-cutting decision. Either a shared
+   `Outcome`-driven composable family, or per-screen ad-hoc. Decide at the
+   first screen implementing the pattern — picking the wrong shape first
+   forces a later refactor across every screen; picking ad-hoc and seeing the
+   duplication emerge is the cheapest signal. This is the one decision the
+   spec intentionally leaves to the build implementer's judgement rather
+   than locking.
+
+### Design reference
+
+boxbox-club (dark-first F1 design tokens) is the design reference, not a
+parity target — the app leans on it for tokens and shape, not a faithful
+re-skin of every surface. The full design tokens, per-screen data mapping,
+and widget dimensioning live outside the repo in the developer's Downloads,
+but their conclusions have been folded into this spec and the referenced
+Lode entries; the spec does not depend on the Downloads copies persisting.
+
+### Ponytail / BSSN standing preference
+
+Simplest system that works, no speculative abstraction. Look before writing
+— reuse a sibling helper before reimplementing. Items marked `ponytail:`
+throughout this spec are deliberate simplifications with a named ceiling and
+upgrade path; revisit only when the ceiling materializes.
+
+### Standing "free API or not built" rule
+
+"If not covered by a free API, it's not built." This is the user's rule about
+*features* (feeders, news, collaborator screens — all out). Enrichments
+(headshots, weather) are a separate question, decided above: headshots + team
+imagery in; weather + flags out for v1.
+
+### Build sequence signal
+
+Theme (ticket 02) and release pipeline (ticket 15) are the only design
+decisions already shipped as code. The rest — architecture, data layer, nav,
+widget, enrichments, testing scope — are design-locked contracts the build
+works toward. Build proceeds down the dependency chain: Architecture → Data
+layer → API client → Navigation → Widget tech → Countdown specifics →
+Research-backed stats → Favorites picker → Enrichments → Testing.
