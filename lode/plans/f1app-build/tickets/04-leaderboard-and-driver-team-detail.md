@@ -15,6 +15,8 @@ owner: ""
 
 **Status:** ready-for-agent
 
+## Done when
+
 - [ ] `Leaderboard` tab renders driver standings + constructor standings (wins, points); rows drill to `DriverDetail`/`TeamDetail`
 - [ ] `GetDriverDetailUseCase(id)` joins `/current/drivers` + `/drivers-championship`; `DriverDetail` shows team, number, standings snapshot; headshot slot renders swatch fallback (imagery in 08)
 - [ ] `GetTeamDetailUseCase(id)` joins `/current/teams` + `/constructors-championship`; `TeamDetail` shows wordmark + standings snapshot; car-imagery hero renders swatch fallback (imagery in 08)

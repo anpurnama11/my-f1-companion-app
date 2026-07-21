@@ -149,10 +149,14 @@ URL serves the same car all year.
 - **Driver headshots** — first item on the ticket's list; the
   Cloudinary `common/f1/{year}/{team}/{driverRef}/` tree is a
   fallback only when OpenF1 `headshot_url` is null.
-- **Country flags, circuit images** — already shipped via
-  OpenF1's `meetings.circuit_image` + `country_flag` fields
-  (tickets 03, 04). F1-commissioned assets in the same `fom-website`
-  DAM tree, not Getty content.
+- **Country flags** — available via OpenF1's `country_flag` field
+  (not yet consumed).
+- **Circuit images** — shipped via OpenF1's `meetings.circuit_image`
+  field. Loaded with Coil `AsyncImage` on the Homepage §1 countdown
+  card; `GetCircuitImageUseCase(year, country)` wraps the
+  `/v1/meetings` lookup and reuses the `F1API_TO_OPENF1_COUNTRY`
+  Silverstone fallback. The image is best-effort: missing images
+  render the card without the decorative track layout.
 - **Pre-2023 seasons** — the legacy AEM tree was 2023 onwards.
   Older constructors/years show the team-colour swatch fallback.
 

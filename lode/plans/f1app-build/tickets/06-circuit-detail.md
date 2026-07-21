@@ -15,6 +15,8 @@ owner: ""
 
 **Status:** ready-for-agent
 
+## Done when
+
 - [ ] `GetCircuit(id)` extension on `F1Api.kt` for `/circuits/{circuitId}` metadata; differs from `/current*` shape (`circuitLength` is `Int` here, not `"7004km"` — use as-is)
 - [ ] `GetCircuitMostWinsUseCase(f1apiCircuitId)`: jolpica `GET /circuits/{id}/results/1.json`, client aggregate top driver + top team; 5-entry `F1API_TO_JOLPICA_CIRCUIT` translation
 - [ ] `CircuitDetail` page: metadata + "Top speed" (reuse 02 use case) + most-wins driver/team

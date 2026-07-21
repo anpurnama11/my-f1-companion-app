@@ -15,6 +15,8 @@ owner: ""
 
 **Status:** ready-for-agent
 
+## Done when
+
 - [ ] OpenF1 `/v1/drivers?driver_number=<n>&session_key=<latest>` extension on `F1Api.kt`; in-memory `Map<driverId, String>` headshot cache in `Wiring`
 - [ ] Coil wired into the Compose tree for image load
 - [ ] Headshot fallback chain: OpenF1 `headshot_url` → Cloudinary `common/f1/{year}/{team}/{driverRef}/` portrait → `team_colour` swatch

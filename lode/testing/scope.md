@@ -39,7 +39,10 @@ are speculative).
 
 - **Unit:** `kotlin.test` + JUnit4 (Android default — already in `libs.versions.toml`).
 - **Coroutines:** `kotlinx-coroutines-test` (`runTest`, `TestScope`) — added when
-  the first `StateFlow`/`combine` test lands.
+  the first `StateFlow`/`combine` test lands. ViewModel tests must set
+  `Dispatchers.Main` via `MainCoroutineRule`; `ViewModel.viewModelScope` is
+  hard-wired to Main, and without the rule launches from the test body are
+  posted to the missing Main dispatcher and never run before assertions.
 - **Ktor stubs:** `ktor-client-mock` (`MockEngine`) — added with the first
   Ktor-touching test (ticket 03/04 implementation).
 - **No Mockito/MockK.** The `Wiring` + function-reference use cases make

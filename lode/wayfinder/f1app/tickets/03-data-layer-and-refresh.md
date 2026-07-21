@@ -3,7 +3,7 @@ id: 03
 title: Data layer & widget refresh strategy
 type: grilling
 status: closed
-closed_by: single-source Ktor + HttpCache + one periodic WorkManager job; no Room, no repo class
+closed_by: single-source Ktor + HttpCache + one periodic WorkManager job; DataStore + HttpCache, no repo class
 blocked_by: [01, 04]
 owner: ""
 ---
@@ -14,7 +14,7 @@ Single-source f1api.dev data layer. One `HttpClient` in `Wiring`, Ktor endpoint
 extensions in `f1/data/F1Api.kt`, use cases that compose + map DTO→model. No
 `F1Repository` class. HttpCache + pull-to-refresh for caching. One periodic WorkManager
 job polling `/current/next` for the Countdown widget, writing typed DataStore keys.
-No Room, no WorkManager-for-sync.
+DataStore + HttpCache; WorkManager reserved for widget refresh only.
 
 ### Screens the data layer serves
 
@@ -67,8 +67,8 @@ Schedule, Driver/Team/Round detail each use their own use case(s).
   headers at all (likely — hobby API), confirm at build time and add a default response
   lifetime via plugin config or a thin in-memory TTL. Strategy locked; exact config
   deferred to implementation.
-- No Room, no WorkManager-for-sync (multi-source is additive endpoints on the same
-  `HttpClient`; caching strategy unchanged from ticket 04).
+- DataStore + HttpCache; WorkManager reserved for widget refresh only (multi-source is
+  additive endpoints on the same `HttpClient`; caching strategy unchanged from ticket 04).
 
 ### Widget refresh — one periodic WorkManager job
 

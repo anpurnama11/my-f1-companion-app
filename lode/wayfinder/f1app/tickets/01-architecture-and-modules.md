@@ -11,7 +11,7 @@ resolved_at: 2025-07-15
 ## Resolution
 
 Mirrors the developer's `PokemonDataViewer` project. Single `:app` module. Manual
-`Wiring(context)` DI on a custom `Application` (`app.wiring`) — no Hilt — so the widget
+`Wiring(context)` DI on a custom `Application` (`app.wiring`) so the widget
 shares the same service locator. MVVM with sealed `UiState` + `StateFlow`, states derived
 via `combine` + `stateIn(WhileSubscribed(5_000))`, **init-less** (`Flow.onStart { load() }`).
 UseCase seam between ViewModels and data (function refs). Sealed `Outcome<T>` at `core/`.
@@ -33,7 +33,7 @@ Android-UI-layer and will be rewritten as SwiftUI at port time (inherent to lear
 SwiftUI, not avoided by any present choice).
 
 Room is NOT an architectural tenet — storage choice is deferred to ticket 03. Current
-lean: no Room; Ktor `HttpCache` + long `max-stale` + pull-to-refresh + one DataStore key
+lean: DataStore + Ktor `HttpCache` + long `max-stale` + pull-to-refresh; one DataStore key
 for the widget's cached next-race timestamp.
 
 Lode: [../../architecture/architecture.md](../../architecture/architecture.md),

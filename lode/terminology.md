@@ -17,8 +17,10 @@ Short term → meaning lines. Domain + project language.
   Navigation 3).
 - **Wiring** — manual service-locator class held by the `Application`; exposes use cases
   and the Ktor `HttpClient` to ViewModels and the widget through one instance.
-- **Outcome\<T\>** — sealed result type: `Success(data)`, `Failure(errorMessage)`,
-  `Loading`. Lives at `core/Outcome.kt`.
+- **Outcome\<T\>** — sealed **data-layer** result type returned by use cases: `Success(data)`,
+  `Failure(errorMessage)`, `Loading`. Lives at `core/Outcome.kt`. Stops at the VM: the VM
+  maps each `Outcome` to a [SectionUiState] via `Outcome.toSection()` at the assignment site.
+  Never imported by composables (ADR 0002).
 - **UiState** — sealed per-screen state exposed by each `ViewModel` as a `StateFlow`.
 - **UseCase** — function-reference seam between a `ViewModel` and data; e.g.
   `GetNextRaceUseCase`. ViewModels take them as `useCase::invoke`.
@@ -27,18 +29,8 @@ Short term → meaning lines. Domain + project language.
 - **Domain-purity invariant** — `f1/` (domain + DTOs + repository interface + Ktor API
   extensions) must contain zero `android.*` imports. Enables a future KMP `:shared`
   module to be a move, not a rewrite.
-- **Countdown widget** — home-screen widget ticking down to the next race; the only
-  widget in scope. Built with **Jetpack Glance** (`androidx.glance:appwidget`) — a
-  `GlanceAppWidget` subclass whose `provideGlance` reads `NextRaceCache` and renders
-  `@Composable` content (compiles to `RemoteViews` under the hood). **No live
-  chronometer** (ticket 07): the displayed countdown is recomputed from
-  `NEXT_RACE_START_MILLIS` at each render; states computed render-time from `now` vs
-  the cached race window → countdown / LIVE NOW (circuit accent) / RACE COMPLETE /
-  Season over (off-season, `START_MILLIS == 0L`) / No race data (no cache + sync fail).
-  GP date/time shown device-local below the countdown. Dark `Surface` body + full-bleed
-  ~6dp `Circuits.forId(circuitId)` accent strip. Tapping fires an `ACTION_VIEW`
-  `PendingIntent` to `f1app://round/{year}/{round}` via Glance
-  `clickable(actionStartActivity(intent))` — suppressed in off-season / no-cache.
+- **Countdown widget** — home-screen Glance widget showing countdown to next race.
+  Detail: [widget/countdown.md](widget/countdown.md).
 - **My Team** — 4th top-level NavKey tab (rightmost); the favorites management
   surface. Three slots: 2 favorite drivers + 1 favorite constructor team.
   Tap a filled slot → selection screen/dialog to pick or replace (driver↔team
@@ -46,12 +38,7 @@ Short term → meaning lines. Domain + project language.
   `FavoritesCache` (DataStore, typed keys, mirrors `NextRaceCache`); first-launch
   default seeds #1 constructor + its two drivers. Homepage §1 reads the same
   cache as a compact pager. Added by ticket 12; amends ticket 05's nav from 3→4.
-- **FavoritesCache** — `DataStore<Preferences>` wrapper (mirrors `NextRaceCache`)
-  with typed keys `FAV_DRIVER_1: String`, `FAV_DRIVER_2: String`, `FAV_TEAM: String`,
-  one atomic `edit` block. Written from My Team's picker, read by
-  HomepageViewModel §1 + MyTeamViewModel. No `FAV_*_TS` timestamps unless a
-  most-recent heuristic is later needed. 3rd-pin = explicit user replace, not
-  auto-evict-oldest.
+
 - **Tour/race/round** — an F1 race weekend. "Round" = a numbered race in a season
   (`RoundDetail(year, round)` route). "Next race" = `/current/next` endpoint from f1api.dev.
 - **CircuitDetail** — NavKey route `CircuitDetail(circuitId: String)`, opened from
@@ -62,8 +49,7 @@ Short term → meaning lines. Domain + project language.
 - **Deep link (custom scheme)** — `f1app://round/{year}/{round}` is the only deep link
   in scope. Countdown widget builds a `PendingIntent` over `Intent.ACTION_VIEW` with
   that data (args from `NextRaceCache`); `MainActivity` parses the URI into a `RoundDetail`
-  nav key and pushes it on Homepage as backstack root. Custom scheme only — no App Links /
-  `autoVerify` (single-app, no public web domain to verify against).
+  nav key and pushes it on Homepage as backstack root. Single-app custom scheme.
 - **f1api.dev** — primary free F1 API (schedule, standings, results, circuit metadata,
   pre-joined driver+team). Zero auth.
 - **OpenF1** — free secondary API; `[BUILT ticket 02]` for top speed via
@@ -106,25 +92,10 @@ Short term → meaning lines. Domain + project language.
 - **Tyres** — `object` in `Color.kt`; six Pirelli compounds as text+background pairs
   (Tyres.Soft + Tyres.SoftBg ... Tyres.Wet + Tyres.WetBg, plus Unknown/UnknownBg).
   Always pair the two halves.
-- **F1Api** — `f1/data/F1Api.kt`; holds the `F1API_BASE` + `OPENF1_BASE`
-  consts and the Ktor extensions:
-  `suspend fun HttpClient.getCurrent(forceRefresh)`,
-  `getNextRace(forceRefresh)`,
-  `getDriversChampionship(forceRefresh)`,
-  `getConstructorsChampionship(forceRefresh)`,
-  `getOpenF1Sessions(year, countryName, sessionName)`,
-  `getOpenF1Laps(sessionKey)`. The f1api.dev extensions take a `forceRefresh`
-  flag and add `Cache-Control: no-cache` when true; the OpenF1 extensions
-  don't (no cache to bust). Also holds `F1API_TO_OPENF1_COUNTRY` (1-entry
-  Silverstone fix). `JOLPICA_BASE` and the jolpica extensions land in slice 04
-  (most-wins-at-circuit). Pure Kotlin (satisfies the domain-purity invariant).
-- **HttpClientFactory** — `core/network/HttpClientFactory.kt`; builds the single
-  Ktor `HttpClient` at `F1App` startup with CIO engine, `ContentNegotiation`
-  (`ignoreUnknownKeys = true; coerceInputValues = true`), `HttpCache` with a 10 MB
-  `FileStorage` under `cacheDir/http_cache`, `HttpTimeout` 15s/10s, and
-  `expectSuccess = true` (so 4xx/5xx throw before body deserialization — the use
-  case's 4xx/5xx catch branches depend on it). Held by `Wiring`; one client per
-  process, shared by the widget when it lands.
+- **F1Api** — Ktor endpoint extensions and base URL constants for f1api.dev, OpenF1,
+  and jolpica. Detail: [core/network.md](core/network.md).
+- **HttpClientFactory** — builds the shared Ktor `HttpClient` used by all use cases
+  and the widget. Detail: [core/network.md](core/network.md).
 - **Route** — sealed `NavKey` hierarchy in `core/navigation/Routes.kt`. The 4
   top-level tabs are `data object`s (`Homepage`, `Schedule`, `Leaderboard`, `MyTeam`).
   `[BUILT ticket 02]` `data class CircuitDetail(circuitId: String)` — the
@@ -138,26 +109,32 @@ Short term → meaning lines. Domain + project language.
   tab clears the back stack and pushes the new top-level route; the system back
   gesture pops one level. Only `Homepage` renders real content this slice; the
   other three are placeholder `Text("… coming soon")` composables.
-- **OutcomeContent** — `core/ui/OutcomeContent.kt`; the shared `Outcome<T>` →
-  composable family (Loading / Failure-with-retry / Success). Pinned for open
+- **SectionUiState\<T\>** — the **VM→UI transport** for a screen section: `Loading`,
+  `Error(message)`, `Content(data)`. Lives at `core/ui/SectionUiState.kt`. Named for screen
+  vocabulary (Content/Error), not operation vocabulary (Success/Failure). Each independently-failing
+  section atom on `HomepageViewModel.UiState.Sections` is a `SectionUiState<T>`. Rendered by the
+  shared `OutcomeContent` family. Outcome maps to this at the VM seam via `Outcome.toSection()`;
+  composables never import `Outcome` (ADR 0002).
+- **OutcomeContent** — `core/ui/OutcomeContent.kt`; the shared `SectionUiState<T>` →
+  composable family (Loading spinner / Error-with-retry / Content). Pinned for open
   question #2 — every later screen reuses this shape, no per-screen ad-hoc
   loading/error rendering. The retry button is suppressed when `onRetry == null`
   (read-only surfaces).
-- **NextRaceCache** — `widget/countdown/data/NextRaceCache.kt`; wraps a
-  `DataStore<Preferences>` with typed keys (`NEXT_RACE_START_MILLIS: Long`,
-  `NEXT_RACE_NAME: String`, `NEXT_RACE_CIRCUIT: String`, `NEXT_RACE_ROUND: Int`,
-  `NEXT_RACE_SEASON: Int`, plus the full session schedule for "closest event"
-  countdown). `CountdownWorker` will write, `CountdownWidget` will read, same instance via
-  `Wiring`. One atomic `edit` block — no serialized JSON blob.
-- **CountdownWorker** — periodic `CoroutineWorker` **(planned, not yet created)**; (15-min WorkManager floor,
-  `NETWORK_TYPE_CONNECTED` constraint, exponential backoff, failure leaves cached
-  value) polling `/current/next` via `GetNextRaceUseCase`. **Adaptive cadence**
-  (ticket 07): inside the cached race window `[FP1_start, race_start + 3h]` it
-  fetches every tick; outside, a gate in `doWork` fetches only when cache age
-  ≥ 60 min (effectively hourly between weekends). One `PeriodicWorkRequest`, no
-  second spec. Calls `CountdownWidget().updateAll(context)` after a successful
-  cache write.
+- **NextRaceCache** — `DataStore<Preferences>` cache for next-race data, read by the
+  Countdown widget and written by CountdownWorker. Detail: [widget/countdown.md](widget/countdown.md).
+- **CountdownWorker** — periodic WorkManager worker that polls next race and updates
+  NextRaceCache. Detail: [widget/countdown.md](widget/countdown.md).
 - **Season aggregates** — will be computed client-side in `GetSeasonUseCase` from
   `/current` (full schedule): completedGp (count `winner != null`), totalKm (sum
   `circuit.circuitLength` digits), totalLaps (sum `laps`), progressPercent. Exposed
   on the `Season` model so ViewModels don't recompute.
+- **SessionTime** — `[BUILT]` `f1/model/RaceWeekend.kt`; a single session of a
+  race weekend (FP1, FP2, FP3, Sprint Quali, Sprint, Quali, Race). Fields:
+  `label` (long form "Practice 1"), `shortLabel` (chip form "FP1"),
+  `start: kotlinx.datetime.Instant` (UTC). Driven by the OpenF1 `date_start`
+  ISO-8601 string. Drives the Homepage §1 countdown card.
+- **WeekendSchedule** — `[BUILT]` `f1/model/RaceWeekend.kt`; the full list of
+  weekend sessions, sorted ascending by `start`. Exposes `nextUpcoming(now:
+  Instant): SessionTime?` — the earliest session whose start is still in
+  the future (or `null` once the whole weekend has started). Drives the
+  §1 countdown card; `null` schedule renders the empty state.

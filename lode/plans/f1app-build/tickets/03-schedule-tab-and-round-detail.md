@@ -15,6 +15,8 @@ owner: ""
 
 **Status:** ready-for-agent
 
+## Done when
+
 - [ ] `Schedule` tab renders upcoming rounds with session times + past rounds with P1/P2/P3 podium
 - [ ] `GetRoundResultsUseCase` over `/{year}/{round}/race` (object-with-results envelope; results `position` kept String; `time` kept String un-parsed)
 - [ ] `GetRoundQualifyingUseCase` over `/{year}/{round}/qualy`

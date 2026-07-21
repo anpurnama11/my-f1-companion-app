@@ -101,8 +101,8 @@ a custom-scheme deep link into the round detail.
   a `git mv` of `f1/`, not a refactor — guarded by the domain-purity invariant
   below, not by premature module extraction.
 - **Manual `Wiring(context)` service locator** held by a custom `Application`
-  subclass (`app.wiring`). No Hilt. The widget shares the same instance —
-  one service locator across entry points.
+  subclass (`app.wiring`). The widget shares the same instance — one manual
+  service locator across entry points.
 - **MVVM:** `ViewModel` + sealed `UiState` + `StateFlow`. State derived via
   `combine` of small `MutableStateFlow` atoms + `stateIn(WhileSubscribed(5_000))`.
 - **Init-less loading:** first load fires from `Flow.onStart { load() }`, not
@@ -233,8 +233,8 @@ model so ViewModels don't recompute.
   `HttpClient`. Two cache policies by request flag.
 - **Offline cold launch:** `max-stale` tolerance for f1api.dev + jolpica;
   OpenF1 has no stale layer (fails to network error offline).
-- No Room, no WorkManager-for-sync. Multi-source is additive endpoints on the
-  same client; the caching strategy is unchanged.
+- DataStore + HttpCache; WorkManager reserved for widget refresh only.
+  Multi-source is additive endpoints on the same client; the caching strategy is unchanged.
 
 ### Persistence (DataStore)
 
@@ -291,8 +291,7 @@ flowchart LR
   `RoundDetail` nav key onto Homepage as the backstack root (`[Homepage,
   RoundDetail]`; back from `RoundDetail` lands on Homepage, not exit). No
   config activity.
-- Custom scheme only — no App Links / `autoVerify` (no public web domain to
-  verify against).
+- Single-app custom scheme (no public web domain for App Links verification).
 - **Suppressed** in off-season (`NEXT_RACE_START_MILLIS == 0L`) and no-cache
   states — no valid round to open.
 

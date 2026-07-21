@@ -15,6 +15,8 @@ owner: ""
 
 **Status:** ready-for-agent
 
+## Done when
+
 - [ ] `NextRaceCache` DataStore (typed keys incl. full session schedule for the race window); worker writes, widget reads, same `Wiring` instance
 - [ ] `CountdownWorker`: `PeriodicWorkRequest`, 15-min floor, `NETWORK_TYPE_CONNECTED`, exponential backoff; adaptive `FP1_start → race_start+3h` fetch-every-tick vs ≥60-min cache-age gate
 - [ ] Fetch failure leaves cached value; success → `CountdownWidget().updateAll(context)`

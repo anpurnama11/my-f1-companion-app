@@ -15,6 +15,8 @@ owner: ""
 
 **Status:** ready-for-agent
 
+## Done when
+
 - [ ] `MyTeam` tab renders 3 slots (2 drivers + 1 team) from `FavoritesCache`
 - [ ] Tap filled slot → `ModalBottomSheet` picker listing drivers/teams (variant A); pick or replace
 - [ ] Driver↔team decoupled; driver `id` unique across the two driver slots; team `id` unique in team slot; 3rd-pin = explicit replace (no auto-evict-oldest)

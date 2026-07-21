@@ -46,14 +46,15 @@ The map is done when every decision a build session needs is locked.
 - [Data layer & widget refresh](tickets/03-data-layer-and-refresh.md) — no `F1Repository`
   class; `f1/data/F1Api.kt` = Ktor endpoint extensions; 8 screen-driven use cases;
   HttpCache + `NO_CACHE` pull-to-refresh; 1 periodic `CountdownWorker` → typed
-  DataStore keys in `NextRaceCache`. No Room, no WorkManager-for-sync.
+  DataStore keys in `NextRaceCache`. DataStore + HttpCache; WorkManager reserved for
+  widget refresh only.
 - [API client & enrichment scope](tickets/04-api-client-and-enrichment-scope.md) —
   multi-source on one `HttpClient` with per-request base URLs: f1api.dev primary,
   OpenF1 for top speed, jolpica for most-wins; no per-source package. Headshot/weather/
   flags enrichment parked to ticket 13.
 - [Navigation & deep links](tickets/05-navigation-and-deep-links.md) — 7 flat `NavKey`
   routes (Homepage/Schedule/Leaderboard start + Driver/Team/Round/Circuit detail);
-  widget deep-links `f1app://round/{year}/{round}` via custom scheme only (no App Links).
+  widget deep-links `f1app://round/{year}/{round}` via single-app custom scheme.
 - [Widget technology](tickets/06-widget-technology.md) — Jetpack Glance;
   `CountdownWidget` reads `NextRaceCache` via `Wiring`; RemoteViews interop reserved as
   escape hatch only.
@@ -92,9 +93,9 @@ The map is done when every decision a build session needs is locked.
   yet on what lands in a first release candidate vs. what stays a follow-up. The
   favorites picker/UX (open ticket 12) and release/signing (ticket 15) feed that cut.
   Ticket 13 enrichments are locked — headshots + team imagery in, weather + flags out.
-- **Error / empty / loading UX pattern.** Per-screen ad-hoc, or a shared
-  `Outcome`-driven composable family? Surfaced implicitly by every screen, never grilled
-  as a cross-cutting decision.
+- **Error / empty / loading UX pattern.** Resolved: shared `OutcomeContent` family
+  (ADR 0002, `core/ui/OutcomeContent.kt`). Every screen maps `Outcome<T>` to
+  `SectionUiState<T>` at the VM seam; composables never import `Outcome`.
 
 ## Out of scope
 

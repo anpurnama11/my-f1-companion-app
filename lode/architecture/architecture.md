@@ -56,7 +56,8 @@ flowchart TD
   greenlit. The domain-purity invariant makes that a move, not a refactor.
 - **DI:** manual `Wiring(context)` on a custom `Application`, exposed as `app.wiring`.
   ViewModels via `viewModelFactory { initializer { ... } }`. The widget shares the same
-  instance → one service locator, one pattern, no second registry. No Hilt.
+  instance → one service locator, one pattern, no second registry. Manual `Wiring`
+  only.
 - **Architecture:** MVVM. `ViewModel` + sealed `UiState` + `StateFlow`. State derived
   via `combine` of small atoms + `stateIn(WhileSubscribed(5_000))`. **Init-less**:
   first load fires from `Flow.onStart { load() }`, not `init {}`. Re-fires on resume.
@@ -124,7 +125,8 @@ injected logger interface.
 - **Data layer & widget refresh** — **decided (ticket 03 design-locked, not built).** Single-source
   f1api.dev, no `F1Repository` class (`f1/data/F1Api.kt` = Ktor endpoint extensions);
   eight screen-driven use cases compose + map DTO→model; HttpCache + NO_CACHE
-  pull-to-refresh (no Room, no WorkManager-for-sync); one periodic `CountdownWorker`
+  pull-to-refresh (DataStore + HttpCache; WorkManager reserved for widget refresh only);
+  one periodic `CountdownWorker`
   (15-min WorkManager floor, network constraint, failure leaves cached value) →
   `GetNextRaceUseCase` → typed DataStore keys in `NextRaceCache` (no JSON blob).
   Three data gaps not served by f1api.dev parked as research tickets 08/09/10; none
@@ -143,6 +145,6 @@ injected logger interface.
   Countdown widget deep-links to `RoundDetail` via custom scheme
   `f1app://round/{year}/{round}` (`PendingIntent` from `NextRaceCache` args);
   `MainActivity` parses the URI, pushes `RoundDetail` onto Homepage backstack.
-  Custom scheme only — no App Links / `autoVerify`.
+  Single-app custom scheme.
 - **Widget tech** — **decided (ticket 06 closed): Jetpack Glance.** Countdown widget subclasses `GlanceAppWidget`; `provideGlance` reads `NextRaceCache` via `Wiring` and renders `@Composable` content. `CountdownWorker` calls `CountdownWidget().updateAll(context)` after a successful cache write. The deep-link `PendingIntent` (ticket 05) attaches via Glance `clickable(actionStartActivity(intent))` over `Intent.ACTION_VIEW` with `f1app://round/{year}/{round}`. Colors imported directly from `ui/theme/Color.kt` (`Surface`/`OnSurface`/`Circuits.forId`) — Glance does not consume Compose `MaterialTheme`. `AndroidRemoteViews` interop is the escape hatch if a Glance API gap is hit at build time. RemoteViews is not the choice.
 - **Countdown specifics** (1s tick, live/finished display) — ticket 07.

@@ -56,8 +56,8 @@ flowchart LR
   seeds `[Homepage, RoundDetail]`; back from `RoundDetail` lands on Homepage,
   not on exit. A warm-launch deep link pushes `RoundDetail` onto the existing
   root.
-- **Scope:** custom scheme only — no App Links / `autoVerify` (no web domain
-  to verify against; this is a single-app deep link, not a public URL).
+- **Scope:** single-app custom scheme (no public web domain for App Links
+  verification).
 
 ### Nav graph wiring
 
@@ -83,9 +83,8 @@ flowchart LR
   stats a home without inventing a nav-graph rewrite. `getCircuit(id)` was
   already specified as an extension on `F1Api.kt` in ticket 03 with "no use
   case until a standalone screen" — this is that screen.
-- Custom scheme (no App Links) because the deep link is single-app only;
-  adding `autoVerify` + a `.well-known` file would be ceremony for no public
-  entry point.
+- Single-app custom scheme; adding `autoVerify` + a `.well-known` file would
+  be ceremony without a public web entry point.
 
 ## Out of scope (parking)
 

@@ -12,12 +12,15 @@ lode/
     architecture.md                  # module, DI, layers, tech choices (ticket 01) [BUILT]
   core/
     navigation.md                    # Navigation 3 4-tab shell shape (ticket 01) [BUILT]
+    network.md                       # Ktor HttpClient factory + F1Api extensions
   design-system/
     theme.md                         # dark-only M3 theme + Circuits/Tyres/Shapes/Spacing (ticket 02)
   testing/
     scope.md                         # testing scope + libs + placement + KMP portability rule (ticket 14)
   decisions/
     0001-openf1-qualydate-not-racedate.md  # OpenF1 join uses qualyDate, not raceDate (correction of ticket 11 research)
+    0002-sectionuistate-is-vm-to-ui-transport.md  # SectionUiState is VM→UI transport; Outcome stops at the VM
+    0003-derived-sections-load-after-nextrace.md  # Derived sections load after loadNextRace(); no reactive observer
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # ready — Foundation + Homepage §2 (pins UX family)
@@ -31,6 +34,8 @@ lode/
       09-testing-cut.md                         # ready — blocked by 02,07
   release/
     build-and-signing.md           # release buildType, signing, R8 (AGP 9 DSL), versioning, output (ticket 15)
+  widget/
+    countdown.md                   # CountdownWidget, CountdownWorker, NextRaceCache
   wayfinder/
     f1app/
       map.md                         # destination spec + scope + fog patches
@@ -39,7 +44,7 @@ lode/
       tickets/
         01-architecture-and-modules.md   # closed (single :app, Wiring DI, MVVM init-less, Nav3, Ktor/CIO)
         02-design-system-theme.md        # closed (dark-only M3 theme; also the only ticket shipped as code)
-        03-data-layer-and-refresh.md     # closed (f1api.dev primary, HttpCache, 1 CountdownWorker; no Room)
+        03-data-layer-and-refresh.md     # closed (f1api.dev primary, HttpCache, 1 CountdownWorker; DataStore + HttpCache)
         04-api-client-and-enrichment-scope.md  # closed (multi-source: f1api.dev + OpenF1 + jolpica on one HttpClient)
         05-navigation-and-deep-links.md  # closed (Navigation 3 × 7 routes, f1app:// custom-scheme deep link to RoundDetail)
         06-widget-technology.md          # closed (Glance; RemoteViews interop as escape hatch)
