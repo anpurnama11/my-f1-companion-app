@@ -1,18 +1,25 @@
 package com.anpurnama.f1_app.feature.homepage
 
 import com.anpurnama.f1_app.core.Outcome
+import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.feature.favorites.Favorites
 import com.anpurnama.f1_app.f1.model.ConstructorStanding
 import com.anpurnama.f1_app.f1.model.DriverStanding
 import com.anpurnama.f1_app.f1.model.NextRace
 import com.anpurnama.f1_app.f1.model.Season
+import com.anpurnama.f1_app.f1.model.WeekendSchedule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import com.anpurnama.f1_app.test.MainCoroutineRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -32,6 +39,9 @@ import org.junit.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomepageViewModelTest {
+
+    @get:Rule
+    val mainRule = MainCoroutineRule()
 
     private val SEASON = Season(
         year = 2026,
@@ -85,41 +95,70 @@ class HomepageViewModelTest {
     private fun fakeVm(
         getSeason: suspend (Boolean) -> Outcome<Season> = { Outcome.Success(SEASON) },
         getNextRace: suspend (Boolean) -> Outcome<NextRace?> = { Outcome.Success(NEXT_RACE) },
+        getRaceWeekend: suspend (Int, String) -> Outcome<WeekendSchedule?> = { _, _ -> Outcome.Success(null) },
         getDrivers: suspend (Boolean) -> Outcome<List<DriverStanding>> = { Outcome.Success(TOP_DRIVERS) },
         getConstructors: suspend (Boolean) -> Outcome<List<ConstructorStanding>> = { Outcome.Success(listOf(TOP_TEAM)) },
         getTopSpeed: suspend (String, String, Int, String) -> Outcome<com.anpurnama.f1_app.f1.model.TopSpeed?> = { _, _, _, _ -> Outcome.Success(null) },
+        getCircuitImage: suspend (Int, String) -> Outcome<String?> = { _, _ -> Outcome.Success(null) },
     ) = HomepageViewModel(
         getSeason = getSeason,
         getNextRace = getNextRace,
+        getRaceWeekendSchedule = getRaceWeekend,
         getDriversStandings = getDrivers,
         getConstructorsStandings = getConstructors,
         getCircuitTopSpeed = getTopSpeed,
+        getCircuitImage = getCircuitImage,
         favoritesFlow = flowOf(Favorites(null, null, null)),
         seedIfEmpty = { _, _ -> },
     )
+
+    /**
+     * Starts collecting [vm.uiState] and waits for the init-less warmUp
+     * sequence to finish. Keeping a collector active prevents
+     * [SharingStarted.WhileSubscribed] from tearing down the upstream
+     * while the test asserts the final state.
+     */
+    private suspend fun TestScope.startCollecting(vm: HomepageViewModel): Job {
+        val job = backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.take(2).toList()
+        testScheduler.advanceUntilIdle()
+        return job
+    }
 
     @Test
     fun `first collector sees Loading then Success when every use case resolves`() = runTest {
         val vm = fakeVm()
 
-        // take(2) = initialValue (Loading) + first post-load emission.
-        val states = vm.uiState.take(2).toList()
+        // The first value is the Loading sentinel; keep a collector active
+        // so warmUp() runs to completion, then assert the final state.
+        val collectJob = startCollecting(vm)
+        val sections = vm.uiState.value as HomepageViewModel.UiState.Sections
+        collectJob.cancel()
 
-        assertTrue(states[0] is HomepageViewModel.UiState.Sections)
-        val sections = states[1] as HomepageViewModel.UiState.Sections
-        assertTrue(sections.season is Outcome.Success)
-        assertEquals(2026, (sections.season as Outcome.Success).data.year)
+        assertTrue(sections.season is SectionUiState.Content)
+        assertEquals(2026, (sections.season as SectionUiState.Content).data.year)
         assertEquals(1, sections.season.data.completedGp)
-        assertTrue(sections.drivers is Outcome.Success)
-        assertTrue(sections.constructors is Outcome.Success)
-        assertTrue(sections.nextRace is Outcome.Success)
+        assertTrue(sections.drivers is SectionUiState.Content)
+        assertTrue(sections.constructors is SectionUiState.Content)
+        assertTrue(sections.nextRace is SectionUiState.Content)
         // §3 top speed must load on first open (warmUp fires every use
         // case on first subscription, not just on refresh). The Hungaroring
         // next race has Hungary/Hungary + qualyDate=2026-07-25 so the fake
         // use case resolves.
         assertTrue(
             "topSpeed should be loaded on first open, not stuck on Loading",
-            sections.topSpeed is Outcome.Success,
+            sections.topSpeed is SectionUiState.Content,
+        )
+        // §1 weekend schedule must also load on first open — the fake
+        // returns Success(null) (no schedule on the fakes), proving the
+        // use case fired from warmUp, not just from refresh.
+        assertTrue(
+            "weekendSchedule should be loaded on first open, not stuck on Loading",
+            sections.weekendSchedule is SectionUiState.Content,
+        )
+        assertTrue(
+            "circuitImage should be loaded on first open, not stuck on Loading",
+            sections.circuitImage is SectionUiState.Content,
         )
     }
 
@@ -127,10 +166,12 @@ class HomepageViewModelTest {
     fun `first collector sees Loading then Failure when the season use case fails`() = runTest {
         val vm = fakeVm(getSeason = { Outcome.Failure("boom") })
 
-        val states = vm.uiState.take(2).toList()
-        val sections = states[1] as HomepageViewModel.UiState.Sections
-        assertTrue(sections.season is Outcome.Failure)
-        assertEquals("boom", (sections.season as Outcome.Failure).errorMessage)
+        val collectJob = startCollecting(vm)
+        val sections = vm.uiState.value as HomepageViewModel.UiState.Sections
+        collectJob.cancel()
+
+        assertTrue(sections.season is SectionUiState.Error)
+        assertEquals("boom", (sections.season as SectionUiState.Error).message)
     }
 
     @Test
@@ -140,10 +181,17 @@ class HomepageViewModelTest {
             getSeason = { _ -> callCount++; Outcome.Success(SEASON) }
         )
 
-        // First subscription: triggers warmUp() → load. take(2) gets Loading + Success.
-        val firstStates = vm.uiState.take(2).toList()
-        val sections = firstStates[1] as HomepageViewModel.UiState.Sections
-        assertTrue(sections.season is Outcome.Success)
+        // First subscription: triggers warmUp() → load.
+        val collectJob1 = startCollecting(vm)
+        assertTrue(vm.uiState.value is HomepageViewModel.UiState.Sections)
         assertEquals(1, callCount)
+        collectJob1.cancel()
+
+        // Second subscription within the WhileSubscribed timeout should
+        // reuse the cached state without calling the use case again.
+        val collectJob2 = backgroundScope.launch { vm.uiState.collect {} }
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, callCount)
+        collectJob2.cancel()
     }
 }

@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.anpurnama.f1_app.core.network.HttpClientFactory
 import com.anpurnama.f1_app.feature.favorites.FavoritesCache
+import com.anpurnama.f1_app.f1.GetCircuitImageUseCase
 import com.anpurnama.f1_app.f1.GetCircuitTopSpeedUseCase
 import com.anpurnama.f1_app.f1.GetConstructorsStandingsUseCase
 import com.anpurnama.f1_app.f1.GetDriversStandingsUseCase
 import com.anpurnama.f1_app.f1.GetNextRaceUseCase
+import com.anpurnama.f1_app.f1.GetRaceWeekendScheduleUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import io.ktor.client.HttpClient
 import java.io.File
@@ -31,9 +33,11 @@ class Wiring(context: Context) {
 
     val getSeason: GetSeasonUseCase = GetSeasonUseCase(httpClient)
     val getNextRace: GetNextRaceUseCase = GetNextRaceUseCase(httpClient)
+    val getRaceWeekendSchedule: GetRaceWeekendScheduleUseCase = GetRaceWeekendScheduleUseCase(httpClient)
     val getDriversStandings: GetDriversStandingsUseCase = GetDriversStandingsUseCase(httpClient)
     val getConstructorsStandings: GetConstructorsStandingsUseCase = GetConstructorsStandingsUseCase(httpClient)
     val getCircuitTopSpeed: GetCircuitTopSpeedUseCase = GetCircuitTopSpeedUseCase(httpClient)
+    val getCircuitImage: GetCircuitImageUseCase = GetCircuitImageUseCase(httpClient)
 
     val favoritesCache: FavoritesCache = FavoritesCache(
         PreferenceDataStoreFactory.create {

@@ -171,3 +171,15 @@ data class OpenF1LapDto(
     @SerialName("lap_number") val lapNumber: Int = 0,
     @SerialName("st_speed") val stSpeed: Int? = null,
 )
+
+// OpenF1 /v1/meetings — only `circuit_image` is read for the countdown
+// card decorative track layout. `country_flag` rides along for future use.
+@Serializable
+data class OpenF1MeetingDto(
+    @SerialName("meeting_key") val meetingKey: Int = 0,
+    @SerialName("meeting_name") val meetingName: String? = null,
+    @SerialName("country_name") val countryName: String? = null,
+    val year: Int = 0,
+    @SerialName("circuit_image") val circuitImage: String? = null,
+    @SerialName("country_flag") val countryFlag: String? = null,
+)

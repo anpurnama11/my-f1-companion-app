@@ -14,36 +14,35 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.ui.theme.Spacing
 
 /**
- * Shared [Outcome] → composable renderer. Pinned for ticket 01 open
- * question #2 (the error / empty / loading UX family): every later
- * screen reuses this shape, no per-screen ad-hoc rendering.
+ * Shared [SectionUiState] → composable renderer. Pinned for ticket 01 open
+ * question #2 (the error / empty / loading UX family): every later screen
+ * reuses this shape, no per-screen ad-hoc rendering.
  *
- *  - [Outcome.Loading] → centered [CircularProgressIndicator].
- *  - [Outcome.Failure] → error message + optional retry [Button].
- *  - [Outcome.Success] → caller-provided [content] lambda.
+ *  - [SectionUiState.Loading] → centered [CircularProgressIndicator].
+ *  - [SectionUiState.Error]   → error message + optional retry [Button].
+ *  - [SectionUiState.Content] → caller-provided [content] lambda.
  *
  * The retry button only renders when [onRetry] is non-null; screens
  * without a refresh affordance (read-only lists) pass `null`.
  */
 @Composable
 fun <T> OutcomeContent(
-    outcome: Outcome<T>,
+    state: SectionUiState<T>,
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
     content: @Composable (T) -> Unit,
 ) {
-    when (outcome) {
-        is Outcome.Loading -> Box(
+    when (state) {
+        is SectionUiState.Loading -> Box(
             modifier = modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator()
         }
-        is Outcome.Failure -> Box(
+        is SectionUiState.Error -> Box(
             modifier = modifier
                 .fillMaxSize()
                 .padding(Spacing.normal),
@@ -54,7 +53,7 @@ fun <T> OutcomeContent(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = outcome.errorMessage,
+                    text = state.message,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyLarge,
                 )
@@ -66,6 +65,6 @@ fun <T> OutcomeContent(
                 }
             }
         }
-        is Outcome.Success -> content(outcome.data)
+        is SectionUiState.Content -> content(state.data)
     }
 }

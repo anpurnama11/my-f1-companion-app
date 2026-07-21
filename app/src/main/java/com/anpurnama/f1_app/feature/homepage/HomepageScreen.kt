@@ -1,6 +1,8 @@
 package com.anpurnama.f1_app.feature.homepage
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,29 +25,47 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.anpurnama.f1_app.F1App
-import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.core.navigation.Route
 import com.anpurnama.f1_app.core.ui.OutcomeContent
+import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.feature.favorites.Favorites
 import com.anpurnama.f1_app.f1.model.ConstructorStanding
 import com.anpurnama.f1_app.f1.model.DriverStanding
 import com.anpurnama.f1_app.f1.model.NextRace
 import com.anpurnama.f1_app.f1.model.Season
+import com.anpurnama.f1_app.f1.model.SessionTime
 import com.anpurnama.f1_app.f1.model.TopSpeed
+import com.anpurnama.f1_app.f1.model.WeekendSchedule
 import com.anpurnama.f1_app.ui.theme.Circuits
 import com.anpurnama.f1_app.ui.theme.Spacing
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
+
+private val RACE_DURATION = 3.hours
 
 /**
  * Homepage — three sections, each section fails independently.
@@ -69,11 +91,13 @@ fun HomepageScreen(
     // Track which sections are loading for the pull-to-refresh affordance.
     // `favorites` stays Success once the DataStore Flow emits, so it's
     // never in Loading past first read — excluded by design.
-    val anyLoading = sections.season is Outcome.Loading ||
-        sections.nextRace is Outcome.Loading ||
-        sections.drivers is Outcome.Loading ||
-        sections.constructors is Outcome.Loading ||
-        sections.topSpeed is Outcome.Loading
+    val anyLoading = sections.season is SectionUiState.Loading ||
+        sections.nextRace is SectionUiState.Loading ||
+        sections.drivers is SectionUiState.Loading ||
+        sections.constructors is SectionUiState.Loading ||
+        sections.topSpeed is SectionUiState.Loading ||
+        sections.weekendSchedule is SectionUiState.Loading ||
+        sections.circuitImage is SectionUiState.Loading
 
     PullToRefreshBox(
         isRefreshing = anyLoading,
@@ -82,6 +106,7 @@ fun HomepageScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.normal)
                 .padding(top = Spacing.normal),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
@@ -91,6 +116,8 @@ fun HomepageScreen(
                 drivers = sections.drivers,
                 constructors = sections.constructors,
                 nextRace = sections.nextRace,
+                weekendSchedule = sections.weekendSchedule,
+                circuitImage = sections.circuitImage,
             )
             Section2Season(sections.season)
             Section3NearestGp(
@@ -108,35 +135,45 @@ fun HomepageScreen(
 
 @Composable
 private fun Section1FavoritesPager(
-    favorites: Outcome<Favorites>,
-    drivers: Outcome<List<DriverStanding>>,
-    constructors: Outcome<List<ConstructorStanding>>,
-    nextRace: Outcome<NextRace?>,
+    favorites: SectionUiState<Favorites>,
+    drivers: SectionUiState<List<DriverStanding>>,
+    constructors: SectionUiState<List<ConstructorStanding>>,
+    nextRace: SectionUiState<NextRace?>,
+    weekendSchedule: SectionUiState<WeekendSchedule?>,
+    circuitImage: SectionUiState<String?>,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        SectionLabel("Pinned")
         // Pager renders the resolved cards if everything loaded, or the
         // loading state if any upstream is still resolving.
         val cards = buildList {
-            val favs = (favorites as? Outcome.Success)?.data
-            val drv = (drivers as? Outcome.Success)?.data.orEmpty()
-            val con = (constructors as? Outcome.Success)?.data.orEmpty()
-            val next = (nextRace as? Outcome.Success)?.data
+            val favs = (favorites as? SectionUiState.Content)?.data
+            val drv = (drivers as? SectionUiState.Content)?.data.orEmpty()
+            val con = (constructors as? SectionUiState.Content)?.data.orEmpty()
+            val ws = (weekendSchedule as? SectionUiState.Content)?.data
+            val next = (nextRace as? SectionUiState.Content)?.data
             if (favs != null) {
                 favs.driver1Id?.let { id -> drv.firstOrNull { it.driverId == id } }?.let { add(PagerCard.Driver(it)) }
                 favs.driver2Id?.let { id -> drv.firstOrNull { it.driverId == id } }?.let { add(PagerCard.Driver(it)) }
                 favs.teamId?.let { id -> con.firstOrNull { it.teamId == id } }?.let { add(PagerCard.Team(it)) }
             }
-            next?.let { add(PagerCard.Race(it)) }
+            // Countdown card needs the next race (for circuit name + accent)
+            // and the weekend schedule (for the next session + time). Both
+            // resolved = countdown. Only one resolved = show the available
+            // half (race name without countdown, or "Loading\u2026" otherwise).
+            val imageUrl = (circuitImage as? SectionUiState.Content)?.data
+            if (next != null) add(PagerCard.Countdown(next, ws, imageUrl))
         }
         if (cards.isEmpty()) {
             // Initial load (or all upstreams failed) — render the first
             // failure surfaced, or Loading if everything is still in flight.
-            val failureOutcome = when {
-                favorites is Outcome.Failure -> favorites
-                drivers is Outcome.Failure -> drivers
-                constructors is Outcome.Failure -> constructors
-                else -> Outcome.Loading
+            val failureState = when {
+                favorites is SectionUiState.Error -> favorites
+                drivers is SectionUiState.Error -> drivers
+                constructors is SectionUiState.Error -> constructors
+                nextRace is SectionUiState.Error -> nextRace
+                weekendSchedule is SectionUiState.Error -> weekendSchedule
+                circuitImage is SectionUiState.Error -> circuitImage
+                else -> SectionUiState.Loading
             }
             Box(
                 modifier = Modifier
@@ -144,7 +181,7 @@ private fun Section1FavoritesPager(
                     .height(180.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                OutcomeContent(outcome = failureOutcome) {
+                OutcomeContent(state = failureState) {
                     /* nothing — the section just stays empty if no picks */
                 }
             }
@@ -161,7 +198,7 @@ private fun Section1FavoritesPager(
                 when (val card = cards[page]) {
                     is PagerCard.Driver -> DriverCard(card.standing)
                     is PagerCard.Team -> TeamCard(card.standing)
-                    is PagerCard.Race -> NextRaceCard(card.race)
+                    is PagerCard.Countdown -> CountdownCard(card.race, card.schedule, card.circuitImageUrl)
                 }
             }
             // Page-indicator dots (small row of circles).
@@ -193,9 +230,15 @@ private fun Section1FavoritesPager(
 private sealed interface PagerCard {
     data class Driver(val standing: DriverStanding) : PagerCard
     data class Team(val standing: ConstructorStanding) : PagerCard
-    // Named `Race` to avoid shadowing the imported `NextRace` model
-    // (which would otherwise create a recursive type in the field below).
-    data class Race(val race: NextRace) : PagerCard
+    // Pager card for §1's countdown. The `NextRace` carries the circuit
+    // (id + name for the accent strip) and the schedule carries the next
+    // upcoming session + its start instant. Either may be missing.
+    // `circuitImageUrl` is the decorative OpenF1 track-layout image.
+    data class Countdown(
+        val race: NextRace,
+        val schedule: WeekendSchedule?,
+        val circuitImageUrl: String?,
+    ) : PagerCard
 }
 
 @Composable
@@ -285,7 +328,38 @@ private fun TeamCard(standing: ConstructorStanding) {
 }
 
 @Composable
-private fun NextRaceCard(race: NextRace) {
+private fun CountdownCard(
+    race: NextRace,
+    schedule: WeekendSchedule?,
+    circuitImageUrl: String?,
+) {
+    // Tick `now` every 30s so a card the user is reading updates without
+    // waiting for the next state push. `LaunchedEffect(Unit)` keys on
+    // composition entry — the timer restarts on navigate-away/return,
+    // which is fine: the first tick is `Clock.System.now()` immediately.
+    var nowMillis by remember { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30.seconds)
+            nowMillis = Clock.System.now().toEpochMilliseconds()
+        }
+    }
+    val now = Instant.fromEpochMilliseconds(nowMillis)
+
+    // Pick the "next upcoming" session; if none, treat the race as
+    // LIVE only until the race window has passed. Once the race is
+    // over we show a transient "RACE COMPLETE" state instead of
+    // staying stuck on "LIVE" forever.
+    val raceSession = schedule?.sessions?.lastOrNull { it.shortLabel == "RACE" }
+
+    val next: SessionTime? = schedule?.nextUpcoming(now)
+    val live: SessionTime? = next ?: raceSession?.takeIf {
+        now < it.start.plus(RACE_DURATION)
+    }
+    val raceComplete = raceSession?.let {
+        now >= it.start.plus(RACE_DURATION)
+    } ?: false
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -293,47 +367,146 @@ private fun NextRaceCard(race: NextRace) {
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(Spacing.normal),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "Next race",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Column {
-                Text(
-                    text = race.raceName,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "Round ${race.round} · ${race.circuit.name}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (race.raceDate != null) {
-                Text(
-                    text = race.raceDate,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        Box(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(Spacing.normal),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    // Header row: label + session chip.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Next event",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (next != null) {
+                            SessionChip(text = next.shortLabel)
+                        } else if (live != null) {
+                            SessionChip(text = "LIVE", emphasis = true)
+                        } else if (raceComplete) {
+                            SessionChip(text = "RACE COMPLETE")
+                        }
+                    }
+                    // Big countdown (or fallback labels).
+                    Text(
+                        text = when {
+                            next != null -> countdownTo(next.start, now)
+                            live != null -> "LIVE"
+                            raceComplete -> "RACE COMPLETE"
+                            schedule == null -> "…"  // still loading
+                            else -> "—"              // no sessions at all
+                        },
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    // Footer: session name + date/time + GP context.
+                    Column {
+                        val session = next ?: live
+                        val sessionLine = session?.let { "${it.label} · ${formatStart(it.start)}" }
+                        val raceLine = "${race.circuit.country} · Round ${race.round}"
+                        Text(
+                            text = sessionLine ?: raceLine,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (sessionLine != null) {
+                            Text(
+                                text = raceLine,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                if (circuitImageUrl != null) {
+                    AsyncImage(
+                        model = circuitImageUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(start = Spacing.sm)
+                            .width(140.dp)
+                            .height(120.dp),
+                        contentScale = ContentScale.Fit,
+                        colorFilter = ColorFilter.tint(
+                            Circuits.forId(race.circuit.id),
+                            BlendMode.SrcIn,
+                        ),
+                    )
+                }
             }
         }
     }
 }
 
+@Composable
+private fun SessionChip(text: String, emphasis: Boolean = false) {
+    val container = if (emphasis) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.surfaceContainerHighest
+    val content = if (emphasis) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onSurface
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(container)
+            .padding(horizontal = Spacing.sm, vertical = 2.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = content,
+        )
+    }
+}
+
+private fun countdownTo(start: Instant, now: Instant): String {
+    val ms = start.toEpochMilliseconds() - now.toEpochMilliseconds()
+    if (ms <= 0) return "LIVE"
+    val totalMinutes = ms / 60_000
+    val days = totalMinutes / (60 * 24)
+    val hours = (totalMinutes / 60) % 24
+    val minutes = totalMinutes % 60
+    return when {
+        days > 0 -> "${days}d ${hours}h"
+        hours > 0 -> "${hours}h ${minutes}m"
+        else -> "${minutes}m"
+    }
+}
+
+/**
+ * Formats a session start as "EEE HH:mm" in the device's local timezone.
+ * Uses `kotlinx.datetime.toLocalDateTime` for the conversion; the day
+ * name is the enum's `name` first-3-chars (e.g. "MONDAY" -> "MON").
+ *
+ * ponytail: java.time's `DateTimeFormatter` pattern support would be
+ * one line, but it's API 26+ and the project's minSdk is 24 without
+ * core-library desugaring. Three lines of manual `take(3)` + `%02d`
+ * is cheaper than flipping the desugar switch for one screen.
+ */
+private fun formatStart(start: Instant): String {
+    val ldt = start.toLocalDateTime(TimeZone.currentSystemDefault())
+    val dow = ldt.dayOfWeek.name.take(3)
+    return "$dow ${"%02d".format(ldt.hour)}:${"%02d".format(ldt.minute)}"
+}
+
 // ─── §2 Season progress ──────────────────────────────────────────────────
 
 @Composable
-private fun Section2Season(season: Outcome<Season>) {
+private fun Section2Season(season: SectionUiState<Season>) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        SectionLabel("Season")
-        OutcomeContent(outcome = season) { s ->
+        OutcomeContent(state = season) { s ->
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 Text(
                     text = "Season ${s.year}",
@@ -389,13 +562,12 @@ private fun StatCard(label: String, value: String) {
 
 @Composable
 private fun Section3NearestGp(
-    nextRace: Outcome<NextRace?>,
-    topSpeed: Outcome<TopSpeed?>,
+    nextRace: SectionUiState<NextRace?>,
+    topSpeed: SectionUiState<TopSpeed?>,
     onClickCircuit: (circuitId: String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        SectionLabel("Next weekend")
-        OutcomeContent(outcome = nextRace) { race ->
+        OutcomeContent(state = nextRace) { race ->
             if (race == null) {
                 // Off-season.
                 Text(
@@ -417,7 +589,7 @@ private fun Section3NearestGp(
 @Composable
 private fun CircuitCard(
     race: NextRace,
-    topSpeed: Outcome<TopSpeed?>,
+    topSpeed: SectionUiState<TopSpeed?>,
     onClick: () -> Unit,
 ) {
     Card(
@@ -472,7 +644,7 @@ private fun CircuitCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     when (val ts = topSpeed) {
-                        is Outcome.Success -> {
+                        is SectionUiState.Content -> {
                             if (ts.data != null) {
                                 Text(
                                     text = "${ts.data.speedKph} km/h",
@@ -488,14 +660,14 @@ private fun CircuitCard(
                                 Box(modifier = Modifier.height(28.dp))
                             }
                         }
-                        is Outcome.Failure -> {
+                        is SectionUiState.Error -> {
                             Text(
                                 text = "—",
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        is Outcome.Loading -> {
+                        is SectionUiState.Loading -> {
                             Text(
                                 text = "…",
                                 style = MaterialTheme.typography.titleLarge,
@@ -511,15 +683,6 @@ private fun CircuitCard(
 
 // ─── helpers ──────────────────────────────────────────────────────────────
 
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
 /**
  * Composes the [HomepageViewModel] from `Wiring` once, so the screen
  * default param doesn't repeat the `(applicationContext as F1App).wiring`
@@ -533,9 +696,11 @@ private fun rememberHomepageViewModel(): HomepageViewModel {
         factory = homepageViewModelFactory(
             getSeason = wiring.getSeason,
             getNextRace = wiring.getNextRace,
+            getRaceWeekendSchedule = wiring.getRaceWeekendSchedule,
             getDriversStandings = wiring.getDriversStandings,
             getConstructorsStandings = wiring.getConstructorsStandings,
             getCircuitTopSpeed = wiring.getCircuitTopSpeed,
+            getCircuitImage = wiring.getCircuitImage,
             favoritesCache = wiring.favoritesCache,
         )
     )

@@ -84,12 +84,12 @@ suspend fun HttpClient.getConstructorsChampionship(forceRefresh: Boolean = false
 suspend fun HttpClient.getOpenF1Sessions(
     year: Int,
     countryName: String,
-    sessionName: String,
+    sessionName: String? = null,
 ): List<OpenF1SessionDto> {
     val response = get("$OPENF1_BASE/sessions") {
         parameter("year", year)
         parameter("country_name", countryName)
-        parameter("session_name", sessionName)
+        if (sessionName != null) parameter("session_name", sessionName)
     }
     return response.body()
 }
@@ -102,6 +102,22 @@ suspend fun HttpClient.getOpenF1Sessions(
 suspend fun HttpClient.getOpenF1Laps(sessionKey: Int): List<OpenF1LapDto> {
     val response = get("$OPENF1_BASE/laps") {
         parameter("session_key", sessionKey)
+    }
+    return response.body()
+}
+
+/**
+ * OpenF1 meetings filtered by year + country. `GetCircuitImageUseCase`
+ * reads `circuit_image` for the countdown card track-layout image.
+ * Sends no cache headers — OpenF1 is nginx, no CDN.
+ */
+suspend fun HttpClient.getOpenF1Meetings(
+    year: Int,
+    countryName: String,
+): List<OpenF1MeetingDto> {
+    val response = get("$OPENF1_BASE/meetings") {
+        parameter("year", year)
+        parameter("country_name", countryName)
     }
     return response.body()
 }

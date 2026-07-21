@@ -6,18 +6,23 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.anpurnama.f1_app.core.Outcome
+import com.anpurnama.f1_app.core.ui.SectionUiState
+import com.anpurnama.f1_app.core.ui.toSection
 import com.anpurnama.f1_app.feature.favorites.Favorites
 import com.anpurnama.f1_app.feature.favorites.FavoritesCache
+import com.anpurnama.f1_app.f1.GetCircuitImageUseCase
 import com.anpurnama.f1_app.f1.GetCircuitTopSpeedUseCase
 import com.anpurnama.f1_app.f1.GetConstructorsStandingsUseCase
 import com.anpurnama.f1_app.f1.GetDriversStandingsUseCase
 import com.anpurnama.f1_app.f1.GetNextRaceUseCase
+import com.anpurnama.f1_app.f1.GetRaceWeekendScheduleUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import com.anpurnama.f1_app.f1.model.ConstructorStanding
 import com.anpurnama.f1_app.f1.model.DriverStanding
 import com.anpurnama.f1_app.f1.model.NextRace
 import com.anpurnama.f1_app.f1.model.Season
 import com.anpurnama.f1_app.f1.model.TopSpeed
+import com.anpurnama.f1_app.f1.model.WeekendSchedule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,11 +44,13 @@ import kotlinx.coroutines.launch
  *  - §2 season aggregates — `GetSeasonUseCase`.
  *  - §3 nearest GP info — `GetNextRaceUseCase` + `GetCircuitTopSpeedUseCase`.
  *
- * **Section independence:** every section has its own `Outcome` and each
- * use case runs in isolation. A 4xx/5xx on the drivers endpoint does NOT
+ * **Section independence:** every section has its own [SectionUiState] and
+ * each use case runs in isolation. A 4xx/5xx on the drivers endpoint does NOT
  * blank the screen; the drivers section shows the shared `OutcomeContent`
- * failure UI and the other 5 sections stay in their state. No composite
- * "get homepage data" use case.
+ * failure UI and the other sections stay in their state. No composite
+ * "get homepage data" use case. Use cases return [Outcome] (data-layer result);
+ * the VM maps each to [SectionUiState] (UI transport) at the assignment site —
+ * the composable never imports [Outcome].
  *
  * **First-launch seed:** when the favorites cache is empty AND the
  * constructors + drivers standings have loaded, write the #1 constructor
@@ -62,6 +69,7 @@ import kotlinx.coroutines.launch
 class HomepageViewModel(
     private val getSeason: suspend (forceRefresh: Boolean) -> Outcome<Season>,
     private val getNextRace: suspend (forceRefresh: Boolean) -> Outcome<NextRace?>,
+    private val getRaceWeekendSchedule: suspend (year: Int, country: String) -> Outcome<WeekendSchedule?>,
     private val getDriversStandings: suspend (forceRefresh: Boolean) -> Outcome<List<DriverStanding>>,
     private val getConstructorsStandings: suspend (forceRefresh: Boolean) -> Outcome<List<ConstructorStanding>>,
     private val getCircuitTopSpeed: suspend (
@@ -70,59 +78,72 @@ class HomepageViewModel(
         year: Int,
         qualyDate: String,
     ) -> Outcome<TopSpeed?>,
+    private val getCircuitImage: suspend (year: Int, country: String) -> Outcome<String?>,
     private val favoritesFlow: Flow<Favorites>,
     private val seedIfEmpty: suspend (topTeamId: String, topDriverIds: List<String>) -> Unit,
 ) : ViewModel() {
 
     sealed interface UiState {
         /**
-         * Composite of the 5 sections (6 atoms: favorites + 5 use case
-         * outcomes). The screen renders each via the shared
-         * `OutcomeContent` family — section independence is the contract.
+         * Composite of the sections (7 atoms: favorites + 6 use case
+         * states). The screen renders each via the shared `OutcomeContent`
+         * family — section independence is the contract.
          */
         data class Sections(
-            val favorites: Outcome<Favorites>,
-            val season: Outcome<Season>,
-            val nextRace: Outcome<NextRace?>,
-            val drivers: Outcome<List<DriverStanding>>,
-            val constructors: Outcome<List<ConstructorStanding>>,
-            val topSpeed: Outcome<TopSpeed?>,
+            val favorites: SectionUiState<Favorites>,
+            val season: SectionUiState<Season>,
+            val nextRace: SectionUiState<NextRace?>,
+            val drivers: SectionUiState<List<DriverStanding>>,
+            val constructors: SectionUiState<List<ConstructorStanding>>,
+            val topSpeed: SectionUiState<TopSpeed?>,
+            val weekendSchedule: SectionUiState<WeekendSchedule?>,
+            val circuitImage: SectionUiState<String?>,
         ) : UiState
     }
 
-    private val favorites = MutableStateFlow<Outcome<Favorites>>(Outcome.Loading)
-    private val season = MutableStateFlow<Outcome<Season>>(Outcome.Loading)
-    private val nextRace = MutableStateFlow<Outcome<NextRace?>>(Outcome.Loading)
-    private val drivers = MutableStateFlow<Outcome<List<DriverStanding>>>(Outcome.Loading)
-    private val constructors = MutableStateFlow<Outcome<List<ConstructorStanding>>>(Outcome.Loading)
-    private val topSpeed = MutableStateFlow<Outcome<TopSpeed?>>(Outcome.Loading)
+    private val favorites = MutableStateFlow<SectionUiState<Favorites>>(SectionUiState.Loading)
+    private val season = MutableStateFlow<SectionUiState<Season>>(SectionUiState.Loading)
+    private val nextRace = MutableStateFlow<SectionUiState<NextRace?>>(SectionUiState.Loading)
+    private val drivers = MutableStateFlow<SectionUiState<List<DriverStanding>>>(SectionUiState.Loading)
+    private val constructors = MutableStateFlow<SectionUiState<List<ConstructorStanding>>>(SectionUiState.Loading)
+    private val topSpeed = MutableStateFlow<SectionUiState<TopSpeed?>>(SectionUiState.Loading)
+    private val weekendSchedule = MutableStateFlow<SectionUiState<WeekendSchedule?>>(SectionUiState.Loading)
+    private val circuitImage = MutableStateFlow<SectionUiState<String?>>(SectionUiState.Loading)
 
     /**
-     * Intermediate shape for the 5-arg combine. The 6th atom (topSpeed)
-     * folds in via a typed 2-arg combine — no vararg `Array<Any?>` cast.
+     * Intermediate shapes for the 5-arg + 2-arg combine. The 7 atoms
+     * fold in via two typed combines — no vararg `Array<Any?>` cast.
      * `private` so the public `UiState` surface is the only thing callers see.
      */
     private data class Sections5(
-        val favorites: Outcome<Favorites>,
-        val season: Outcome<Season>,
-        val nextRace: Outcome<NextRace?>,
-        val drivers: Outcome<List<DriverStanding>>,
-        val constructors: Outcome<List<ConstructorStanding>>,
+        val favorites: SectionUiState<Favorites>,
+        val season: SectionUiState<Season>,
+        val nextRace: SectionUiState<NextRace?>,
+        val drivers: SectionUiState<List<DriverStanding>>,
+        val constructors: SectionUiState<List<ConstructorStanding>>,
+    )
+
+    private data class Sections2(
+        val topSpeed: SectionUiState<TopSpeed?>,
+        val weekendSchedule: SectionUiState<WeekendSchedule?>,
+        val circuitImage: SectionUiState<String?>,
     )
 
     val uiState: StateFlow<UiState> = combine(
         combine(favorites, season, nextRace, drivers, constructors) { f, s, n, d, c ->
             Sections5(f, s, n, d, c)
         },
-        topSpeed,
-    ) { five, ts ->
+        combine(topSpeed, weekendSchedule, circuitImage) { ts, ws, ci -> Sections2(ts, ws, ci) },
+    ) { five, two ->
         UiState.Sections(
             favorites = five.favorites,
             season = five.season,
             nextRace = five.nextRace,
             drivers = five.drivers,
             constructors = five.constructors,
-            topSpeed = ts,
+            topSpeed = two.topSpeed,
+            weekendSchedule = two.weekendSchedule,
+            circuitImage = two.circuitImage,
         )
     }
         .onStart { warmUp() }
@@ -133,36 +154,39 @@ class HomepageViewModel(
             // something to show. The first real emission arrives when
             // `warmUp()` finishes.
             initialValue = UiState.Sections(
-                favorites = Outcome.Loading,
-                season = Outcome.Loading,
-                nextRace = Outcome.Loading,
-                drivers = Outcome.Loading,
-                constructors = Outcome.Loading,
-                topSpeed = Outcome.Loading,
+                favorites = SectionUiState.Loading,
+                season = SectionUiState.Loading,
+                nextRace = SectionUiState.Loading,
+                drivers = SectionUiState.Loading,
+                constructors = SectionUiState.Loading,
+                topSpeed = SectionUiState.Loading,
+                weekendSchedule = SectionUiState.Loading,
+                circuitImage = SectionUiState.Loading,
             ),
         )
 
     /**
-     * Subscribes to the favorites cache and fires the 5 use case loads.
+     * Subscribes to the favorites cache and fires the use case loads.
      * Each use case writes to its own atom; section independence is
-     * enforced by the per-atom `Outcome` mapping (no composite use case).
+     * enforced by the per-atom [SectionUiState] (no composite use case).
      */
     private fun warmUp() {
         // Reactive favorites read — emits empty on first launch, populated
         // values after the seed runs.
         favoritesFlow
-            .onEach { favorites.value = Outcome.Success(it) }
+            .onEach { favorites.value = SectionUiState.Content(it) }
             .launchIn(viewModelScope)
 
         // One-shot first load (no forceRefresh). Each section is independent;
-        // topSpeed is derived from the next-race atom so it loads AFTER
-        // loadNextRace completes in this coroutine. The seed runs LAST so
-        // the standings atoms are populated when the check fires; it waits
-        // for the first favorites emission to read the current cache state.
+        // topSpeed + weekendSchedule + circuitImage are derived from the
+        // next-race atom so they load AFTER loadNextRace completes. The seed
+        // runs LAST so the standings atoms are populated when the check fires;
+        // it waits for the first favorites emission to read the current cache
+        // state.
         viewModelScope.launch {
             loadSeason(forceRefresh = false)
             loadNextRace(forceRefresh = false)
-            loadTopSpeed(forceRefresh = false)
+            loadRaceDerivedSections(forceRefresh = false)
             loadDrivers(forceRefresh = false)
             loadConstructors(forceRefresh = false)
             seedIfCacheEmpty()
@@ -172,36 +196,61 @@ class HomepageViewModel(
     /**
      * Public pull-to-refresh. Re-fires every use case with
      * `forceRefresh = true` so each adds `Cache-Control: no-cache`. The
-     * top-speed cell refreshes too if a next race is known.
+     * top-speed cell + weekend schedule refresh too if a next race is
+     * known.
      */
     fun refresh() {
         viewModelScope.launch {
             loadSeason(forceRefresh = true)
             loadNextRace(forceRefresh = true)
-            loadTopSpeed(forceRefresh = true)
+            loadRaceDerivedSections(forceRefresh = true)
             loadDrivers(forceRefresh = true)
             loadConstructors(forceRefresh = true)
         }
     }
 
     private suspend fun loadSeason(forceRefresh: Boolean) {
-        season.value = Outcome.Loading
-        season.value = getSeason(forceRefresh)
+        season.value = SectionUiState.Loading
+        season.value = getSeason(forceRefresh).toSection()
     }
 
     private suspend fun loadNextRace(forceRefresh: Boolean) {
-        nextRace.value = Outcome.Loading
-        nextRace.value = getNextRace(forceRefresh)
+        nextRace.value = SectionUiState.Loading
+        nextRace.value = getNextRace(forceRefresh).toSection()
     }
 
     private suspend fun loadDrivers(forceRefresh: Boolean) {
-        drivers.value = Outcome.Loading
-        drivers.value = getDriversStandings(forceRefresh)
+        drivers.value = SectionUiState.Loading
+        drivers.value = getDriversStandings(forceRefresh).toSection()
     }
 
     private suspend fun loadConstructors(forceRefresh: Boolean) {
-        constructors.value = Outcome.Loading
-        constructors.value = getConstructorsStandings(forceRefresh)
+        constructors.value = SectionUiState.Loading
+        constructors.value = getConstructorsStandings(forceRefresh).toSection()
+    }
+
+    /**
+     * Loads the three sections that are derived from the current `nextRace`
+     * atom: top speed, weekend schedule, and circuit image. If the season is
+     * over (next race is `null`), the atoms are cleared to `Content(null)` so
+     * the UI shows an empty state instead of stale data.
+     *
+     * This is called immediately after every `loadNextRace()` — in `warmUp()`
+     * and `refresh()` — which is the only path that writes the `nextRace`
+     * atom. No reactive observer is needed because the atom has no other
+     * writer.
+     */
+    private suspend fun loadRaceDerivedSections(forceRefresh: Boolean) {
+        val next = (nextRace.value as? SectionUiState.Content)?.data
+        if (next == null) {
+            topSpeed.value = SectionUiState.Content(null)
+            weekendSchedule.value = SectionUiState.Content(null)
+            circuitImage.value = SectionUiState.Content(null)
+            return
+        }
+        loadTopSpeed(forceRefresh)
+        loadWeekendSchedule()
+        loadCircuitImage()
     }
 
     /**
@@ -212,12 +261,39 @@ class HomepageViewModel(
      * happy-path read; the use case handles the actual session_key join.
      */
     private suspend fun loadTopSpeed(forceRefresh: Boolean) {
-        val next = (nextRace.value as? Outcome.Success)?.data ?: return
+        val next = (nextRace.value as? SectionUiState.Content)?.data ?: return
         val circuit = next.circuit
         val qualyDate = next.qualyDate ?: next.raceDate ?: return
         val country = circuit.country ?: return
-        topSpeed.value = Outcome.Loading
-        topSpeed.value = getCircuitTopSpeed(circuit.id, country, next.year, qualyDate)
+        topSpeed.value = SectionUiState.Loading
+        topSpeed.value = getCircuitTopSpeed(circuit.id, country, next.year, qualyDate).toSection()
+    }
+
+    /**
+     * Loads §1's race-weekend schedule from the current `nextRace` atom.
+     * Skips for the same reasons `loadTopSpeed` does — no next race, or
+     * the inlined race is missing the (year, country) the OpenF1 lookup
+     * needs. The use case handles the country-divergence fallback
+     * (Silverstone) and the empty-session case (`Success(null)`).
+     */
+    private suspend fun loadWeekendSchedule() {
+        val next = (nextRace.value as? SectionUiState.Content)?.data ?: return
+        val country = next.circuit.country ?: return
+        weekendSchedule.value = SectionUiState.Loading
+        weekendSchedule.value = getRaceWeekendSchedule(next.year, country).toSection()
+    }
+
+    /**
+     * Loads §1's circuit track-layout image from the current `nextRace`
+     * atom. Skips if no next race or the country is missing. The use case
+     * handles the country-divergence fallback and returns `Success(null)`
+     * when OpenF1 has no image for this circuit.
+     */
+    private suspend fun loadCircuitImage() {
+        val next = (nextRace.value as? SectionUiState.Content)?.data ?: return
+        val country = next.circuit.country ?: return
+        circuitImage.value = SectionUiState.Loading
+        circuitImage.value = getCircuitImage(next.year, country).toSection()
     }
 
     /**
@@ -236,8 +312,8 @@ class HomepageViewModel(
     private suspend fun seedIfCacheEmpty() {
         val favs = favoritesFlow.first()
         if (!favs.isEmpty()) return
-        val con = (constructors.value as? Outcome.Success)?.data ?: return
-        val drv = (drivers.value as? Outcome.Success)?.data ?: return
+        val con = (constructors.value as? SectionUiState.Content)?.data ?: return
+        val drv = (drivers.value as? SectionUiState.Content)?.data ?: return
         val topTeamId = con.firstOrNull()?.teamId ?: return
         val topDriverIds = drv.filter { it.teamId == topTeamId }.take(2).map { it.driverId }
         if (topDriverIds.size == 2) {
@@ -255,18 +331,22 @@ class HomepageViewModel(
 fun homepageViewModelFactory(
     getSeason: GetSeasonUseCase,
     getNextRace: GetNextRaceUseCase,
+    getRaceWeekendSchedule: GetRaceWeekendScheduleUseCase,
     getDriversStandings: GetDriversStandingsUseCase,
     getConstructorsStandings: GetConstructorsStandingsUseCase,
     getCircuitTopSpeed: GetCircuitTopSpeedUseCase,
+    getCircuitImage: GetCircuitImageUseCase,
     favoritesCache: FavoritesCache,
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         HomepageViewModel(
             getSeason = getSeason::invoke,
             getNextRace = getNextRace::invoke,
+            getRaceWeekendSchedule = getRaceWeekendSchedule::invoke,
             getDriversStandings = getDriversStandings::invoke,
             getConstructorsStandings = getConstructorsStandings::invoke,
             getCircuitTopSpeed = getCircuitTopSpeed::invoke,
+            getCircuitImage = getCircuitImage::invoke,
             favoritesFlow = favoritesCache.read(),
             seedIfEmpty = favoritesCache::seedIfEmpty,
         )
