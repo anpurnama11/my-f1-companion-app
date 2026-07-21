@@ -80,7 +80,11 @@ flowchart TD
 - **Network:** Ktor Client, **CIO engine** (KMP-safe, ports to every target
   unchanged). `ContentNegotiation` (`kotlinx.serialization` JSON) + `HttpCache` plugin
   (native HTTP response caching — ~10MB file cache, `max-stale` tolerance for offline
-  cold launch, `CacheControl.NO_CACHE` per request for pull-to-refresh). One
+  cold launch, `CacheControl.NO_CACHE` per request for pull-to-refresh).
+  `Logging` plugin at `LogLevel.BODY` (method+URL+headers+body) via a custom `Logger` →
+  `Log.i("F1api", ...)` — Ktor equivalent of OkHttp `HttpLoggingInterceptor.BODY`;
+  `ponytail:` no redaction, fine while every source is public race data, downgrade
+  before wiring an authenticated source. One
   `HttpClient` instance held by `Wiring`; `const val F1API_BASE = "https://f1api.dev/api"`
   in `f1/data/F1Api.kt`, full URLs per request (no default base URL — second source
   adds its own base const later). `ponytail:` fallback flagged in `HttpClientFactory`

@@ -10,7 +10,8 @@ Short term → meaning lines. Domain + project language.
 > wiring) is a **locked design contract** the build works toward; their present-tense
 > phrasing is the spec, not a claim the code exists.
 
-- **F1app** — this app, package `com.anpurnama.f1_app`, Android Compose, dark-first. `[BUILT]` greenfield scaffold + dark-only theme only.
+- **F1app** — this app, package `com.anpurnama.f1_app`, Android Compose, dark-first. `[BUILT]` greenfield scaffold + dark-only theme + foundation slice (ticket 01) + Homepage §1+§3 (ticket 02).
+- **FavoritesCache** — `[BUILT]` `DataStore<Preferences>` wrapper (mirrors `NextRaceCache` in shape, even though not called that way) with typed keys `FAV_DRIVER_1: String`, `FAV_DRIVER_2: String`, `FAV_TEAM: String`, one atomic `edit` block. Written from My Team's picker (later) and from `HomepageViewModel`'s first-launch seed; read by `HomepageViewModel` §1. The `seedIfEmpty(topTeamId, topDriverIds)` is partial-fill safe — it only writes into slots the user hasn't filled yet. `circuitId` translation map (f1api.dev → OpenF1 short name) is **NOT** used (see deviation note in `lode/wayfinder/f1app/tickets/11-...md` — we use the date match on `qualyDate` instead, no translation map needed).
 - **PokeDV** — `PokemonDataViewer`, the developer's prior project; architecture
   reference for F1app (single module, manual Wiring DI, sealed Outcome, MVVM init-less,
   Navigation 3).
@@ -65,16 +66,21 @@ Short term → meaning lines. Domain + project language.
   `autoVerify` (single-app, no public web domain to verify against).
 - **f1api.dev** — primary free F1 API (schedule, standings, results, circuit metadata,
   pre-joined driver+team). Zero auth.
-- **OpenF1** — free secondary API; **design-locked (ticket 04, not yet built)** for top speed via
+- **OpenF1** — free secondary API; `[BUILT ticket 02]` for top speed via
   `/v1/laps` `st_speed` (natively kph), 2023+. Join key is
-  `country_name + year + race-date match` (ticket 11) — `country_name` alone
-  is insufficient for US (3 circuits), Spain (2 circuits 2026+), and Italy
-  (2 circuits 2023–2025); the date match is the unique disambiguator. One
-  country string diverges (`Great Britain` vs `United Kingdom` for
-  Silverstone) → 1-entry `F1API_TO_OPENF1_COUNTRY` fallback map, applied
-  only when literal returns 0. Sends **no cache headers** (nginx, no CDN) →
-  HttpCache skips it; accepted uncached (~0.3s/call). Driver headshots /
-  weather / race-control flags remain parked additive enrichments.
+  `country_name + year + qualyDate match` (ticket 11 + ticket 02 deviation) —
+  the date match is on f1api.dev's `schedule.qualy.date` (Qualifying day), not
+  `schedule.race.date` (race day). Ticket 11 research claimed the date
+  matched race day; live probes during ticket 02 build showed OpenF1's
+  `date_start` is Qualifying day, which is 1 day before the race (or 2 days
+  for sprint weekends). `country_name` alone is insufficient for US (3
+  circuits), Spain (2 circuits 2026+), and Italy (2 circuits 2023–2025);
+  the date match is the unique disambiguator. One country string diverges
+  (`Great Britain` vs `United Kingdom` for Silverstone) → 1-entry
+  `F1API_TO_OPENF1_COUNTRY` fallback map, applied only when literal returns 0.
+  Sends **no cache headers** (nginx, no CDN) → HttpCache skips it; accepted
+  uncached (~0.3s/call). Driver headshots / weather / race-control flags remain
+  parked additive enrichments.
 - **jolpica** — free Ergast-successor API; **design-locked (ticket 04, not yet built)** for all-time
   most-wins-at-circuit via `/circuits/{id}/results/1.json` (1 call, ~25KB,
   client-aggregated top driver + top team). `driverId`/`constructorId` match
@@ -100,11 +106,18 @@ Short term → meaning lines. Domain + project language.
 - **Tyres** — `object` in `Color.kt`; six Pirelli compounds as text+background pairs
   (Tyres.Soft + Tyres.SoftBg ... Tyres.Wet + Tyres.WetBg, plus Unknown/UnknownBg).
   Always pair the two halves.
-- **F1Api** — `f1/data/F1Api.kt`; holds the `F1API_BASE` const +
-  `suspend fun HttpClient.getCurrent(forceRefresh)` (adds `Cache-Control: no-cache`
-  when `forceRefresh`). `JOLPICA_BASE` and `OPENF1_BASE` land here with the
-  jolpica/OpenF1 endpoint extensions in tickets 04/08/09 — not in this slice.
-  Pure Kotlin (satisfies the domain-purity invariant).
+- **F1Api** — `f1/data/F1Api.kt`; holds the `F1API_BASE` + `OPENF1_BASE`
+  consts and the Ktor extensions:
+  `suspend fun HttpClient.getCurrent(forceRefresh)`,
+  `getNextRace(forceRefresh)`,
+  `getDriversChampionship(forceRefresh)`,
+  `getConstructorsChampionship(forceRefresh)`,
+  `getOpenF1Sessions(year, countryName, sessionName)`,
+  `getOpenF1Laps(sessionKey)`. The f1api.dev extensions take a `forceRefresh`
+  flag and add `Cache-Control: no-cache` when true; the OpenF1 extensions
+  don't (no cache to bust). Also holds `F1API_TO_OPENF1_COUNTRY` (1-entry
+  Silverstone fix). `JOLPICA_BASE` and the jolpica extensions land in slice 04
+  (most-wins-at-circuit). Pure Kotlin (satisfies the domain-purity invariant).
 - **HttpClientFactory** — `core/network/HttpClientFactory.kt`; builds the single
   Ktor `HttpClient` at `F1App` startup with CIO engine, `ContentNegotiation`
   (`ignoreUnknownKeys = true; coerceInputValues = true`), `HttpCache` with a 10 MB
@@ -114,7 +127,9 @@ Short term → meaning lines. Domain + project language.
   process, shared by the widget when it lands.
 - **Route** — sealed `NavKey` hierarchy in `core/navigation/Routes.kt`. The 4
   top-level tabs are `data object`s (`Homepage`, `Schedule`, `Leaderboard`, `MyTeam`).
-  Detail routes (`data class`es with `driverId`/`teamId`/`year`+`round`/`circuitId`)
+  `[BUILT ticket 02]` `data class CircuitDetail(circuitId: String)` — the
+  entry exists so §3's tap-target pushes a valid route; the page itself is a
+  placeholder until slice 06 lands. `DriverDetail`/`TeamDetail`/`RoundDetail`
   land with the screens that open them, per ticket 05.
 - **NavShell** — `core/navigation/NavShell.kt`; the 4-tab `Scaffold` +
   `NavigationBar` + `NavDisplay` host. Uses Navigation 3 1.1.4's `NavBackStack` +

@@ -16,10 +16,12 @@ lode/
     theme.md                         # dark-only M3 theme + Circuits/Tyres/Shapes/Spacing (ticket 02)
   testing/
     scope.md                         # testing scope + libs + placement + KMP portability rule (ticket 14)
+  decisions/
+    0001-openf1-qualydate-not-racedate.md  # OpenF1 join uses qualyDate, not raceDate (correction of ticket 11 research)
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # ready — Foundation + Homepage §2 (pins UX family)
-      02-homepage-section-1-and-section-3.md    # ready — blocked by 01
+      02-homepage-section-1-and-section-3.md    # built — Homepage §1 favorites pager + §3 top speed (2027-01-15)
       03-schedule-tab-and-round-detail.md       # ready — blocked by 01
       04-leaderboard-and-driver-team-detail.md  # ready — blocked by 01
       05-my-team-tab-and-favorites-picker.md    # ready — blocked by 02

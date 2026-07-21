@@ -55,6 +55,51 @@ object Circuits {
     val UsaAustin = Color(0xFF27549E)
     val UsaLasVegas = Color(0xFF27549E)
     val UsaMiami = Color(0xFF27549E)
+
+    /**
+     * Neutral brand-accent fallback for any `circuitId` not in the
+     * palette (e.g. a brand-new circuit added mid-season before the
+     * design tokens catch up). A muted neutral beats picking a random
+     * circuit color — that's a worse failure mode (lying about brand
+     * identity). `private` so the only public surface is [forId] — the
+     * fallback isn't a "real" circuit color callers should reference.
+     */
+    private val Neutral = Color(0xFF3A3A3A)
+
+    /**
+     * f1api.dev's `circuitId` is a snake/kebab slug (e.g. "hungaroring",
+     * "usa_austin"). This maps it to the matching brand color; unknown
+     * ids return the neutral fallback so the §3 card always renders.
+     */
+    fun forId(circuitId: String): Color = when (circuitId) {
+        "abudhabi" -> AbuDhabi
+        "albert_park" -> Australia
+        "austin" -> UsaAustin
+        "azerbaijan" -> Azerbaijan
+        "bahrain" -> Bahrain
+        "baku" -> Azerbaijan
+        "catalunya" -> Spain
+        "hungaroring" -> Hungary
+        "imola" -> Italy
+        "interlagos" -> Brazil
+        "jeddah" -> SaudiArabia
+        "lusail" -> Qatar
+        "madring" -> Spain
+        "marina_bay" -> Singapore
+        "miami" -> UsaMiami
+        "monaco" -> Monaco
+        "montmelo" -> Spain
+        "monza" -> Italy
+        "redbullring" -> Austria
+        "shanghai" -> China
+        "silverstone" -> Uk
+        "spa" -> Belgium
+        "suzuka" -> Japan
+        "vegas" -> UsaLasVegas
+        "yasmarina" -> AbuDhabi
+        "zandvoort" -> Netherlands
+        else -> Neutral
+    }
 }
 
 // Pirelli tyre compound colors: text + background pairs.

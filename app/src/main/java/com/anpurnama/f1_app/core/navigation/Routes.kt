@@ -25,4 +25,14 @@ sealed interface Route : NavKey {
 
     @Serializable
     data object MyTeam : Route
+
+    /**
+     * Detail page for a single circuit. Opened from RoundDetail's
+     * circuit block and from Homepage §3's nearest-GP card. The page
+     * itself lands in slice 06 — the route is wired in ticket 02 so
+     * §3's tap-target navigates correctly, and the slice 06 page
+     * just adds the `entry<CircuitDetail>` content.
+     */
+    @Serializable
+    data class CircuitDetail(val circuitId: String) : Route
 }

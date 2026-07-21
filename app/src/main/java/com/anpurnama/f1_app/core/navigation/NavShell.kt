@@ -46,10 +46,14 @@ fun NavShell() {
             modifier = Modifier.padding(innerPadding),
             onBack = { backStack.removeLastOrNull() },
             entryProvider = entryProvider {
-                entry<Route.Homepage> { HomepageScreen() }
+                entry<Route.Homepage> { HomepageScreen(backStack = backStack) }
                 entry<Route.Schedule> { PlaceholderScreen("Schedule") }
                 entry<Route.Leaderboard> { PlaceholderScreen("Leaderboard") }
                 entry<Route.MyTeam> { PlaceholderScreen("My Team") }
+                // The CircuitDetail page lands in slice 06. For now, the
+                // entry exists so §3's tap-target pushes a valid route;
+                // the page is a placeholder until the real screen lands.
+                entry<Route.CircuitDetail> { PlaceholderScreen("Circuit") }
             },
         )
     }

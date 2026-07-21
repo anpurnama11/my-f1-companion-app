@@ -2,29 +2,44 @@
 
 **Current code state:** a greenfield Jetpack Compose app (`com.anpurnama.f1_app`, single
 `:app` module) with the dark-only Material3 theme (ticket 02) and a **release build
-pipeline** (ticket 15) shipped, plus the **first foundation slice** (ticket 01) landed
-end-to-end via TDD: `core/Outcome.kt` (sealed `Success`/`Failure`/`Loading`); the
-pure-Kotlin `f1/` domain package (`f1/data/F1Api.kt` Ktor `/current` extension + the
-`F1API_BASE` const — `JOLPICA_BASE`/`OPENF1_BASE` are deferred to ticket 04 with the
-multi-source use cases; `f1/data/Dtos.kt` `@Serializable` envelopes; `f1/model/Season.kt`
-domain models; `f1/GetSeasonUseCase.kt` with `internal SeasonResponseDto.toSeason()`
-pre-computing `completedGp`/`totalKm`/`totalLaps`/`progressPercent`); the
-**composition root** (`F1App` `Application` subclass + `core/di/Wiring` service locator
-+ `core/network/HttpClientFactory` building the single Ktor `HttpClient` with the CIO
-engine, `ContentNegotiation` (`ignoreUnknownKeys`/`coerceInputValues`), `HttpCache`
-with a 10 MB `FileStorage` under `cacheDir/http_cache`, `HttpTimeout` 15s/10s, and
-`expectSuccess = true`); a **4-tab Navigation 3 shell** (`core/navigation/Routes.kt`
-with the `Homepage`/`Schedule`/`Leaderboard`/`MyTeam` `NavKey` data objects +
-`NavShell.kt` with `NavigationBar` + `NavDisplay` using the `NavBackStack` /
-`rememberNavBackStack` 1.1.4 surface); the **shared `OutcomeContent` composable
-family** (`core/ui/OutcomeContent.kt` — loading / failure-with-retry / success —
-pinned for open #2, every later screen reuses this shape); and the **Homepage screen**
-(`feature/homepage/HomepageScreen.kt` rendering §2 aggregates inside a
-`PullToRefreshBox` that calls `viewModel.refresh()` with `forceRefresh = true` so the
-request bypasses HttpCache). `MainActivity` is now 14 lines: `setContent {
-F1appTheme { NavShell() } }`. **24 JVM unit tests, 0 failures** (`Outcome` 6,
-`SeasonAggregates` 6, `F1Api` 6, `GetSeasonUseCase` 3, `HomepageViewModel` 3); debug
-+ release APKs both green (release = R8 minified + lint-vital clean).
+pipeline** (ticket 15) shipped, the **first foundation slice** (ticket 01), and the
+**second slice** (ticket 02 — Homepage §1 favorites pager + §3 top speed) landed
+end-to-end via TDD. The §2-only `HomepageViewModel` grew into a 5-use-case combine
+(`GetSeason` + `GetNextRace` + `GetDriversStandings` + `GetConstructorsStandings` +
+`GetCircuitTopSpeed`) plus a `FavoritesCache` DataStore read; every section fails
+independently, no composite "get homepage data" use case. New domain pieces: `f1/data`
+adds `OPENF1_BASE` + `getNextRace` / `getDriversChampionship` /
+`getConstructorsChampionship` / `getOpenF1Sessions` / `getOpenF1Laps` (no
+`openf1/` package — per ticket 04's multi-source contract) and the 1-entry
+`F1API_TO_OPENF1_COUNTRY` fallback map (Silverstone "Great Britain" →
+"United Kingdom"); new use cases wrap them in `Outcome` with the same
+4xx/5xx/general catch shape as `GetSeasonUseCase`; new DTO envelopes
+(`NextRaceResponseDto`/`NextRaceInnerDto`, `DriversChampionshipResponseDto`,
+`ConstructorsChampionshipResponseDto`, `OpenF1SessionDto`, `OpenF1LapDto`) with
+`internal fun XxxDto.toXxx()` mappers; new domain models in `f1/model/NextRace.kt`
+(`NextRace` carrying **both** `raceDate` and `qualyDate` — the OpenF1 join key
+is `qualyDate`, not `raceDate`; ticket 11 research was wrong about the date match,
+verified live 2027-01-15 — see Practices §"deviation notes"); `DriverStanding`,
+`ConstructorStanding`, `TopSpeed`. `feature/favorites/FavoritesCache.kt` wraps
+`DataStore<Preferences>` with `FAV_DRIVER_1`/`FAV_DRIVER_2`/`FAV_TEAM` typed
+keys + a `seedIfEmpty(topTeamId, topDriverIds)` partial-fill-safe seed. New
+`core/navigation/Routes.kt` `data class CircuitDetail(circuitId: String)` route
++ `NavShell` `entry<CircuitDetail>` placeholder (real page in slice 06); the §3
+circuit card's `onClick` pushes the route on the back stack. `ui/theme/Color.kt`
+adds `Circuits.forId(circuitId: String): Color` (kebab→CamelCase mapping for the
+24-circuit palette, neutral fallback for unknowns). `HomepageScreen` now renders
+all three sections: §1 `HorizontalPager` of driver cards + team card + next-race
+card with page-indicator dots; §2 the original aggregates inside its existing
+`OutcomeContent`; §3 a circuit card with `Circuits.forId(circuitId)` brand-accent
+strip, the race details, and the top speed cell (empty for pre-2023, never a
+fake "—"). `MainActivity` is still 14 lines. **63 JVM unit tests, 0 failures**
+(`Outcome` 6, `SeasonAggregates` 6, `F1Api` 6, `GetSeasonUseCase` 3,
+`NextRaceMapper` 2, `GetNextRaceUseCase` 6, `DriverStandingsMapper` 3,
+`GetDriversStandingsUseCase` 3, `ConstructorStandingsMapper` 2,
+`GetConstructorsStandingsUseCase` 3, `GetCircuitTopSpeedUseCase` 7,
+`FavoritesCache` 6, `CircuitsForId` 3, `HomepageViewModel` 3,
+`HomepageViewModelSectionIndependence` 4); debug + release APKs both green
+(release = R8 minified + lint-vital clean).
 
 **Design state:** the full app is *designed* — every architectural, data-source,
 navigation, widget, and enrichment decision is locked in the wayfinder map + tickets

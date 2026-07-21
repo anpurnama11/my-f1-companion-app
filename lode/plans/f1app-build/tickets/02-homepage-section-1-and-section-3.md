@@ -13,17 +13,26 @@ owner: ""
 
 **Blocked by:** 01 — Foundation + Homepage §2 (shares the `Wiring`/HttpClient/Navigation shell/UX family this slice builds on).
 
-**Status:** ready-for-agent
+**Status:** built (2027-01-15)
 
-- [ ] `GetNextRaceUseCase` over `/current/next` (`race: [...]` envelope) → `NextRace` model
-- [ ] `GetDriversStandingsUseCase` + `GetConstructorsStandingsUseCase` over the two `/current/*-championship` endpoints
-- [ ] `FavoritesCache` DataStore (typed keys, one atomic `edit`); `HomepageViewModel` reads it for §1
-- [ ] First-launch default seed: `GetConstructorsStandings` #1 constructor + that team's two drivers written into `FavoritesCache` (empty-only)
-- [ ] `GetCircuitTopSpeedUseCase`: OpenF1 `getOpenF1Sessions(year, countryName, "Qualifying")` joined by `country_name + year + race-date`, then `getOpenF1Laps(sessionKey)` `max(st_speed)` (natively kph; never send `speed_unit`); `F1API_TO_OPENF1_COUNTRY` 1-entry fallback only on literal-0
-- [ ] §1 pager renders 2 fav drivers + fav team + nearest GP from the cache + `GetNextRace`; §3 renders circuit name/`Circuits.forId` accent + "Top speed" label (not "record")
-- [ ] Pre-2023 rounds show an empty top-speed cell — no placeholder, no fake dash
-- [ ] Homepage combines five use cases; each section fails independently (per-section failure surfaces via the shared UX family from 01, never blanks the whole screen)
-- [ ] Pull-to-refresh on §2/§3 uses `CacheControl.NO_CACHE`
-- [ ] §3 circuit card navigation edge to `CircuitDetail` route (page itself in slice 06)
+- [x] `GetNextRaceUseCase` over `/current/next` (`race: [...]` envelope) → `NextRace` model
+- [x] `GetDriversStandingsUseCase` + `GetConstructorsStandingsUseCase` over the two `/current/*-championship` endpoints
+- [x] `FavoritesCache` DataStore (typed keys, one atomic `edit`); `HomepageViewModel` reads it for §1
+- [x] First-launch default seed: `GetConstructorsStandings` #1 constructor + that team's two drivers written into `FavoritesCache` (empty-only, partial-fill safe)
+- [x] `GetCircuitTopSpeedUseCase`: OpenF1 `getOpenF1Sessions(year, countryName, "Qualifying")` joined by `country_name + year + qualyDate match` (**deviation from ticket text: use `schedule.qualy.date`, not `schedule.race.date` — see invariant note below**), then `getOpenF1Laps(sessionKey)` `max(st_speed)`; `F1API_TO_OPENF1_COUNTRY` 1-entry fallback only on literal-0
+- [x] §1 pager renders 2 fav drivers + fav team + nearest GP from the cache + `GetNextRace`; §3 renders circuit name/`Circuits.forId` accent + "Top speed" label (not "record")
+- [x] Pre-2023 rounds show an empty top-speed cell — no placeholder, no fake dash
+- [x] Homepage combines five use cases; each section fails independently (per-section failure surfaces via the shared UX family from 01, never blanks the whole screen)
+- [x] Pull-to-refresh on §2/§3 uses `CacheControl.NO_CACHE`
+- [x] §3 circuit card navigation edge to `CircuitDetail` route (page itself in slice 06)
+
+**Invariant (deviation from ticket text):** the OpenF1 join uses
+`schedule.qualy.date` (Qualifying day, "YYYY-MM-DD"), NOT
+`schedule.race.date` (race day). Ticket 11 research claimed
+`date_start` matched the race day — live probes show OpenF1's Qualifying
+is on the day before the race (or two days before for sprint weekends).
+The fix: `NextRace` carries `qualyDate: String?`; the use case matches
+`OpenF1.dateStart.dateOnly == qualyDate`. See
+`f1/GetCircuitTopSpeedUseCase.kt` doc comment for the live data probes.
 
 Spec cross-ref: `lode/specs/f1app.md` (OpenF1 top-speed specifics, Favorites, Homepage composition), `lode/wayfinder/f1app/top-speed.md`.

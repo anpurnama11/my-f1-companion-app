@@ -5,7 +5,7 @@ type: research
 status: closed
 blocked_by: [04]
 owner: ""
-closed_by: "Join = country_name + year + race-date match (one /v1/sessions call, no static map needed for the common case; 1-entry country fallback for 'Great Britain' → 'United Kingdom'). Stat ships as latest Qualifying peak relabeled 'Top speed' — 2 calls + ~200 KB per open, same as ticket 08 baseline. All-time OpenF1 scan is feasible (8 calls + ~800 KB / circuit) but 'all-time' is misleading because OpenF1 starts 2023+. Pre-2023 cells empty."
+closed_by: "Join = country_name + year + race-date match (one /v1/sessions call, no static map needed for the common case; 1-entry country fallback for 'Great Britain' → 'United Kingdom'). Stat ships as latest Qualifying peak relabeled 'Top speed' — 2 calls + ~200 KB per open, same as ticket 08 baseline. All-time OpenF1 scan is feasible (8 calls + ~800 KB / circuit) but 'all-time' is misleading because OpenF1 starts 2023+. Pre-2023 cells empty. **Superseded 2027-01-15: live probes show OpenF1's `date_start` is Qualifying day (1 day before the race, or 2 for sprint weekends), not race day. The implementation uses `schedule.qualy.date` (Qualifying day) instead; `race-date match` was the wrong date field. See ticket 02's build invariant note.**"
 ---
 
 ## Question

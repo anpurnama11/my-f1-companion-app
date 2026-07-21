@@ -1,10 +1,14 @@
 package com.anpurnama.f1_app.core.network
 
 import android.content.Context
+import android.util.Log
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.cache.HttpCache
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.plugins.cache.storage.FileStorage
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
@@ -24,6 +28,11 @@ import java.io.File
  *    Honors server `max-age`/`max-stale` headers — f1api.dev sends
  *    `max-age=600` so cold offline launches serve from cache; sources
  *    without cache headers (OpenF1, added later) bypass the plugin.
+ *  - [Logging] at `LogLevel.BODY` (request/response method + URL + headers +
+ *    full body — the Ktor equivalent of OkHttp `HttpLoggingInterceptor.Level.BODY`).
+ *    A custom [Logger] routes to `android.util.Log` under the `F1api` tag.
+ *    `ponytail:` no redaction — fine while every source is public race data;
+ *    gate or drop to `LogLevel.INFO` before wiring an authenticated source.
  *
  * `expectSuccess = true` is required so 4xx/5xx throw
  * [io.ktor.client.plugins.ClientRequestException] /
@@ -55,6 +64,13 @@ object HttpClientFactory {
         install(HttpTimeout) {
             requestTimeoutMillis = 15_000
             connectTimeoutMillis = 10_000
+        }
+
+        install(Logging) {
+            level = LogLevel.BODY
+            logger = object : Logger {
+                override fun log(message: String) { Log.i("F1api", message) }
+            }
         }
     }
 }
