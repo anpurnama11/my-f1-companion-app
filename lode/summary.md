@@ -7,10 +7,12 @@ favorites pager, §2 season aggregates, §3 nearest-GP circuit card with top-spe
 line) and the Schedule tab (Material 3 `SecondaryTabRow` switching between **Upcoming**
 and **Past**; Upcoming rows mirror the §3 card shape — round/GP name/date/city/
 circuit image; Past rows add a P1/P2/P3 podium cell with per-row retry).
-Round detail page (race results + qualifying + circuit block linked to
-`CircuitDetail`) is wired behind `Route.RoundDetail`. Four bottom tabs
+Round detail page (`Route.RoundDetail`) switches between upcoming mode
+(race-weekend schedule + circuit stats) and past mode (per-session result rows);
+tapping **Results** pushes `Route.SessionResult` for a full session result list.
+The circuit block links to `CircuitDetail`. Four bottom tabs
 (Homepage, Schedule, Leaderboard, My Team); the latter two are placeholders.
-Data from f1api.dev primary, OpenF1 for top speed. Manual `Wiring` DI, MVVM
+Data from f1api.dev primary, OpenF1 for top speed, Jolpica standard for race status/grid and most-wins. Manual `Wiring` DI, MVVM
 init-less, sealed `Outcome<T>`/`SectionUiState<T>` with shared `OutcomeContent`
 renderer (ADR 0002). Single `:app` module; KMP `:shared` extraction deferred.
 

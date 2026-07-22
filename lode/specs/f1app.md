@@ -74,9 +74,10 @@ a custom-scheme deep link into the round detail.
 14. As a fan, I want first launch to seed sensible defaults (the current
     championship-leading constructor plus its two drivers) so neither the
     Homepage nor My Team is empty before I pick anything.
-15. As a fan, I want a Round detail page showing race and qualifying results
-    with a circuit block that links to Circuit detail, so I can dig into a
-    specific weekend.
+15. As a fan, I want a Round detail page showing the race-weekend schedule
+    (upcoming) or per-session result rows (past), plus a circuit block that
+    links to Circuit detail, and a per-session result page, so I can dig into
+    a specific weekend.
 16. As a fan, I want a Circuit detail page showing the top speed recorded
     there and the all-time most-winning driver and team at that circuit, so
     a track has identity beyond one race.
@@ -145,23 +146,33 @@ This is the hedge that makes a future KMP port a move instead of a rewrite.
 
 - f1api.dev endpoints wired (all zero auth):
   - `GET /current` — full-season schedule + sessions (Homepage §2 aggregates;
-    Schedule both tabs)
+    Schedule both tabs; `RaceSchedule` DTO also carries `sprintQualy` and
+    `sprintRace` fields, null when the GP has no sprint)
   - `GET /current/next` — next race (Homepage §1+§3, Countdown worker)
   - `GET /current/drivers`, `GET /current/teams` — Driver / Team detail
   - `GET /current/drivers-championship`, `GET /current/constructors-championship`
     — Leaderboard, Homepage fav-driver / fav-team, detail pages
-  - `GET /{year}/{round}/race`, `GET /{year}/{round}/qualy` — Round detail,
-    past-list podium (slices `[0..2]` from race results)
+  - `GET /{year}/{round}/race`, `GET /{year}/{round}/qualy`,
+    `GET /{year}/{round}/fp1`, `GET /{year}/{round}/fp2`,
+    `GET /{year}/{round}/fp3` — `SessionResult` route for Race / Qualifying /
+    FP1/2/3; also past-list podium (slices `[0..2]` from race results)
+  - Jolpica alpha `GET /f1/alpha/results/{round_id}/SR/` and `/SQ/` —
+    `SessionResult` route for Sprint and Sprint Qualifying results
+    (f1api.dev has no sprint endpoints)
   - `GET /circuits/{circuitId}` — Circuit metadata (cheap; inlined elsewhere
     but called directly for `CircuitDetail`)
 
-- OpenF1 extensions (for top speed only in v1):
+- OpenF1 extensions (for top speed and fastest pitstop in v1):
   - `getOpenF1Sessions(year, countryName, sessionName)` —
     `GET /v1/sessions`
   - `getOpenF1Laps(sessionKey)` — `GET /v1/laps?session_key=...` (the
     `st_speed` field is natively kph; never pass `speed_unit`, it 404s)
+  - `getOpenF1PitStops(sessionKey)` — `GET /v1/pit?session_key=...`
+    (`stop_duration` is stationary pit time; available from 2024 US GP onwards)
 
-- jolpica extension (all-time most-wins at circuit):
+- jolpica extensions:
+  - `GET /{year}/{round}/results.json` — authoritative race `status` and
+    `grid` for `GetRoundResultsUseCase` (merged with f1api.dev race result).
   - `getCircuitWinners(f1apiCircuitId)` —
     `GET /circuits/{id}/results/1.json`; client-aggregates the top driver +
     top team. `driverId` / `constructorId` match f1api.dev's namespace; only
@@ -193,8 +204,13 @@ This is the hedge that makes a future KMP port a move instead of a rewrite.
 | `GetConstructorsStandingsUseCase` | f1api.dev `/current/constructors-championship` | Leaderboard, Homepage fav-team, Team detail, first-launch seed |
 | `GetDriverDetailUseCase(id)` | f1api.dev `/current/drivers` + `/drivers-championship` | Driver detail |
 | `GetTeamDetailUseCase(id)` | f1api.dev `/current/teams` + `/constructors-championship` | Team detail |
-| `GetRoundResultsUseCase(year, round)` | f1api.dev `/{y}/{r}/race` | Round detail, Past-list podium |
-| `GetRoundQualifyingUseCase(year, round)` | f1api.dev `/{y}/{r}/qualy` | Round detail |
+| `GetRoundResultsUseCase(year, round)` | f1api.dev `/{y}/{r}/race` + Jolpica standard `/ergast/f1/{y}/{r}/results.json` (hybrid) | Race `SessionResult`, RoundDetail past-mode podium chips, Past-list podium |
+| `GetRoundQualifyingUseCase(year, round)` | f1api.dev `/{y}/{r}/qualy` | Qualifying `SessionResult` |
+| `GetPracticeResultUseCase(year, round, session)` | f1api.dev `/{y}/{r}/fp1|fp2|fp3` | FP1/FP2/FP3 `SessionResult` |
+| `GetSprintResultUseCase(year, round)` | Jolpica alpha `/f1/alpha/results/{round_id}/SR/` | Sprint `SessionResult` |
+| `GetSprintQualifyingResultUseCase(year, round)` | Jolpica alpha `/f1/alpha/results/{round_id}/SQ/` | Sprint Qualifying `SessionResult` |
+| `GetSessionResultUseCase(year, round, sessionType)` | branches to the five use cases above | `SessionResult` screen |
+| `GetFastestPitstopUseCase(year, round)` | OpenF1 `/v1/sessions` + `/v1/pit` | Race `SessionResult` standout card |
 | `GetRoundPodiumUseCase(year, round)` | reuses `getRoundResults`, slices `[0..2]` | Schedule > Past list |
 | `GetCircuitTopSpeedUseCase(circuitId, year?)` | OpenF1 `/v1/sessions` + `/v1/laps` (`max(st_speed)`) | Homepage §3, Round detail |
 | `GetCircuitMostWinsUseCase(f1apiCircuitId)` | jolpica `/circuits/{id}/results/1.json` | Round detail, Circuit detail |
@@ -262,6 +278,8 @@ Two `DataStore<Preferences>` wrappers in `Wiring`, both using one atomic
 - `data class DriverDetail(val driverId: String) : NavKey`
 - `data class TeamDetail(val teamId: String) : NavKey`
 - `data class RoundDetail(val year: Int, val round: Int) : NavKey`
+- `data class SessionResult(val year: Int, val round: Int, val session: SessionType) : NavKey` —
+  full result list for one session; pushed from a RoundDetail session row
 - `data class CircuitDetail(val circuitId: String) : NavKey` — home for the
   top-speed + most-wins stats; opened from RoundDetail's circuit block and
   Homepage §3.
@@ -278,6 +296,7 @@ flowchart LR
   Leaderboard -->|round row| RoundDetail
   Schedule -->|round row| RoundDetail
   RoundDetail -->|circuit block| CircuitDetail
+  RoundDetail -->|session Results row| SessionResult
   Widget["Countdown widget"] ==>|"f1app://round/{y}/{r}"| RoundDetail
 ```
 
@@ -305,6 +324,43 @@ Cross-ref: `lode/plans/f1app-build/tickets/03-schedule-tab-and-round-detail.md` 
 - Single-app custom scheme (no public web domain for App Links verification).
 - **Suppressed** in off-season (`NEXT_RACE_START_MILLIS == 0L`) and no-cache
   states — no valid round to open.
+
+### Round detail + Session result
+
+`Route.RoundDetail(year, round)` is one screen with two modes driven by the
+Race session start time:
+
+- **Upcoming mode** — circuit stats card (length, laps, turns, top speed) +
+  the full five-session race-weekend schedule (FP1 → FP2/FP3 or
+  Sprint Quali → Sprint → Qualifying → Race). Tapping the circuit card or the
+  "Circuit Stats" button opens `Route.CircuitDetail(circuitId)`.
+- **Past mode** — circuit stats card + a **Results** tab with per-session rows
+  (Race, Qualifying, Sprint, Sprint Quali, FP1). Each row has a **Results**
+  button that pushes `Route.SessionResult(year, round, session)`. The **Highlights**
+  tab and Driver of the Day are out of scope for v1.
+
+Top speed in the circuit stats card uses the same source as Homepage §3
+(OpenF1 all-time max `stSpeed` per circuit). Elevation is not available in a
+free API and is dropped from v1.
+
+`Route.SessionResult(year, round, session)` renders a full result list for the
+selected session:
+
+- **Race** — podium chip header (P1/P2/P3 driver abbreviations), Fastest Lap
+  standout card (derived from f1api.dev `fastLap`), Fastest Pitstop standout
+  card (OpenF1 `stop_duration`; hidden when unavailable), and a full grid table
+  showing position, driver, team, grid-change arrow (hidden for pit-lane starts),
+  time/status, and points. `Retired` rows show **"DNF"**; `Did not start` rows show
+  **"DNS"**; pit-lane starts (`grid: "0"`) display **"PL"**.
+- **Sprint** — same table shape as Race.
+- **Qualifying / Sprint Quali** — position, driver, team, Q1/Q2/Q3 times.
+- **FP1 / FP2 / FP3** — time-ordered list with implicit position, driver, team,
+  fastest-lap time.
+
+The session list is built from the f1api.dev schedule, which includes
+`sprintQualy` and `sprintRace` fields (null when the GP has no sprint). Sprint
+and Sprint Qualifying results come from Jolpica alpha because f1api.dev does
+not provide them. See ADR `0005-session-results-use-two-apis.md`.
 
 ### Favorites (My Team / Homepage §1)
 
@@ -418,9 +474,19 @@ flowchart LR
   with `results: [...]`. Three different envelope DTOs.
 - `circuit` is an object in `/current*` but a one-element array in
   `/{y}/{r}/race` — different DTO per endpoint.
+- `/current` `RaceSchedule` now includes `sprintQualy` and `sprintRace` fields
+  (nullable) in addition to `fp1`/`fp2`/`fp3`/`qualy`/`race`; the model and UI
+  must pick the five active sessions for the weekend.
+- f1api.dev `/{y}/{r}/fp1|fp2|fp3` results have only `time` per driver, no
+  explicit `position` — position is implicit from time ordering.
+- Jolpica alpha results use opaque `round_id` and a different response schema
+  from f1api.dev; the sprint session use cases wrap that translation.
 - Three spellings of "firstAppearance" across endpoints
   (`firstAppareance`, `firstAppearance`, `firstParticipationYear`) —
   `@SerialName` per DTO.
+- Jolpica standard race results expose `status` (`Finished`, `Lapped`,
+  `Retired`, `Did not start`) and a numeric `grid`; `grid: "0"` means a
+  pit-lane start.
 - OpenF1 returns lowercase-no-underscore fields
   (`sessionkey`, `countryname`, `circuitshortname`) — OpenF1 DTOs get their
   own `@SerialName` mapping, distinct from f1api.dev's snake_case.
@@ -442,11 +508,15 @@ com.anpurnama.f1_app/
     model/                        # NextRace, Season (+aggregates), Race, Circuit,
                                   # Driver, Team, DriverStanding,
                                   # ConstructorStanding, RaceResult,
-                                  # QualifyingResult
+                                  # QualifyingResult, SessionType,
+                                  # SessionResult, FastestPitstop
     {GetNextRaceUseCase, GetSeasonUseCase,
      GetDriversStandingsUseCase, GetConstructorsStandingsUseCase,
      GetDriverDetailUseCase, GetTeamDetailUseCase,
      GetRoundResultsUseCase, GetRoundQualifyingUseCase,
+     GetPracticeResultUseCase,
+     GetSprintResultUseCase, GetSprintQualifyingResultUseCase,
+     GetSessionResultUseCase, GetFastestPitstopUseCase,
      GetCircuitTopSpeedUseCase, GetCircuitMostWinsUseCase,
      GetRoundPodiumUseCase}.kt
   ui/theme/{Color,Theme,Type}.kt   # [BUILT] dark-only M3 theme
@@ -457,7 +527,8 @@ com.anpurnama.f1_app/
     myteam/{MyTeamScreen,MyTeamViewModel,...}.kt
     driver/...
     team/...
-    round/...
+    round/{RoundScreen,RoundViewModel,...}.kt
+    sessionresult/{SessionResultScreen,SessionResultViewModel,...}.kt
     circuit/...
   widget/countdown/
     CountdownWidget.kt
@@ -542,8 +613,9 @@ they port to a future KMP `:shared`.
 - **Driver Comparison screen** — dropped.
 - **Driver Timeline Graph widget** — dropped (most call-heavy; per-round
   result fan-out).
-- **Telemetry (RPM / speed / DRS), per-lap times, pit stops** — OpenF1 /
-  jolpica-only data not needed by any in-scope screen or widget.
+- **Telemetry (RPM / speed / DRS), per-lap times, full pit-stop history** —
+  OpenF1 / jolpica-only data not needed by any in-scope screen or widget.
+  (Only the single fastest pitstop is surfaced on Race `SessionResult`.)
 - **Weather + race-control flags** enrichments — out of scope for v1
   (live-window only; graduate as a fresh ticket).
 - **App Links / `autoVerify`** — no public web domain; custom scheme only.

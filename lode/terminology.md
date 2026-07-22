@@ -102,8 +102,22 @@ Short term → meaning lines. Domain + project language.
   entry exists so §3's tap-target pushes a valid route; the page itself is a
   placeholder until slice 06 lands. `[BUILT ticket 03]` `data class RoundDetail(year: Int, round: Int)` —
   pushed from the Schedule tab row tap; opens the Round detail screen
-  (race results + qualifying + circuit block). `DriverDetail`/`TeamDetail` land
-  with the screens that open them, per ticket 05.
+  (circuit stats + weekend schedule / result session rows). `DriverDetail`/`TeamDetail` land
+  with the screens that open them, per ticket 05. `data class SessionResult(year: Int, round: Int, session: SessionType)` —
+  full result list for one session (Race, Qualifying, Sprint, SQuali, FP1);
+  pushed from a RoundDetail session row.
+- **SessionType** — enum of the possible session types across all GPs:
+  `FP1`, `FP2`, `FP3`, `SprintQuali`, `Sprint`, `Quali`, `Race`. A single GP
+  always uses exactly **five** of these: Sprint weekends use FP1 → SprintQuali
+  → Sprint → Quali → Race; non-sprint weekends use FP1 → FP2 → FP3 → Quali →
+  Race. Used by `SessionResult` to pick the correct endpoint and to render the
+  correct label/short label.
+  Endpoint mapping: Race/Quali/FP1/FP2/FP3 → f1api.dev
+  (`/{year}/{round}/race`, `/qualy`, `/fp1`, `/fp2`, `/fp3`);
+  Sprint/SprintQuali → Jolpica alpha
+  (`/f1/alpha/results/{round_id}/SR/` and `/SQ/`). The session list in
+  `RoundDetail` is built from the f1api.dev schedule (which includes
+  `sprintQualy` and `sprintRace` fields, null when no sprint).
 - **NavShell** — `core/navigation/NavShell.kt`; the 4-tab `Scaffold` +
   `NavigationBar` + `NavDisplay` host. Uses Navigation 3 multi-backstack
   (revision 2): each tab owns a persistent `NavBackStack`; switching tabs
@@ -133,8 +147,11 @@ Short term → meaning lines. Domain + project language.
   `circuit.circuitLength` digits), totalLaps (sum `laps`), progressPercent. Exposed
   on the `Season` model so ViewModels don't recompute.
 - **SessionTime** — `[BUILT]` `f1/model/RaceWeekend.kt`; a single session of a
-  race weekend (FP1, FP2, FP3, Sprint Quali, Sprint, Quali, Race). Fields:
-  `label` (long form "Practice 1"), `shortLabel` (chip form "FP1"),
+  race weekend. A GP always has exactly **five sessions**. Sprint weekends:
+  FP1 → Sprint Quali → Sprint → Quali → Race. Non-sprint weekends:
+  FP1 → FP2 → FP3 → Quali → Race. Aliases: **Quali** = **Qualifying** =
+  **Race Qualification**; **Sprint Quali** = **Sprint Qualifying** = **SQuali**.
+  Fields: `label` (long form "Practice 1"), `shortLabel` (chip form "FP1"),
   `start: kotlinx.datetime.Instant` (UTC). Driven by the OpenF1 `date_start`
   ISO-8601 string. Drives the Homepage §1 countdown card.
 - **WeekendSchedule** — `[BUILT]` `f1/model/RaceWeekend.kt`; the full list of
@@ -143,14 +160,27 @@ Short term → meaning lines. Domain + project language.
   the future (or `null` once the whole weekend has started). Drives the
   §1 countdown card; `null` schedule renders the empty state.
 - **RoundDetail** — `[BUILT ticket 03]` `Route.RoundDetail(year, round)`,
-  the Round detail screen (`feature/round/RoundScreen.kt`). Three
-  independently-failing blocks: race results (`/{year}/{round}/race`),
-  qualifying (`/{year}/{round}/qualy`), and a circuit block (name +
-  length, clickable → `Route.CircuitDetail(circuit.id)`; destination
-  page in slice 06). Driven by `RoundViewModel` (init-less, two
-  parallel `MutableStateFlow<SectionUiState<…>>` combined via
-  `combine().onStart{warmUp()}.stateIn(WhileSubscribed(5_000))`;
-  `refresh()` re-fires both use cases with `forceRefresh = true`).
+  the Round detail screen (`feature/round/RoundScreen.kt`). One route with
+  two modes driven by the Race session start time: **upcoming** shows circuit
+  stats (length, laps, turns, top speed) + the five-session race weekend
+  schedule; **past** shows circuit stats + a Results tab + per-session rows
+  (Race, Qualifying, Sprint, SQuali, FP1). The circuit stats are always
+  visible regardless of mode. The Highlights tab and Driver of the Day are out
+  of scope for v1. Each past session row has a **Results** action that pushes a
+  full `SessionResult` screen.
+- **SessionResult** — `Route.SessionResult(year, round, session)` full result
+  list for one session. Race results include a podium chip header (top 3),
+  Fastest Lap, and Fastest Pitstop standout cards. Fastest Lap is derived from
+  f1api.dev `fastLap` fields. Fastest Pitstop comes from OpenF1
+  (`/pit.stop_duration`, stationary time). If no pit-stop data exists for the
+  round (e.g., pre-2024 US GP), the card is hidden. Other sessions show their
+  session-specific result table (Quali/SprintQuali = Q1/Q2/Q3; Sprint = same as
+  Race; FP = time-ordered fastest lap).
+- **CircuitDetail** — `[PLACEHOLDER ticket 06]` `Route.CircuitDetail(circuitId)`,
+  the circuit detail screen. Shows most successful driver and constructor at
+  this circuit with win counts, the year of the first Grand Prix held there,
+  and the race lap record time plus its driver. Reached from RoundDetail's
+  circuit card tap.
 - **RaceSchedule** — `[BUILT ticket 03]` `f1/model/Season.kt`; the
   per-session date+time block carried on `Race` from f1api.dev `/current`
   (`RaceScheduleDto`). Fields: `fp1`/`fp2`/`fp3`/`qualy`/`race`, each a

@@ -22,11 +22,13 @@ lode/
     0002-sectionuistate-is-vm-to-ui-transport.md  # SectionUiState is VM→UI transport; Outcome stops at the VM
     0003-derived-sections-load-after-nextrace.md  # Derived sections load after loadNextRace(); no reactive observer
     0004-multi-backstack-tab-navigation.md   # Multi-backstack; per-tab NavBackStack avoids ViewModel destruction on tab switch
+    0005-session-results-use-two-apis.md     # Session results: f1api.dev for R/Q/FP, Jolpica alpha for Sprint/SprintQuali
+    0006-race-results-hybrid-source.md       # Race results: f1api.dev metadata/fastest-lap + Jolpica standard status/grid
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # built — Foundation + Homepage §2 (pins UX family)
       02-homepage-section-1-and-section-3.md    # built — Homepage §1 favorites pager + §3 top speed (2027-01-15)
-      03-schedule-tab-and-round-detail.md       # built — Schedule tab (Upcoming/Past + podium retry) + Round detail (race + qualy + circuit)
+      03-schedule-tab-and-round-detail.md       # built — Schedule tab (Upcoming/Past + podium retry) + Round detail two-mode + SessionResult (Rev 3 design locked)
       04-leaderboard-and-driver-team-detail.md  # ready — blocked by 01
       05-my-team-tab-and-favorites-picker.md    # ready — blocked by 02
       06-circuit-detail.md                      # ready — blocked by 02,03
