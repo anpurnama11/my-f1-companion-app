@@ -66,8 +66,7 @@ class ScheduleViewModel(
         year: Int,
         round: Int,
         forceRefresh: Boolean,
-    ) -> Outcome<RoundPodium>,
-    private val getCircuitImage: suspend (year: Int, country: String) -> Outcome<String?>,
+    ) -> Outcome<RoundPodium>
 ) : ViewModel() {
 
     sealed interface UiState {
@@ -78,34 +77,27 @@ class ScheduleViewModel(
          *  - `podiums` — per-round podium state, keyed by round
          *    (1-based). Failure on one round = retry row; the other
          *    past rounds keep their content.
-         *  - `circuitImages` — per-round OpenF1 image URL state, keyed
-         *    by round. Failure on one round = image cell is empty;
-         *    the other races' image cells render normally.
          */
         data class Sections(
             val season: SectionUiState<Season>,
             val year: Int,
             val podiums: Map<Int, SectionUiState<RoundPodium>>,
-            val circuitImages: Map<Int, SectionUiState<String?>>,
         ) : UiState
     }
 
     private val seasonState = MutableStateFlow<SectionUiState<Season>>(SectionUiState.Loading)
     private val podiumsState = MutableStateFlow<Map<Int, SectionUiState<RoundPodium>>>(emptyMap())
-    private val circuitImagesState = MutableStateFlow<Map<Int, SectionUiState<String?>>>(emptyMap())
     private val yearState = MutableStateFlow(0)
 
     val uiState: StateFlow<UiState> = combine(
         seasonState,
         yearState,
         podiumsState,
-        circuitImagesState,
-    ) { season, year, podiums, circuitImages ->
+    ) { season, year, podiums, ->
         UiState.Sections(
             season = season,
             year = year,
             podiums = podiums,
-            circuitImages = circuitImages,
         )
     }
         .onStart { warmUp() }
@@ -116,7 +108,6 @@ class ScheduleViewModel(
                 season = SectionUiState.Loading,
                 year = 0,
                 podiums = emptyMap(),
-                circuitImages = emptyMap(),
             ),
         )
 
@@ -167,28 +158,7 @@ class ScheduleViewModel(
                 // assignments of new maps (not RMW), so no race.
                 podiumsState.value = if (pastRounds.isEmpty()) emptyMap()
                     else pastRounds.associate { it.round to SectionUiState.Loading }
-                // All races seed to Loading — circuit images are
-                // fetched from OpenF1 for every race (upcoming + past)
-                // that has a country. Rows without a country seed to
-                // Content(null) — brand accent fallback, no fetch.
-                circuitImagesState.value = season.races
-                    .associate { it.round to SectionUiState.Loading }
 
-                // Fire per-row circuit image loads for all
-                // country-bearing races. The VM owns the re-fire on
-                // refresh (the screen's `LaunchedEffect` does NOT
-                // re-fire on same-key re-render). Rows without a
-                // country get the accent-only fallback immediately.
-                season.races.forEach { race ->
-                    val country = race.circuit.country
-                    if (country != null) {
-                        viewModelScope.launch { loadCircuitImage(year = season.year, round = race.round, country = country) }
-                    } else {
-                        circuitImagesState.update {
-                            it + (race.round to SectionUiState.Content<String?>(null))
-                        }
-                    }
-                }
                 pastRounds.forEach { race ->
                     viewModelScope.launch { loadPodium(year = season.year, round = race.round, forceRefresh = forceRefresh) }
                 }
@@ -196,7 +166,6 @@ class ScheduleViewModel(
             is SectionUiState.Error -> {
                 yearState.value = 0
                 podiumsState.value = emptyMap()
-                circuitImagesState.value = emptyMap()
             }
             is SectionUiState.Loading -> {
                 // `getSeason` does not emit Loading in practice; the VM
@@ -222,19 +191,6 @@ class ScheduleViewModel(
         podiumsState.update { it + (round to SectionUiState.Loading) }
         podiumsState.update { it + (round to getRoundPodium(year, round, forceRefresh).toSection()) }
     }
-
-    /**
-     * Loads a single race's OpenF1 circuit image into the per-row
-     * map. Atomic [MutableStateFlow.update] writes. OpenF1 has no
-     * cache layer (per spec), so the `forceRefresh` flag is recorded
-     * but the underlying call always hits the network.
-     */
-    private suspend fun loadCircuitImage(year: Int, round: Int, country: String) {
-        circuitImagesState.update { it + (round to SectionUiState.Loading) }
-        circuitImagesState.update {
-            it + (round to getCircuitImage(year, country).toSection())
-        }
-    }
 }
 
 /**
@@ -246,13 +202,11 @@ class ScheduleViewModel(
 fun scheduleViewModelFactory(
     getSeason: GetSeasonUseCase,
     getRoundPodium: GetRoundPodiumUseCase,
-    getCircuitImage: GetCircuitImageUseCase,
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         ScheduleViewModel(
             getSeason = getSeason::invoke,
             getRoundPodium = getRoundPodium::invoke,
-            getCircuitImage = getCircuitImage::invoke,
         )
     }
 }

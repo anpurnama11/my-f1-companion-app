@@ -1,6 +1,5 @@
 package com.anpurnama.f1_app.feature.schedule
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,13 +20,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,23 +33,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.ui.OutcomeContent
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.f1.RoundPodium
-import com.anpurnama.f1_app.f1.model.Circuit
 import com.anpurnama.f1_app.f1.model.Race
 import com.anpurnama.f1_app.f1.model.Season
-import com.anpurnama.f1_app.ui.theme.Circuits
 import com.anpurnama.f1_app.ui.theme.Spacing
 
 /**
@@ -106,7 +98,7 @@ fun ScheduleScreen(
                 .padding(top = Spacing.normal),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            TabRow(
+            SecondaryTabRow(
                 selectedTabIndex = activeTab.ordinal,
             ) {
                 ScheduleTab.entries.forEach { tab ->
@@ -129,14 +121,12 @@ fun ScheduleScreen(
                     ScheduleTab.Upcoming -> UpcomingList(
                         season = season,
                         year = sections.year,
-                        circuitImages = sections.circuitImages,
                         onRoundClick = onRoundClick,
                     )
                     ScheduleTab.Past -> PastList(
                         season = season,
                         year = sections.year,
                         podiums = sections.podiums,
-                        circuitImages = sections.circuitImages,
                         onRoundClick = onRoundClick,
                         onRetryPodium = { viewModel.retryPodium(it) },
                     )
@@ -156,7 +146,6 @@ private enum class ScheduleTab(val label: String) {
 private fun UpcomingList(
     season: Season,
     year: Int,
-    circuitImages: Map<Int, SectionUiState<String?>>,
     onRoundClick: (year: Int, round: Int) -> Unit,
 ) {
     val upcoming = season.races.filter { it.winnerId == null }
@@ -167,7 +156,6 @@ private fun UpcomingList(
             upcoming.forEach { race ->
                 ScheduleRow(
                     race = race,
-                    circuitImage = circuitImages[race.round],
                     showPodium = false,
                     podium = null,
                     onClick = { onRoundClick(year, race.round) },
@@ -183,7 +171,6 @@ private fun PastList(
     season: Season,
     year: Int,
     podiums: Map<Int, SectionUiState<RoundPodium>>,
-    circuitImages: Map<Int, SectionUiState<String?>>,
     onRoundClick: (year: Int, round: Int) -> Unit,
     onRetryPodium: (round: Int) -> Unit,
 ) {
@@ -202,7 +189,6 @@ private fun PastList(
                 // to own re-fetch. The VM owns the full lifecycle.
                 ScheduleRow(
                     race = race,
-                    circuitImage = circuitImages[race.round],
                     showPodium = true,
                     podium = podiums[race.round],
                     onClick = { onRoundClick(year, race.round) },
@@ -236,7 +222,6 @@ private fun EmptyState(message: String) {
 @Composable
 private fun ScheduleRow(
     race: Race,
-    circuitImage: SectionUiState<String?>?,
     showPodium: Boolean,
     podium: SectionUiState<RoundPodium>?,
     onClick: () -> Unit,
@@ -270,7 +255,7 @@ private fun ScheduleRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = race.name.ifEmpty { race.circuit.name },
+                        text = race.name.ifEmpty { race.name },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -292,10 +277,6 @@ private fun ScheduleRow(
                         )
                     }
                 }
-                CircuitImage(
-                    circuit = race.circuit,
-                    image = circuitImage,
-                )
             }
             if (showPodium) {
                 PodiumCell(
@@ -303,37 +284,6 @@ private fun ScheduleRow(
                     onRetryPodium = onRetryPodium,
                 )
             }
-        }
-    }
-}
-
-/**
- * Decorative circuit image. The accent strip is always rendered
- * (18% alpha) so the cell has identity even while the image loads
- * and when OpenF1 returns no image. When an image URL is resolved
- * it tints on top of the accent, matching the homepage §3 card.
- */
-@Composable
-private fun CircuitImage(
-    circuit: Circuit,
-    image: SectionUiState<String?>?,
-) {
-    val accent = Circuits.forId(circuit.id)
-    Box(
-        modifier = Modifier
-            .size(72.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(accent.copy(alpha = 0.18f)),
-    ) {
-        val url = (image as? SectionUiState.Content)?.data
-        if (url != null) {
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                colorFilter = ColorFilter.tint(accent, BlendMode.SrcIn),
-            )
         }
     }
 }
@@ -403,13 +353,6 @@ private fun PodiumChip(position: Int, name: String?, team: String?) {
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        if (teamLabel.isNotEmpty()) {
-            Text(
-                text = teamLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
     // ponytail: no separator between chips — the P1/P2/P3 labels are
     // the visual break. If designers want pill chips later, wrap in a
@@ -421,11 +364,8 @@ private fun PodiumChip(position: Int, name: String?, team: String?) {
 private fun formatRaceDate(race: Race): String? {
     val slot = race.schedule?.race ?: return null
     val date = slot.date
-    val time = slot.time
     return when {
-        date != null && time != null -> "$date · $time"
         date != null -> date
-        time != null -> time
         else -> null
     }
 }
@@ -437,7 +377,6 @@ private fun rememberScheduleViewModel(): ScheduleViewModel {
         factory = scheduleViewModelFactory(
             getSeason = wiring.getSeason,
             getRoundPodium = wiring.getRoundPodium,
-            getCircuitImage = wiring.getCircuitImage,
         )
     )
 }
