@@ -10,6 +10,9 @@ import com.anpurnama.f1_app.f1.GetConstructorsStandingsUseCase
 import com.anpurnama.f1_app.f1.GetDriversStandingsUseCase
 import com.anpurnama.f1_app.f1.GetNextRaceUseCase
 import com.anpurnama.f1_app.f1.GetRaceWeekendScheduleUseCase
+import com.anpurnama.f1_app.f1.GetRoundPodiumUseCase
+import com.anpurnama.f1_app.f1.GetRoundQualifyingUseCase
+import com.anpurnama.f1_app.f1.GetRoundResultsUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import io.ktor.client.HttpClient
 import java.io.File
@@ -38,6 +41,9 @@ class Wiring(context: Context) {
     val getConstructorsStandings: GetConstructorsStandingsUseCase = GetConstructorsStandingsUseCase(httpClient)
     val getCircuitTopSpeed: GetCircuitTopSpeedUseCase = GetCircuitTopSpeedUseCase(httpClient)
     val getCircuitImage: GetCircuitImageUseCase = GetCircuitImageUseCase(httpClient)
+    val getRoundResults: GetRoundResultsUseCase = GetRoundResultsUseCase(httpClient)
+    val getRoundQualifying: GetRoundQualifyingUseCase = GetRoundQualifyingUseCase(httpClient)
+    val getRoundPodium: GetRoundPodiumUseCase = GetRoundPodiumUseCase(getRoundResults)
 
     val favoritesCache: FavoritesCache = FavoritesCache(
         PreferenceDataStoreFactory.create {

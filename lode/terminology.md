@@ -10,7 +10,7 @@ Short term → meaning lines. Domain + project language.
 > wiring) is a **locked design contract** the build works toward; their present-tense
 > phrasing is the spec, not a claim the code exists.
 
-- **F1app** — this app, package `com.anpurnama.f1_app`, Android Compose, dark-first. `[BUILT]` greenfield scaffold + dark-only theme + foundation slice (ticket 01) + Homepage §1+§3 (ticket 02).
+- **F1app** — this app, package `com.anpurnama.f1_app`, Android Compose, dark-first. `[BUILT]` greenfield scaffold + dark-only theme + foundation slice (ticket 01) + Homepage §1+§3 (ticket 02) + Schedule tab + Round detail (ticket 03).
 - **FavoritesCache** — `[BUILT]` `DataStore<Preferences>` wrapper (mirrors `NextRaceCache` in shape, even though not called that way) with typed keys `FAV_DRIVER_1: String`, `FAV_DRIVER_2: String`, `FAV_TEAM: String`, one atomic `edit` block. Written from My Team's picker (later) and from `HomepageViewModel`'s first-launch seed; read by `HomepageViewModel` §1. The `seedIfEmpty(topTeamId, topDriverIds)` is partial-fill safe — it only writes into slots the user hasn't filled yet. `circuitId` translation map (f1api.dev → OpenF1 short name) is **NOT** used (see deviation note in `lode/wayfinder/f1app/tickets/11-...md` — we use the date match on `qualyDate` instead, no translation map needed).
 - **PokeDV** — `PokemonDataViewer`, the developer's prior project; architecture
   reference for F1app (single module, manual Wiring DI, sealed Outcome, MVVM init-less,
@@ -100,8 +100,10 @@ Short term → meaning lines. Domain + project language.
   top-level tabs are `data object`s (`Homepage`, `Schedule`, `Leaderboard`, `MyTeam`).
   `[BUILT ticket 02]` `data class CircuitDetail(circuitId: String)` — the
   entry exists so §3's tap-target pushes a valid route; the page itself is a
-  placeholder until slice 06 lands. `DriverDetail`/`TeamDetail`/`RoundDetail`
-  land with the screens that open them, per ticket 05.
+  placeholder until slice 06 lands. `[BUILT ticket 03]` `data class RoundDetail(year: Int, round: Int)` —
+  pushed from the Schedule tab row tap; opens the Round detail screen
+  (race results + qualifying + circuit block). `DriverDetail`/`TeamDetail` land
+  with the screens that open them, per ticket 05.
 - **NavShell** — `core/navigation/NavShell.kt`; the 4-tab `Scaffold` +
   `NavigationBar` + `NavDisplay` host. Uses Navigation 3 1.1.4's `NavBackStack` +
   `rememberNavBackStack` (Android-only reflection serializer) and `NavDisplay(backStack,
@@ -138,3 +140,39 @@ Short term → meaning lines. Domain + project language.
   Instant): SessionTime?` — the earliest session whose start is still in
   the future (or `null` once the whole weekend has started). Drives the
   §1 countdown card; `null` schedule renders the empty state.
+- **RoundDetail** — `[BUILT ticket 03]` `Route.RoundDetail(year, round)`,
+  the Round detail screen (`feature/round/RoundScreen.kt`). Three
+  independently-failing blocks: race results (`/{year}/{round}/race`),
+  qualifying (`/{year}/{round}/qualy`), and a circuit block (name +
+  length, clickable → `Route.CircuitDetail(circuit.id)`; destination
+  page in slice 06). Driven by `RoundViewModel` (init-less, two
+  parallel `MutableStateFlow<SectionUiState<…>>` combined via
+  `combine().onStart{warmUp()}.stateIn(WhileSubscribed(5_000))`;
+  `refresh()` re-fires both use cases with `forceRefresh = true`).
+- **RaceSchedule** — `[BUILT ticket 03]` `f1/model/Season.kt`; the
+  per-session date+time block carried on `Race` from f1api.dev `/current`
+  (`RaceScheduleDto`). Fields: `fp1`/`fp2`/`fp3`/`qualy`/`race`, each a
+  nullable `SessionSlot(date, time)`. The whole `RaceSchedule` is
+  `null` when the DTO's schedule block is empty (older seasons, partial
+  data). Revision 1 of the Schedule tab renders only the `race` slot
+  (date + time as a one-liner); the 5-session breakdown was dropped to
+  match the Homepage §3 card shape. Distinct from `WeekendSchedule`
+  (which is the OpenF1 Instant-based, `nextUpcoming`-aware model
+  driving the Homepage §1 countdown).
+- **SessionSlot** — `[BUILT ticket 03]` `f1/model/Season.kt`; a
+  `date: String?, time: String?` pair from f1api.dev's
+  `SessionDto`. Kept as raw strings (e.g. `"2024-03-02"`,
+  `"15:00:00Z"`) — the screen formats them. Distinct from
+  `SessionTime` (OpenF1 Instant-based).
+- **RoundPodium** — `[BUILT ticket 03]` `f1/GetRoundPodiumUseCase.kt`;
+  the Schedule > Past list's per-row podium. `data class
+  RoundPodium(val topThree: List<RoundResult>)` with
+  `companion object { const val PODIUM_SIZE = 3 }`. The use case
+  composes `GetRoundResultsUseCase` and slices `[0..2]` (per the
+  ticket 10 research; no extra network call). On the Schedule screen
+  the podium cell renders the 3 `RoundResult`s as P1/P2/P3 chips
+  (driver short name + team); on failure the cell degrades to an
+  inline error + Retry button that calls
+  `ScheduleViewModel.retryPodium(round)` (re-fires a single row with
+  `forceRefresh = true`). The whole schedule never blanks from a
+  single-row failure (shared UX family from ticket 01).

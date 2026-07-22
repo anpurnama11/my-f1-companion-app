@@ -110,4 +110,43 @@ class SeasonAggregatesTest {
         val season = dto.toSeason()
         assertEquals(5412, season.totalKm)
     }
+
+    @Test
+    fun `race schedule is carried onto the domain Race when present`() {
+        val dto = SeasonResponseDto(
+            season = 2024,
+            races = listOf(
+                RaceDto(
+                    round = 1,
+                    raceName = "Bahrain GP",
+                    circuit = CircuitDto(circuitId = "bahrain", circuitName = "Bahrain"),
+                    schedule = com.anpurnama.f1_app.f1.data.RaceScheduleDto(
+                        fp1 = com.anpurnama.f1_app.f1.data.SessionDto(date = "2024-02-29", time = "11:30:00Z"),
+                        fp2 = com.anpurnama.f1_app.f1.data.SessionDto(date = "2024-02-29", time = "15:00:00Z"),
+                        fp3 = com.anpurnama.f1_app.f1.data.SessionDto(date = "2024-03-01", time = "11:30:00Z"),
+                        qualy = com.anpurnama.f1_app.f1.data.SessionDto(date = "2024-03-01", time = "15:00:00Z"),
+                        race = com.anpurnama.f1_app.f1.data.SessionDto(date = "2024-03-02", time = "15:00:00Z"),
+                    ),
+                ),
+            ),
+        )
+        val season = dto.toSeason()
+        val schedule = season.races[0].schedule
+        assertEquals("2024-02-29", schedule?.fp1?.date)
+        assertEquals("15:00:00Z", schedule?.fp2?.time)
+        assertEquals("2024-03-01", schedule?.fp3?.date)
+        assertEquals("15:00:00Z", schedule?.qualy?.time)
+        assertEquals("2024-03-02", schedule?.race?.date)
+    }
+
+    @Test
+    fun `race schedule is null when every slot is absent`() {
+        // DTO defaults to all-null when the endpoint doesn't carry it.
+        val dto = SeasonResponseDto(
+            season = 2024,
+            races = listOf(race(1, "bahrain", "5412km", hasWinner = false)),
+        )
+        val season = dto.toSeason()
+        assertEquals(null, season.races[0].schedule)
+    }
 }

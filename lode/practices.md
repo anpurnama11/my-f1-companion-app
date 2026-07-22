@@ -14,12 +14,17 @@ else is the agreed contract the build works toward, written present-tense as the
 to implement against. Flip a section to `[BUILT]` as it lands.
 
 **Still pending:** the widget (`CountdownWidget` + `CountdownWorker` + `NextRaceCache`),
-the remaining use cases (driver/team standings, round results, qualifying, top-speed,
-most-wins-at-circuit, podium), the §1 favorite pager and §3 nearest-GP sections on
-Homepage, the placeholder tabs (Schedule/Leaderboard/MyTeam), and ticket 04's
-multi-source `HttpClient` extensions (jolpica + OpenF1). Detail routes
-(`DriverDetail`/`TeamDetail`/`RoundDetail`/`CircuitDetail`) land with the screens that
-open them, per ticket 05.
+the remaining use cases (driver/team standings, top-speed, most-wins-at-circuit),
+the placeholder tabs (Leaderboard/MyTeam), and ticket 04's
+multi-source `HttpClient` extensions (jolpica + OpenF1). Round detail
+(`Route.RoundDetail` + `RoundViewModel`/`RoundScreen`, fed by
+`GetRoundResultsUseCase` + `GetRoundQualifyingUseCase`) and the Schedule tab
+(`ScheduleViewModel`/`ScheduleScreen` reusing `GetSeasonUseCase` for the list and
+`GetRoundPodiumUseCase` for per-row past podiums) are now `[BUILT]`. Detail
+routes (`DriverDetail`/`TeamDetail`) land with the screens that open them, per
+ticket 05; `RoundDetail` is wired but its destination page is the
+ticket-03-built `RoundScreen`, and `CircuitDetail` remains the slice-06
+placeholder.
 
 ## Build floor `[BUILT]` `[from ticket 02]`
 

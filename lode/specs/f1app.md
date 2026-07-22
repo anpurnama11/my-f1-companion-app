@@ -281,6 +281,17 @@ flowchart LR
   Widget["Countdown widget"] ==>|"f1app://round/{y}/{r}"| RoundDetail
 ```
 
+### Schedule surface shape (locked — revision 1 of ticket 03)
+
+The `Route.Schedule` tab is a **tab switcher at the top of the screen** (Material 3 `TabRow` or a `SegmentedButton` row), not a single scroll with two section headers. Two tabs: **Upcoming** and **Past**. The active tab is the only one whose list is visible; the inactive tab's state stays alive in `ScheduleViewModel` so a tab switch is instant (no re-fetch).
+
+- **Upcoming row** — closest in shape to the Homepage §3 circuit card. Fields: round number, GP name, race date, city, **circuit image** (decorative; per-circuit brand accent or OpenF1 track-layout). No podium cell (no winner yet). Lazy per-row `LaunchedEffect` does not fire (no extra fetch needed for upcoming rows; the season response already carries everything).
+- **Past row** — same fields as Upcoming (round / GP name / date / city / circuit image) plus a **podium winner** cell replacing any countdown block. Past rows have no countdown by definition. The lazy per-row `LaunchedEffect(race.round) { onLoadPodium() }` fires here, same as the v1 single-list shape; `GetRoundPodiumUseCase` is unchanged. Per-row failure degrades to a retry row inside the Past tab, never blanks the schedule.
+- **No countdown anywhere on Schedule.** Countdown is a Homepage §1 / widget surface; the Schedule tab is a reference (what's coming / what happened), not a live timer.
+- **Pull-to-refresh** on either tab re-fetches the season + every past podium with `forceRefresh = true` (NO_CACHE). Tab state is preserved across the refresh.
+
+Cross-ref: `lode/plans/f1app-build/tickets/03-schedule-tab-and-round-detail.md` (the build record + revision 1 block).
+
 ### Deep link (custom scheme, widget → RoundDetail)
 
 - Form: `f1app://round/{year}/{round}`.

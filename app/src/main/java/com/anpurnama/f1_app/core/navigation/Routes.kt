@@ -35,4 +35,14 @@ sealed interface Route : NavKey {
      */
     @Serializable
     data class CircuitDetail(val circuitId: String) : Route
+
+    /**
+     * Detail page for a single round. Opened from a Schedule row tap
+     * and (in the future, ticket 07) from the Countdown widget's
+     * custom-scheme deep link. Lands in this slice (ticket 03): the
+     * page shows the race results, the qualifying results, and a
+     * circuit block that links to [CircuitDetail].
+     */
+    @Serializable
+    data class RoundDetail(val year: Int, val round: Int) : Route
 }

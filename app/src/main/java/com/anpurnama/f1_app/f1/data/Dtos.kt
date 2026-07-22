@@ -183,3 +183,133 @@ data class OpenF1MeetingDto(
     @SerialName("circuit_image") val circuitImage: String? = null,
     @SerialName("country_flag") val countryFlag: String? = null,
 )
+
+// f1api.dev /{year}/{round}/race envelope — `races` is an *object* here
+// (different from /current's `races: [...]` array), holding a
+// one-element `circuit: [...]` array (also different from /current's
+// inlined `circuit` object). `results` is ordered by finishing position.
+// `position` is a String (`"1"`/`"2"`/`"NC"`); `time` is a dirty String
+// (`"1:31:44"`/`"+22.457"`/`"+1 lap"`/`"DNF (1)"`) — both kept
+// un-parsed per the ticket 03 spec.
+@Serializable
+data class RoundResultsResponseDto(
+    val season: Int = 0,
+    val races: RacesDto = RacesDto(),
+) {
+    @Serializable
+    data class RacesDto(
+        val round: String? = null,
+        val date: String? = null,
+        val time: String? = null,
+        val raceId: String = "",
+        val raceName: String? = null,
+        val url: String? = null,
+        val circuit: List<CircuitDto> = emptyList(),
+        val results: List<ResultDto> = emptyList(),
+    ) {
+        @Serializable
+        data class CircuitDto(
+            val circuitId: String = "",
+            val circuitName: String? = null,
+            val country: String? = null,
+            val city: String? = null,
+            val circuitLength: String = "",
+            val corners: Int? = null,
+        )
+
+        @Serializable
+        data class ResultDto(
+            val position: String? = null,
+            val points: Int = 0,
+            val grid: String? = null,
+            val time: String? = null,
+            val fastLap: String? = null,
+            val retired: String? = null,
+            val driver: DriverDto = DriverDto(),
+            val team: TeamDto = TeamDto(),
+        ) {
+            @Serializable
+            data class DriverDto(
+                val driverId: String = "",
+                val number: Int? = null,
+                val shortName: String? = null,
+                val name: String? = null,
+                val surname: String? = null,
+                val nationality: String? = null,
+                val birthday: String? = null,
+            )
+
+            @Serializable
+            data class TeamDto(
+                val teamId: String = "",
+                val teamName: String? = null,
+                val nationality: String? = null,
+                val firstAppareance: Int? = null,
+            )
+        }
+    }
+}
+
+// f1api.dev /{year}/{round}/qualy envelope — `races` is an *object* with
+// a SINGLE `circuit` object (not a one-element array like /race uses).
+// `qualyResults` is ordered by `gridPosition` (1-based Int). q1/q2/q3
+// are dirty Strings or null when the driver didn't reach that segment.
+@Serializable
+data class RoundQualifyingResponseDto(
+    val season: Int = 0,
+    val races: RacesDto = RacesDto(),
+) {
+    @Serializable
+    data class RacesDto(
+        val round: String? = null,
+        val qualyDate: String? = null,
+        val qualyTime: String? = null,
+        val raceId: String = "",
+        val raceName: String? = null,
+        val url: String? = null,
+        val circuit: CircuitDto = CircuitDto(),
+        val qualyResults: List<QualyResultDto> = emptyList(),
+    ) {
+        @Serializable
+        data class CircuitDto(
+            val circuitId: String = "",
+            val circuitName: String? = null,
+            val country: String? = null,
+            val city: String? = null,
+            val circuitLength: String = "",
+            val corners: Int? = null,
+        )
+
+        @Serializable
+        data class QualyResultDto(
+            val classificationId: Int? = null,
+            val driverId: String = "",
+            val teamId: String = "",
+            val q1: String? = null,
+            val q2: String? = null,
+            val q3: String? = null,
+            val gridPosition: Int = 0,
+            val driver: DriverDto = DriverDto(),
+            val team: TeamDto = TeamDto(),
+        ) {
+            @Serializable
+            data class DriverDto(
+                val driverId: String = "",
+                val number: Int? = null,
+                val shortName: String? = null,
+                val name: String? = null,
+                val surname: String? = null,
+                val nationality: String? = null,
+                val birthday: String? = null,
+            )
+
+            @Serializable
+            data class TeamDto(
+                val teamId: String = "",
+                val teamName: String? = null,
+                val nationality: String? = null,
+                val firstAppareance: Int? = null,
+            )
+        }
+    }
+}

@@ -5,7 +5,9 @@ import com.anpurnama.f1_app.f1.data.SeasonResponseDto
 import com.anpurnama.f1_app.f1.data.getCurrent
 import com.anpurnama.f1_app.f1.model.Circuit
 import com.anpurnama.f1_app.f1.model.Race
+import com.anpurnama.f1_app.f1.model.RaceSchedule
 import com.anpurnama.f1_app.f1.model.Season
+import com.anpurnama.f1_app.f1.model.SessionSlot
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
@@ -74,4 +76,25 @@ private fun com.anpurnama.f1_app.f1.data.RaceDto.toRace(): Race = Race(
     ),
     winnerId = winner?.driverId,
     laps = laps,
+    schedule = schedule.toSchedule(),
 )
+
+/**
+ * Maps the f1api.dev `/current` `RaceScheduleDto` (which has all-null
+ * defaults when the endpoint doesn't carry it) to the domain
+ * [RaceSchedule]. Returns null when every slot is absent so the
+ * screen can render "no schedule" instead of a row of empty cells.
+ */
+private fun com.anpurnama.f1_app.f1.data.RaceScheduleDto.toSchedule(): RaceSchedule? {
+    if (fp1 == null && fp2 == null && fp3 == null && qualy == null && race == null) return null
+    return RaceSchedule(
+        fp1 = fp1?.toSlot(),
+        fp2 = fp2?.toSlot(),
+        fp3 = fp3?.toSlot(),
+        qualy = qualy?.toSlot(),
+        race = race?.toSlot(),
+    )
+}
+
+private fun com.anpurnama.f1_app.f1.data.SessionDto.toSlot(): SessionSlot =
+    SessionSlot(date = date, time = time)

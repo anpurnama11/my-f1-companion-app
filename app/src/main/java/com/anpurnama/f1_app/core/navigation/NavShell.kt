@@ -17,6 +17,8 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.anpurnama.f1_app.feature.homepage.HomepageScreen
+import com.anpurnama.f1_app.feature.round.RoundScreen
+import com.anpurnama.f1_app.feature.schedule.ScheduleScreen
 
 /**
  * The 4-tab app shell. Only [Route.Homepage] renders real content this
@@ -47,13 +49,27 @@ fun NavShell() {
             onBack = { backStack.removeLastOrNull() },
             entryProvider = entryProvider {
                 entry<Route.Homepage> { HomepageScreen(backStack = backStack) }
-                entry<Route.Schedule> { PlaceholderScreen("Schedule") }
+                entry<Route.Schedule> {
+                    ScheduleScreen(
+                        onRoundClick = { y, r -> backStack.add(Route.RoundDetail(y, r)) },
+                    )
+                }
                 entry<Route.Leaderboard> { PlaceholderScreen("Leaderboard") }
                 entry<Route.MyTeam> { PlaceholderScreen("My Team") }
                 // The CircuitDetail page lands in slice 06. For now, the
                 // entry exists so §3's tap-target pushes a valid route;
                 // the page is a placeholder until the real screen lands.
                 entry<Route.CircuitDetail> { PlaceholderScreen("Circuit") }
+                // Round detail — pushed from the Schedule tab's row
+                // tap. The screen needs no backStack param; the system
+                // back gesture pops the route, handled by NavDisplay.
+                entry<Route.RoundDetail> { key ->
+                    RoundScreen(
+                        year = key.year,
+                        round = key.round,
+                        onCircuitClick = { id -> backStack.add(Route.CircuitDetail(id)) },
+                    )
+                }
             },
         )
     }

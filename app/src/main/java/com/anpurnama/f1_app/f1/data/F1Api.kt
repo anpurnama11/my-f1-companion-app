@@ -132,3 +132,37 @@ suspend fun HttpClient.getOpenF1Meetings(
 internal val F1API_TO_OPENF1_COUNTRY: Map<String, String> = mapOf(
     "Great Britain" to "United Kingdom",
 )
+
+/**
+ * Per-round race results. Drives Round detail (full grid) and the
+ * Schedule > Past list podium (sliced via `GetRoundPodiumUseCase`).
+ * The `races` envelope here is the unusual object-with-results shape,
+ * distinct from `/current`'s array envelope.
+ */
+suspend fun HttpClient.getRoundResults(
+    year: Int,
+    round: Int,
+    forceRefresh: Boolean = false,
+): RoundResultsResponseDto {
+    val response = get("$F1API_BASE/$year/$round/race") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+/**
+ * Per-round qualifying results. Same envelope shape as the race
+ * endpoint but with `qualyResults` (ordered by `gridPosition`) and a
+ * single `circuit` object (not a one-element array). Drives Round
+ * detail's Qualifying tab.
+ */
+suspend fun HttpClient.getRoundQualifying(
+    year: Int,
+    round: Int,
+    forceRefresh: Boolean = false,
+): RoundQualifyingResponseDto {
+    val response = get("$F1API_BASE/$year/$round/qualy") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}

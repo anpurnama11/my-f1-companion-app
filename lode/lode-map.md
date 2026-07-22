@@ -23,9 +23,9 @@ lode/
     0003-derived-sections-load-after-nextrace.md  # Derived sections load after loadNextRace(); no reactive observer
   plans/
     f1app-build/tickets/
-      01-foundation-and-homepage-section-2.md   # ready — Foundation + Homepage §2 (pins UX family)
+      01-foundation-and-homepage-section-2.md   # built — Foundation + Homepage §2 (pins UX family)
       02-homepage-section-1-and-section-3.md    # built — Homepage §1 favorites pager + §3 top speed (2027-01-15)
-      03-schedule-tab-and-round-detail.md       # ready — blocked by 01
+      03-schedule-tab-and-round-detail.md       # built — Schedule tab (Upcoming/Past + podium retry) + Round detail (race + qualy + circuit)
       04-leaderboard-and-driver-team-detail.md  # ready — blocked by 01
       05-my-team-tab-and-favorites-picker.md    # ready — blocked by 02
       06-circuit-detail.md                      # ready — blocked by 02,03
