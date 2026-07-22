@@ -43,7 +43,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.anpurnama.f1_app.F1App
-import com.anpurnama.f1_app.core.navigation.Route
 import com.anpurnama.f1_app.core.ui.OutcomeContent
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.feature.favorites.Favorites
@@ -56,8 +55,6 @@ import com.anpurnama.f1_app.f1.model.TopSpeed
 import com.anpurnama.f1_app.f1.model.WeekendSchedule
 import com.anpurnama.f1_app.ui.theme.Circuits
 import com.anpurnama.f1_app.ui.theme.Spacing
-import androidx.navigation3.runtime.NavBackStack
-import androidx.navigation3.runtime.NavKey
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -81,7 +78,7 @@ private val RACE_DURATION = 3.hours
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomepageScreen(
-    backStack: NavBackStack<NavKey>? = null,
+    onCircuitClick: (String) -> Unit = {},
     viewModel: HomepageViewModel = rememberHomepageViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -124,7 +121,7 @@ fun HomepageScreen(
                 nextRace = sections.nextRace,
                 topSpeed = sections.topSpeed,
                 onClickCircuit = { circuitId ->
-                    backStack?.add(Route.CircuitDetail(circuitId))
+                    onCircuitClick(circuitId)
                 },
             )
         }

@@ -21,6 +21,7 @@ lode/
     0001-openf1-qualydate-not-racedate.md  # OpenF1 join uses qualyDate, not raceDate (correction of ticket 11 research)
     0002-sectionuistate-is-vm-to-ui-transport.md  # SectionUiState is VM→UI transport; Outcome stops at the VM
     0003-derived-sections-load-after-nextrace.md  # Derived sections load after loadNextRace(); no reactive observer
+    0004-multi-backstack-tab-navigation.md   # Multi-backstack; per-tab NavBackStack avoids ViewModel destruction on tab switch
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # built — Foundation + Homepage §2 (pins UX family)

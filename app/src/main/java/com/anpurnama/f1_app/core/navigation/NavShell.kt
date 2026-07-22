@@ -9,87 +9,79 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.navigation3.runtime.NavBackStack
-import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.anpurnama.f1_app.feature.homepage.HomepageScreen
 import com.anpurnama.f1_app.feature.round.RoundScreen
 import com.anpurnama.f1_app.feature.schedule.ScheduleScreen
 
 /**
- * The 4-tab app shell. Only [Route.Homepage] renders real content this
- * slice — Schedule, Leaderboard, and MyTeam are placeholders that later
- * slices replace (ticket 02, 03, 05).
+ * The 4-tab app shell using Navigation 3's multi-backstack pattern.
  *
- * Navigation 3 1.1.4 surface used here:
- *  - [rememberNavBackStack] → persistent [NavBackStack] backed by
- *    reflection serialization (Android-only overload).
- *  - [NavDisplay] with the backStack + an [entryProvider] whose
- *    `entry<T>` matches by reified KClass.
- *  - System back is wired by passing `onBack` that pops the stack.
+ * Each top-level tab (Homepage, Schedule, Leaderboard, MyTeam) owns a
+ * persistent [NavBackStack] that is never cleared on tab switch.
+ * This means ViewModels and composable state survive across tab switches
+ * — no re-fetch of data when the user goes Home → Schedule → Home.
  *
- * The bottom bar mutates `backStack` directly: a tap on a non-current
- * tab clears the stack and pushes the new top-level route. Detail
- * routes (when they land in ticket 05) push on top without clearing.
+ * Navigation actions go through a [Navigator] that dispatches to the
+ * correct per-tab backstack (tab switch vs within-stack push/pop).
+ *
+ * **Exit-through-home:** [Route.Homepage] entries are always rendered.
+ * Pressing back on another tab's root switches to Homepage; pressing
+ * back on Homepage's root exits the app.
  */
 @Composable
 fun NavShell() {
-    val backStack = rememberNavBackStack(Route.Homepage)
+    val navigationState = rememberNavigationState(
+        startRoute = Route.Homepage,
+        topLevelRoutes = Route.homepageTabs,
+    )
+    val navigator = remember(navigationState) { Navigator(navigationState) }
+
+    val entryProvider = entryProvider {
+        entry<Route.Homepage> {
+            HomepageScreen(
+                onCircuitClick = { id -> navigator.navigate(Route.CircuitDetail(id)) },
+            )
+        }
+        entry<Route.Schedule> {
+            ScheduleScreen(
+                onRoundClick = { y, r -> navigator.navigate(Route.RoundDetail(y, r)) },
+            )
+        }
+        entry<Route.Leaderboard> { PlaceholderScreen("Leaderboard") }
+        entry<Route.MyTeam> { PlaceholderScreen("My Team") }
+        entry<Route.CircuitDetail> { PlaceholderScreen("Circuit") }
+        entry<Route.RoundDetail> { key ->
+            RoundScreen(
+                year = key.year,
+                round = key.round,
+                onCircuitClick = { id -> navigator.navigate(Route.CircuitDetail(id)) },
+            )
+        }
+    }
 
     Scaffold(
-        bottomBar = { F1BottomBar(backStack) },
+        bottomBar = { F1BottomBar(navigationState) },
     ) { innerPadding ->
         NavDisplay(
-            backStack = backStack,
+            entries = navigationState.toDecoratedEntries(entryProvider),
             modifier = Modifier.padding(innerPadding),
-            onBack = { backStack.removeLastOrNull() },
-            entryProvider = entryProvider {
-                entry<Route.Homepage> { HomepageScreen(backStack = backStack) }
-                entry<Route.Schedule> {
-                    ScheduleScreen(
-                        onRoundClick = { y, r -> backStack.add(Route.RoundDetail(y, r)) },
-                    )
-                }
-                entry<Route.Leaderboard> { PlaceholderScreen("Leaderboard") }
-                entry<Route.MyTeam> { PlaceholderScreen("My Team") }
-                // The CircuitDetail page lands in slice 06. For now, the
-                // entry exists so §3's tap-target pushes a valid route;
-                // the page is a placeholder until the real screen lands.
-                entry<Route.CircuitDetail> { PlaceholderScreen("Circuit") }
-                // Round detail — pushed from the Schedule tab's row
-                // tap. The screen needs no backStack param; the system
-                // back gesture pops the route, handled by NavDisplay.
-                entry<Route.RoundDetail> { key ->
-                    RoundScreen(
-                        year = key.year,
-                        round = key.round,
-                        onCircuitClick = { id -> backStack.add(Route.CircuitDetail(id)) },
-                    )
-                }
-            },
+            onBack = { navigator.goBack() },
         )
     }
 }
 
 @Composable
-private fun F1BottomBar(backStack: NavBackStack<NavKey>) {
-    val current = backStack.lastOrNull()
+private fun F1BottomBar(navigationState: NavigationState) {
     NavigationBar {
         TopLevelDestination.entries.forEach { dest ->
             NavigationBarItem(
-                selected = current == dest.route,
-                onClick = {
-                    if (current != dest.route) {
-                        backStack.clear()
-                        backStack.add(dest.route)
-                    }
-                },
-                // ponytail: text glyph stand-in; swap for Material vector
-                // icons when the icons-extended dep lands.
+                selected = navigationState.currentRoute == dest.route,
+                onClick = { navigationState.selectTab(dest.route) },
                 icon = {
                     Text(
                         text = dest.glyph,

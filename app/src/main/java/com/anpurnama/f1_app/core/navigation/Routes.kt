@@ -14,6 +14,11 @@ import kotlinx.serialization.Serializable
  */
 sealed interface Route : NavKey {
 
+    /** The 4 top-level tab destinations. */
+    companion object {
+        val homepageTabs: Set<Route> = setOf(Homepage, Schedule, Leaderboard, MyTeam)
+    }
+
     @Serializable
     data object Homepage : Route
 

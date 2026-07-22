@@ -1,8 +1,10 @@
-# Navigation 3 — 4-tab shell
+# Navigation 3 — multi-backstack shell
 
 The app's top-level navigation shape. Built with Jetpack Navigation 3
-(`androidx.navigation3:navigation3-runtime:1.1.4` + `navigation3-ui:1.1.4`).
-Source files: `app/src/main/java/com/anpurnama/f1_app/core/navigation/{Routes,NavShell}.kt`.
+(`androidx.navigation3:navigation3-runtime:1.1.4` + `navigation3-ui:1.1.4` +
+`lifecycle-viewmodel-navigation3:2.11.0`).
+Source files:
+`app/src/main/java/com/anpurnama/f1_app/core/navigation/{Routes,NavShell,NavigationState}.kt`.
 
 ## Topology
 
@@ -10,13 +12,18 @@ Source files: `app/src/main/java/com/anpurnama/f1_app/core/navigation/{Routes,Na
 flowchart LR
   subgraph F1App
     NavShell --> BottomBar["NavigationBar\n4 NavigationBarItems"]
-    NavShell --> NavDisplay
+    NavShell --> NavigationState
+    NavigationState -->|map| Stacks["Map<Route, NavBackStack>\n1 per tab"]
+    NavigationState -->|toDecoratedEntries| NavDisplay
   end
-  BottomBar -->|tap| BackStack["NavBackStack<NavKey>"]
-  BackStack -->|cleared on tab switch| TopLevel["data object:\nHomepage/Schedule/Leaderboard/MyTeam"]
-  NavDisplay -->|entry<T>| Content["HomepageScreen /\nPlaceholderScreen"]
-  BackStack -.->|push later| Detail["data class:\nDriverDetail / TeamDetail /\nRoundDetail / CircuitDetail\n(ticket 05)"]
+  BottomBar -->|selectTab| NavigationState
+  NavigationState -->|push/pop| Stacks
+  NavDisplay -->|entries| Entries["Flattened NavEntry list"]
 ```
+
+Each tab has its own persistent [NavBackStack] that is never cleared on tab
+switch. ViewModels and composable state survive across tab switches via
+decorators.
 
 ## Routes
 
@@ -47,19 +54,47 @@ with parameters that the deserializer reads from `data` on the intent / deeplink
   matches by `K::class`. For `data object` routes the KClass is the singleton
   type; the `content` lambda receives the deserialized instance.
 
-## Bottom-bar contract
+## Multi-backstack approach (revision 2)
 
-A tap on the currently-selected tab is a no-op. A tap on a different tab
-clears the back stack and pushes the new top-level route. Detail routes
-(when they exist) push on top of the back stack without clearing it, so
-system back from a detail returns to the parent tab.
+**Problem (revision 1):** `backStack.clear()` on tab switch destroyed the
+Nav3 entry, which destroyed the entry's ViewModelStoreOwner. Each tab switch
+caused a full data re-fetch because ViewModels were recreated from scratch.
+
+**Fix (revision 2):** Replace the single shared [NavBackStack] with one
+persistent stack per top-level tab. Switching tabs only changes which stack
+`NavDisplay` renders — the inactive stacks stay alive with their ViewModels.
+
+### Key classes
+
+- **[NavigationState]** — holds `Map<Route, NavBackStack<NavKey>>` (one per tab)
+  + the currently-active tab. Created by `rememberNavigationState()`.
+- **[Navigator]** — thin wrapper dispatching `navigate(route)`: if `route` is a
+  top-level tab key, switches tabs; otherwise pushes onto the current stack.
+- **View lifecycle:** each tab's entries get their own
+  `rememberSaveableStateHolderNavEntryDecorator` + `rememberViewModelStoreNavEntryDecorator`,
+  scoping ViewModels and composable state per-entry per-tab.
+
+### Tab switching
+
+A tap on a different tab calls `navigationState.selectTab(route)`, which just
+updates the `currentRoute` property. `NavDisplay` recomposes to show the
+active stack's entries. The inactive stack's entries remain in their
+`NavBackStack` with full ViewModel state.
 
 ```kotlin
-if (current != dest.route) {
-    backStack.clear()
-    backStack.add(dest.route)
-}
+NavigationBarItem(
+    selected = navigationState.currentRoute == dest.route,
+    onClick = { navigationState.selectTab(dest.route) },
+)
 ```
+
+### Exit-through-home
+
+`Route.Homepage` is the start route — its entries are always in the rendered
+list (for exit-through-home). Back behavior:
+- **On Homepage root + back** → `pop()` returns `false` → the system exits the app.
+- **On a non-start tab root + back** → `pop()` switches back to Homepage.
+- **Any tab with a detail route pushed + back** → pops within that tab's stack.
 
 ## `MainActivity`
 
@@ -93,3 +128,10 @@ Real Material vectors swap in when the first screen gets a real icon.
 - Deep-link handling (`Intent.ACTION_VIEW` with `f1app://round/...` lands
   in ticket 05 alongside the `RoundDetail` route).
 - `SceneStrategy` chains — single-pane is the default and the only scene.
+
+## `decorator order is load-bearing
+
+The doc shows `rememberSaveableStateHolderNavEntryDecorator()` **before**
+`rememberViewModelStoreNavEntryDecorator()`. Preserve that order — the
+saveable-state holder must wrap the VM store so `SavedStateHandle`/UI state
+survives process death.

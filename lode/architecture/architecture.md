@@ -139,9 +139,14 @@ injected logger interface.
   OpenF1 enrichment (headshot, weather, race-control flags) parks as a bounded
   follow-up — the `session_key` plumbing is contractually scoped by 04+11, so landing
   them is cheaper once 04 is built, but shipping is a separate prioritization.
-- **Navigation & deep links** — **decided (ticket 05 design-locked, not built).** Navigation 3 with 7 flat
+- **Navigation & deep links** — **built (revision 2, multi-backstack).** Navigation 3 with 7 flat
   `NavKey` routes: `Homepage` (start), `Schedule`, `Leaderboard`, `DriverDetail(driverId)`,
   `TeamDetail(teamId)`, `RoundDetail(year, round)`, `CircuitDetail(circuitId)`.
+  Multi-backstack: each tab has its own persistent `NavBackStack`; switching tabs does not
+  destroy ViewModel state. Entry decorators (`rememberSaveableStateHolderNavEntryDecorator` +
+  `rememberViewModelStoreNavEntryDecorator`) scope composable state and ViewModels per entry.
+  `Navigator` dispatches tab switches vs within-stack pushes. Exit-through-home: Homepage entries
+  always rendered; back on another tab's root returns to Homepage.
   Countdown widget deep-links to `RoundDetail` via custom scheme
   `f1app://round/{year}/{round}` (`PendingIntent` from `NextRaceCache` args);
   `MainActivity` parses the URI, pushes `RoundDetail` onto Homepage backstack.

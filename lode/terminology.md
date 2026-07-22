@@ -105,12 +105,14 @@ Short term → meaning lines. Domain + project language.
   (race results + qualifying + circuit block). `DriverDetail`/`TeamDetail` land
   with the screens that open them, per ticket 05.
 - **NavShell** — `core/navigation/NavShell.kt`; the 4-tab `Scaffold` +
-  `NavigationBar` + `NavDisplay` host. Uses Navigation 3 1.1.4's `NavBackStack` +
-  `rememberNavBackStack` (Android-only reflection serializer) and `NavDisplay(backStack,
-  onBack, entryProvider = entryProvider { entry<T> { ... } })`. Tapping a different
-  tab clears the back stack and pushes the new top-level route; the system back
-  gesture pops one level. Only `Homepage` renders real content this slice; the
-  other three are placeholder `Text("… coming soon")` composables.
+  `NavigationBar` + `NavDisplay` host. Uses Navigation 3 multi-backstack
+  (revision 2): each tab owns a persistent `NavBackStack`; switching tabs
+  does not destroy ViewModels — no data re-fetch.
+  `NavigationState` holds the per-tab stacks + current tab;
+  `Navigator` dispatches tab switches vs within-stack pushes.
+  Entry decorators (`rememberSaveableStateHolderNavEntryDecorator` +
+  `rememberViewModelStoreNavEntryDecorator`) scope state per-entry.
+  Exit-through-home: Homepage is the start route, always rendered.
 - **SectionUiState\<T\>** — the **VM→UI transport** for a screen section: `Loading`,
   `Error(message)`, `Content(data)`. Lives at `core/ui/SectionUiState.kt`. Named for screen
   vocabulary (Content/Error), not operation vocabulary (Success/Failure). Each independently-failing
