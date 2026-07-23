@@ -120,9 +120,6 @@ class ScheduleViewModelTest {
         getPodium: suspend (Int, Int, Boolean) -> Outcome<RoundPodium> = { _, round, _ ->
             Outcome.Success(podium(SEASON.races.first { it.round == round }))
         },
-        getCircuitImage: suspend (Int, String) -> Outcome<String?> = { year, country ->
-            Outcome.Success<String?>("https://example.com/$year/$country.png")
-        },
     ) = ScheduleViewModel(
         getSeason = getSeason,
         getRoundPodium = getPodium
@@ -198,48 +195,12 @@ class ScheduleViewModelTest {
     }
 
     @Test
-    fun `circuit images are fetched for all country-bearing races on warmUp`() = runTest {
-        val imageCalls = mutableListOf<Pair<Int, String>>()
-        val vm = fakeVm(
-            getCircuitImage = { year, country ->
-                imageCalls += year to country
-                Outcome.Success<String?>("https://example.com/$year/$country.png")
-            },
-        )
-
-        startCollecting(vm)
-        val state = vm.uiState.value as ScheduleViewModel.UiState.Sections
-        assertTrue(state.season is SectionUiState.Content)
-
-        // All country-bearing races fire (past + upcoming).
-        // Round 12 (no country) is skipped — accent fallback.
-        assertEquals("image fetches for all country-bearing races",
-            setOf("Bahrain", "Saudi Arabia", "Hungary"),
-            imageCalls.map { it.second }.toSet())
-        assertEquals(3, imageCalls.size)
-    }
-
-    @Test
-    fun `per-race circuit image failure degrades to Error, not screen blank`() = runTest {
-        val vm = fakeVm(
-            getCircuitImage = { _, country ->
-                if (country == "Bahrain") Outcome.Failure("boom-bahrain")
-                else Outcome.Success<String?>("https://example.com/$country.png")
-            },
-        )
-
-        startCollecting(vm)
-        val state = vm.uiState.value as ScheduleViewModel.UiState.Sections
-    }
-
-    @Test
     fun `season failure blanks the screen and clears every per-row map`() = runTest {
         var podiumCalls = 0
         var imageCalls = 0
         val vm = fakeVm(
             getSeason = { Outcome.Failure("boom") },
-            getPodium = { _, _, _ -> podiumCalls++; Outcome.Success(podium(BAHRAIN)) },
-            getCircuitImage = { _, _ -> imageCalls++; Outcome.Success<String?>(null) },
+            getPodium = { _, _, _ -> podiumCalls++; Outcome.Success(podium(BAHRAIN)) }
         )
 
         startCollecting(vm)
