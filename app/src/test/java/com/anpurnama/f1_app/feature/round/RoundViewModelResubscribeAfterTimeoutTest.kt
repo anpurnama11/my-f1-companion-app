@@ -20,30 +20,25 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Adversarial verification: the RoundViewModel's `uiState` is built as
+ * Regression test for the "back from Round detail re-loads Schedule"
+ * bug.
  *
- *   combine(...).onStart { warmUp() }.stateIn(WhileSubscribed(5_000))
+ * The RoundViewModel's `uiState` is built as
  *
- * Kotlin Flow semantics: `WhileSubscribed(stopTimeoutMillis)` cancels
- * the upstream after the timeout with zero subscribers; on
- * re-subscription, a fresh upstream starts, and `onStart { warmUp() }`
- * re-fires — so `loadResults(false)` and `loadQualifying(false)` run
- * again, and the underlying use cases are called a second time.
+ *   combine(...).onStart { warmUp() }.stateIn(Lazily)
  *
- * This is the prescribed behavior per lode/practices.md for the
- * init-less + WhileSubscribed pattern. The test pins the *intra-window*
- * behavior (re-subscribe within 5_000ms does NOT re-fire warmUp) which
- * is the part that matters for the "tab switch and back" UX. The
- * post-timeout re-fire is documented Kotlin Flow behavior — verified
- * by reading the SharingStarted source (1.11.0: `transformLatest`
- * emits STOP after `delay(stopTimeout)`, and a new START on the next
- * subscription re-runs the upstream including `onStart`).
+ * Under `Lazily`, the cold upstream runs from the first subscriber
+ * until the VM is cleared (`viewModelScope` cancel). It does NOT stop
+ * when the last subscriber leaves, so `onStart { warmUp() }` fires
+ * exactly once in the VM's lifetime. The previous `WhileSubscribed(5_000)`
+ * setting caused warmUp to re-fire on any re-subscribe past 5s — which
+ * is what the user reported when reading a Round detail for >5s and
+ * pressing back.
  *
- * The post-timeout re-fire is hard to pin in a unit test because
- * `viewModelScope` uses `Dispatchers.Main.immediate` which doesn't
- * cooperate with `advanceTimeBy` for the WhileSubscribed timer. The
- * intra-window check below is the testable half — it confirms the
- * `WhileSubscribed(5_000)` window is honored.
+ * This test pins the new contract: warmUp fires once, no matter how
+ * many times the screen re-enters composition within the VM's
+ * lifetime. The test name deliberately avoids "WhileSubscribed" —
+ * the timeout is gone.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RoundViewModelResubscribeAfterTimeoutTest {
@@ -89,7 +84,7 @@ class RoundViewModelResubscribeAfterTimeoutTest {
     )
 
     @Test
-    fun `re-subscription within the WhileSubscribed window reuses the loaded state`() = runTest {
+    fun `re-subscription within the VM lifetime reuses the loaded state`() = runTest {
         val resultCalls = mutableListOf<Pair<Int, Boolean>>()
         val qualyCalls = mutableListOf<Pair<Int, Boolean>>()
         val vm = fakeVm(resultCalls, qualyCalls)
@@ -111,26 +106,22 @@ class RoundViewModelResubscribeAfterTimeoutTest {
             (firstTwo[1] as RoundViewModel.UiState.Sections).results
                 is com.anpurnama.f1_app.core.ui.SectionUiState.Content)
 
-        // Unsubscribe (user backgrounds the screen).
+        // Unsubscribe (user backs out to Schedule).
         collectJob1.cancel()
         testScheduler.advanceUntilIdle()
 
-        // Re-subscribe within the 5_000ms window: warmUp does NOT
-        // re-fire (the cached upstream is still alive). This is the
-        // "tab-switch-and-back" UX the timeout is tuned for.
-        advanceTimeBy(4_000)
+        // Re-subscribe well past the previous `WhileSubscribed(5_000)`
+        // window. Under `Lazily` the upstream is still hot, so
+        // warmUp does NOT re-fire. This is the back-from-detail UX.
+        advanceTimeBy(60_000)
         val collectJob2 = backgroundScope.launch { vm.uiState.collect() }
         testScheduler.advanceUntilIdle()
-        assertEquals("within 5s window: no extra results call",
+        assertEquals("after 60s: no extra results call (Lazily keeps upstream hot)",
             listOf(1 to false), resultCalls)
-        assertEquals("within 5s window: no extra qualifying call",
+        assertEquals("after 60s: no extra qualifying call (Lazily keeps upstream hot)",
             listOf(1 to false), qualyCalls)
         collectJob2.cancel()
         testScheduler.advanceUntilIdle()
-        // Drain the WhileSubscribed timer on viewModelScope so
-        // runTest doesn't see it as a pending coroutine after the
-        // last subscriber leaves.
-        advanceTimeBy(5_001)
     }
 }
 
