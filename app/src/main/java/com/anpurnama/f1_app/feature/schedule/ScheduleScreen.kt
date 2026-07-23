@@ -5,15 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,7 +29,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -323,44 +319,62 @@ private fun PodiumCell(
                 Text("Retry")
             }
         }
-        is SectionUiState.Content -> Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            podium.data.topThree.forEachIndexed { index, r ->
-                PodiumChip(position = index + 1, name = r.driverShortName, team = r.teamName)
-            }
-        }
+        is SectionUiState.Content -> InlinePodium(
+            drivers = podium.data.topThree.map { it.driverShortName },
+        )
     }
 }
 
+/**
+ * Past-row podium line. Single inline text in the row's existing visual
+ * language — no container, no background, no chip shape.
+ *
+ * ```
+ * P1 RUS  ·  P2 ANT  ·  P3 LEC
+ * ```
+ *
+ * Position label and driver code share `titleMedium` SemiBold (matches
+ * the GP-name weight above). Position is `onSurfaceVariant` (muted);
+ * driver code is `onSurface` (full). Color carries the label-vs-value
+ * hierarchy so the line reads as one typeface, not two mismatched
+ * sizes. P1 dominance is implicit — left-to-right scan reads P1 first.
+ *
+ * Replaces the v1 chips (`/impeccable bolder` overshot, `/quieter`
+ * still read as a foreign primitive in the row; `/impeccable shape`
+ * resolved the premise itself).
+ */
 @Composable
-private fun PodiumChip(position: Int, name: String?, team: String?) {
-    val label = name ?: "—"
-    val teamLabel = team ?: ""
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .padding(horizontal = Spacing.sm, vertical = 4.dp),
-        horizontalAlignment = Alignment.Start,
-    ) {
-        Text(
-            text = "P$position",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+private fun InlinePodium(drivers: List<String?>) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        drivers.forEachIndexed { index, code ->
+            Text(
+                text = "P${index + 1}",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+            )
+            // `start` padding on the code Text — without it the position
+            // and code mash into one word (`P1ANT`); the brief was `P1
+            // RUS` with breathing room. Spacing.xs matches the breathing
+            // room on each side of the middle dot, so the line has one
+            // consistent rhythm.
+            Text(
+                text = code ?: "—",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = Spacing.xs),
+            )
+            if (index < drivers.lastIndex) {
+                Text(
+                    text = "·",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.xs),
+                )
+            }
+        }
     }
-    // ponytail: no separator between chips — the P1/P2/P3 labels are
-    // the visual break. If designers want pill chips later, wrap in a
-    // Box(.background(surfaceContainerHighest)) and add `Spacer`.
-    Spacer(Modifier.width(Spacing.xs))
 }
 
 /**

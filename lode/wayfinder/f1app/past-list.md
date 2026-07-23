@@ -136,6 +136,12 @@ a single loading shimmer — not a different API.
 
 - `Race.winner: Driver?` on the `Season` model is the P1 source + row order
   from `/current`. Null on upcoming races; render "—" or hide the podium cell.
+- **Order: most-recent first.** The Past tab is a "what just happened" scan
+  path; `season.races.filter { it.winnerId != null }.sortedByDescending { it.round }`
+  — round number is monotonic within a season, so descending round ≡
+  reverse-chronological. (Upcoming keeps ascending: next race first.) The
+  f1api.dev `/current` response is round-ascending, so the filter alone
+  produces the wrong order; the explicit `sortedByDescending` is required.
 - Past list row cells: `[round#, circuit-flag, race-name, P1/P2/P3 drivers]`.
   P1 available immediately from `/current`; P2/P3 load via the per-row use
   case. Click → `RoundDetail(year, round)`.
@@ -146,6 +152,72 @@ a single loading shimmer — not a different API.
   is a cache hit for rounds the list already fetched.
 - `position` is a String; consumers must tolerate `"NC"`. Slice the ordered
   array rather than filtering by position.
+
+## Visual treatment (locked 2027-01-15, `/impeccable shape`)
+
+The past-row podium cell is the only reason a casual fan opens the Past tab;
+the cell answers "who raced last, and when" in one glance. The treatment
+extends — does not replace — the data contract above.
+
+Three design iterations landed here, documented because the failed
+attempts are also a record of what the row does *not* want:
+
+1. **v1: three flat `Column` chips** — P1/P2/P3 looked identical; no
+   visual hierarchy, no team name. (Original P0 #4 in the 2027-01-15
+   critique.)
+2. **Bolder pass: tiered chips with `F1Primary` on P1, `surfaceContainerHigh`
+   on P2/P3, `titleLarge` Bold on P1, `titleMedium` on P2/P3, full team
+   name underneath** — `titleLarge` made RUS/ANT as big as the GP name
+   above, the row's height broke, "Mercedes For…" truncation on long
+   team names added noise. Quieter pass dropped the type bump + team
+   name + padding but still read as a foreign primitive in the row.
+3. **Shape pass: replace chips with an inline text line** (this version).
+   The row's existing visual language is text on the card surface; the
+   chip shape (rounded background container) was a new primitive the
+   row didn't share. Dropping the chip resolves the mismatch.
+
+**Treatment (locked).**
+
+- Single inline text line on the row, no container, no background, no chip:
+  ```
+  P1 RUS  ·  P2 ANT  ·  P3 LEC
+  ```
+- Position label (`P1` / `P2` / `P3`) and driver code (`RUS` / `ANT` /
+  `LEC`) share `titleMedium` SemiBold (matches the GP-name weight
+  above the row). Position is `onSurfaceVariant` (muted); driver code
+  is `onSurface` (full). Color carries the label-vs-value hierarchy
+  so the line reads as one typeface, not two mismatched sizes.
+- **`start` padding `Spacing.xs` on the code Text.** Without it the
+  position and code mash into one word (`P1ANT`); the brief was
+  `P1 RUS` with breathing room. `Spacing.xs` matches the breathing
+  room on each side of the middle dot, so the line has one consistent
+  rhythm.
+- Middle dot `·` with `Spacing.xs` on each side as the separator. No
+  trailing separator after the last entry. The middle dot itself is
+  `bodyMedium` `onSurfaceVariant` — smaller and muted, so it sits
+  between the pairs without competing with them.
+- P1 dominance is implicit — left-to-right scan reads P1 first; no
+  special color or weight treatment on P1. The `1` in `P1` is the
+  first/most-recent position.
+- Position labels stay (`P1/P2/P3`) — DtS-orthodox; the race mechanic
+  communicates that way to the driver.
+- No team name on the row. The driver code is the F1-canonical signal;
+  team is implied. If team becomes a hard requirement later, route it
+  through `RoundDetail` or a future `teamShortName` field — do not
+  reintroduce the chip shape.
+
+**Rejected directions (do not revisit without a strong reason).**
+
+- P1 red chip (or any coloured background) — the chip *shape* is what
+  was broken; colour does not fix it.
+- `1st` / `2nd` / `3rd` (English ordinal) — chose `P1` / `P2` / `P3` for
+  DtS orthodoxy; user explicitly picked this.
+- Team name on the row — long names (`Scuderia Ferrari`,
+  `Mercedes-AMG Petronas`) truncate ugly inside the row's natural width;
+  the team is one tap away on `RoundDetail`.
+- A stepped 3-row list (vertical stack of 1/2/3 + code) — the row
+  already has a vertical city/date line; stacking more text below it
+  pushes the next row down without adding scanning speed.
 
 ## Out of scope (parked elsewhere)
 
