@@ -62,7 +62,7 @@ class HomepageViewModelTest {
             )
         ),
         completedGp = 1,
-        totalKm = 5412,
+        totalKm = 5.412,  // Bahrain 5412 meters = 5.412 km
         totalLaps = 57,
         progressPercent = 1f,
     )

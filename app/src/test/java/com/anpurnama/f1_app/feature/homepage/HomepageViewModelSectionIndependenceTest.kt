@@ -53,7 +53,7 @@ class HomepageViewModelSectionIndependenceTest {
 
     private val SEASON = Season(
         year = 2026, races = emptyList(),
-        completedGp = 0, totalKm = 0, totalLaps = 0, progressPercent = 0f,
+        completedGp = 0, totalKm = 0.0, totalLaps = 0, progressPercent = 0f,
     )
     private val TOP_TEAM = ConstructorStanding(
         teamId = "mercedes", position = 1, points = 358, wins = 8,

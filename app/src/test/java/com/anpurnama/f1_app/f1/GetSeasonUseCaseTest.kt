@@ -70,7 +70,9 @@ class GetSeasonUseCaseTest {
         val season = (out as Outcome.Success).data
         assertEquals(2026, season.year)
         assertEquals(1, season.completedGp)
-        assertEquals(5412, season.totalKm)
+        // Wire "5412km" = 5412 meters = 5.412 km (see SeasonAggregatesTest
+        // for the unit contract).
+        assertEquals(5.412, season.totalKm, 0.0001)
         assertEquals(57, season.totalLaps)
     }
 

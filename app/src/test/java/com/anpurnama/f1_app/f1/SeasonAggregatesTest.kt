@@ -45,6 +45,23 @@ class SeasonAggregatesTest {
     }
 
     @Test
+    fun `totalKm converts meters on the wire to km in the domain`() {
+        // Pins the unit interpretation. f1api.dev returns `circuitLength`
+        // as `"<meters>km"` (e.g. Bahrain `"5412km"` = 5.412 km). A
+        // regression that drops the `/ 1000` would re-introduce the
+        // 1000× too-large value flagged in the persona critique.
+        val dto = SeasonResponseDto(
+            season = 2026,
+            races = listOf(
+                race(1, "bahrain", "5412km", laps = 57, hasWinner = true),    // 5.412 km
+                race(2, "spa", "7004km", laps = 44, hasWinner = true),        // 7.004 km
+            ),
+        )
+        val season = dto.toSeason()
+        assertEquals(5.412 + 7.004, season.totalKm, 0.0001)
+    }
+
+    @Test
     fun `totalKm sums digit-stripped circuitLength of completed races only`() {
         val dto = SeasonResponseDto(
             season = 2026,
@@ -56,7 +73,10 @@ class SeasonAggregatesTest {
             ),
         )
         val season = dto.toSeason()
-        assertEquals(5412 + 6275 + 5300, season.totalKm)
+        // 5412 + 6275 + 5300 = 16987 meters = 16.987 km. Dot/comma are
+        // stripped by `filter(Char::isDigit)`, so each raw string is
+        // pre-divided by 1000.
+        assertEquals((5412 + 6275 + 5300) / 1000.0, season.totalKm, 0.0001)
     }
 
     @Test
@@ -108,7 +128,8 @@ class SeasonAggregatesTest {
             ),
         )
         val season = dto.toSeason()
-        assertEquals(5412, season.totalKm)
+        // Only `y` contributes; "5412" meters → 5.412 km.
+        assertEquals(5.412, season.totalKm, 0.0001)
     }
 
     @Test

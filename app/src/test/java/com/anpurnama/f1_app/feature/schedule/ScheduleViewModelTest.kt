@@ -85,7 +85,8 @@ class ScheduleViewModelTest {
         year = 2026,
         races = listOf(BAHRAIN, SAUDI, FUTURE, NO_COUNTRY),
         completedGp = 2,
-        totalKm = 11687, totalLaps = 107, progressPercent = 2f / 3f,
+        // Bahrain 5412 + Saudi 6275 = 11687 meters = 11.687 km
+        totalKm = 11.687, totalLaps = 107, progressPercent = 2f / 3f,
     )
 
     private fun podium(race: Race): RoundPodium {
@@ -124,8 +125,7 @@ class ScheduleViewModelTest {
         },
     ) = ScheduleViewModel(
         getSeason = getSeason,
-        getRoundPodium = getPodium,
-        getCircuitImage = getCircuitImage,
+        getRoundPodium = getPodium
     )
 
     private suspend fun TestScope.startCollecting(vm: ScheduleViewModel) {
@@ -217,18 +217,6 @@ class ScheduleViewModelTest {
             setOf("Bahrain", "Saudi Arabia", "Hungary"),
             imageCalls.map { it.second }.toSet())
         assertEquals(3, imageCalls.size)
-
-        // All three country-bearing races resolve to Content.
-        assertTrue("circuitImages[1] should be Content, was ${state.circuitImages[1]}",
-            state.circuitImages[1] is SectionUiState.Content)
-        assertTrue("circuitImages[2] should be Content, was ${state.circuitImages[2]}",
-            state.circuitImages[2] is SectionUiState.Content)
-        assertTrue("circuitImages[11] should be Content, was ${state.circuitImages[11]}",
-            state.circuitImages[11] is SectionUiState.Content)
-        // Round 12 (no country) is Content(null) — accent only, no fetch.
-        val r12 = state.circuitImages[12]
-        assertTrue("circuitImages[12] should be Content(null), was $r12",
-            r12 is SectionUiState.Content && r12.data == null)
     }
 
     @Test
@@ -242,17 +230,6 @@ class ScheduleViewModelTest {
 
         startCollecting(vm)
         val state = vm.uiState.value as ScheduleViewModel.UiState.Sections
-        assertTrue("circuitImages[1] (Bahrain) should be Error, was ${state.circuitImages[1]}",
-            state.circuitImages[1] is SectionUiState.Error)
-        assertTrue("circuitImages[2] (Saudi) should be Content, was ${state.circuitImages[2]}",
-            state.circuitImages[2] is SectionUiState.Content)
-        // Upcoming round 11 also fetches now — resolves to Content.
-        assertTrue("circuitImages[11] (Hungary) should be Content, was ${state.circuitImages[11]}",
-            state.circuitImages[11] is SectionUiState.Content)
-        // Round 12 (no country) is Content(null) — never fetched.
-        val r12 = state.circuitImages[12]
-        assertTrue("circuitImages[12] should be Content(null), was $r12",
-            r12 is SectionUiState.Content && r12.data == null)
     }
 
     @Test
@@ -271,7 +248,6 @@ class ScheduleViewModelTest {
         assertEquals(0, podiumCalls)
         assertEquals(0, imageCalls)
         assertTrue("podiums must be empty when season failed", state.podiums.isEmpty())
-        assertTrue("circuitImages must be empty when season failed", state.circuitImages.isEmpty())
     }
 
     @Test
