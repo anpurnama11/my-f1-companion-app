@@ -172,7 +172,12 @@ private fun PastList(
     onRoundClick: (year: Int, round: Int) -> Unit,
     onRetryPodium: (round: Int) -> Unit,
 ) {
+    // Most-recent first — the Past tab is a "what just happened" scan
+    // path. Round number is monotonic within a season, so descending
+    // round ≡ reverse-chronological. (Upcoming keeps ascending: next
+    // race first.)
     val past = season.races.filter { it.winnerId != null }
+        .sortedByDescending { it.round }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         if (past.isEmpty()) {
             EmptyState("No past rounds")
