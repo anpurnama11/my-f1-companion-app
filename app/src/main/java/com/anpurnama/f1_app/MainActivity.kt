@@ -11,6 +11,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // edge-to-edge: keep the system from drawing a contrast scrim over the
+        // gesture-pill / 3-button nav area — it would wash out the dark
+        // surfaceContainer bottom bar. See edge-to-edge skill checklist.
+        window.isNavigationBarContrastEnforced = false
         setContent {
             F1appTheme {
                 NavShell()
