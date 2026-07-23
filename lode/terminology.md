@@ -47,6 +47,14 @@ Short term → meaning lines. Domain + project language.
   `FavoritesCache` (DataStore, typed keys, mirrors `NextRaceCache`); first-launch
   default seeds #1 constructor + its two drivers. Homepage §1 reads the same
   cache as a compact pager. Added by ticket 12; amends ticket 05's nav from 3→4.
+- **Constructor** — the F1 championship concept for a team (the entity that
+  scores constructors' championship points). On the §1 Team card the caption
+  is "Constructor", not "Team" or "My team". Avoid: "Team" (loses the F1
+  championship meaning), "My team" (misleading when no favorites are picked
+  yet — the §1 pager shows the championship leader by default, not the
+  user's team), "Constructor team" (redundant). Source-of-truth decision:
+  ticket 20 (`lode/wayfinder/f1app/tickets/20-q3-constructor-caption.md`).
+  Domain shape: `ConstructorStanding` data class; Jolpica `Constructor` object.
 
 - **Tour/race/round** — an F1 race weekend. "Round" = a numbered race in a season
   (`RoundDetail(year, round)` route). "Next race" = `/current/next` endpoint from f1api.dev.
