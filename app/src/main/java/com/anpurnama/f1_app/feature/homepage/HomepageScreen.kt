@@ -512,7 +512,7 @@ private fun Section2Season(season: SectionUiState<Season>) {
                 )
                 ProgressCard(percent = (s.progressPercent * 100).toInt())
                 StatCard(label = "GPs completed", value = s.completedGp.toString())
-                StatCard(label = "Total km", value = s.totalKm.toString())
+                StatCard(label = "Total km covered", value = "%.1f".format(s.totalKm))
                 StatCard(label = "Total laps", value = s.totalLaps.toString())
             }
         }

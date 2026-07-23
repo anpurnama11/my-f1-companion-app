@@ -7,7 +7,15 @@ data class Season(
     val year: Int,
     val races: List<Race>,
     val completedGp: Int,
-    val totalKm: Int,
+    /**
+     * Total **kilometers** of track distance across completed rounds
+     * (sum of `circuitLength / 1000` for races with a winner). Stored
+     * as `Double` because the wire value is in meters (e.g. `"5412km"`
+     * for Bahrain = 5.412 km) and a 24-race season can carry three
+     * decimal places across the sum. Renders as `"%.1f"` to drop the
+     * trailing noise.
+     */
+    val totalKm: Double,
     val totalLaps: Int,
     val progressPercent: Float,
 )

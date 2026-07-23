@@ -36,16 +36,21 @@ class GetSeasonUseCase(private val client: HttpClient) {
 
 /**
  * DTO → domain mapping. Aggregates are pre-computed here so the
- * ViewModel never re-walks the list. Per the spec, `circuitLength` is
- * stored raw on the model and only digit-stripped for the `totalKm`
- * sum — same parse applied to every completed race.
+ * ViewModel never re-walks the list.
+ *
+ * **Unit on the wire:** `circuitLength` arrives as a string with the
+ * **meter** value concatenated to `"km"` (e.g. Bahrain `"5412km"` =
+ * 5.412 km, not 5412 km). The mapper digit-strips then divides by
+ * 1000 so `totalKm` is in real kilometers. `Double` is required to
+ * preserve the per-circuit precision across a season sum; a 24-race
+ * season of mixed-length circuits needs three decimal places.
  *
  * Visible for testing (internal); not exposed as public API.
  */
 internal fun SeasonResponseDto.toSeason(): Season {
     val completed = races.filter { it.winner != null }
     val totalKm = completed.sumOf { race ->
-        race.circuit.circuitLength.filter(Char::isDigit).toIntOrNull() ?: 0
+        race.circuit.circuitLength.filter(Char::isDigit).toIntOrNull()?.div(1000.0) ?: 0.0
     }
     val totalLaps = completed.sumOf { it.laps ?: 0 }
     val progress = if (races.isEmpty()) {
