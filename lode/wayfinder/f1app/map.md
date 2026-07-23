@@ -2,12 +2,12 @@
 
 ## Destination
 
-An implementation-ready spec for building a Jetpack Compose Android app on the existing
-`com.anpurnama.f1_app` scaffold. Dark-first F1 design system transcribed from
-boxbox-club. **4 top-level navs** (Homepage, Schedule, Leaderboard, My Team) +
-Driver/Team/Round/Circuit detail pages, and **1 home-screen widget** (Countdown). Data
-from free F1 APIs (f1api.dev primary, OpenF1/jolpica only where a feature needs them).
-The map is done when every decision a build session needs is locked.
+F1app v1 spec + v1 polish, every decision a build session needs is locked. Tickets
+01–15 are the v1 spec (closed); tickets 16+ are the v1 polish pass — the
+post-critique decisions, team-accent source, §3 favorites shape, and minor-observation
+graduation. The map is done when (a) every critique P0/P1 has a locked decision,
+(b) every minor-observation item has a graduated execution ticket, and (c) no
+design decision in the codebase is unrecorded.
 
 > **Build vs decide.** Wayfinder plans; building is downstream of the map. A `closed`
 > ticket here means the *planning decision* is locked — it says nothing about whether the
@@ -86,16 +86,44 @@ The map is done when every decision a build session needs is locked.
   `keystore.properties`; `optimization { enable = true }` (AGP 9 DSL) +
   `android.r8.gradual.support=true`; `versionCode 1` / `versionName "1.0.0"`;
   no app keeps needed. Macrobenchmark rung folded in (blocked only on real screens).
+- [Team-accent source](tickets/16-team-accent-source.md) — `TeamColors.forId` hardcoded
+  map for v1 (11 constructors, Compose `Color(0xFF...)` from Jolpica alpha hex values);
+  OpenF1 join rejected (30-day live window breaks the off-season favorites surface);
+  Jolpica alpha `/alpha/core/teams/?year={year}` `primary_color` is the future source
+  when the alpha tree stabilizes (issue #304). Detail: [team-accent.md](team-accent.md).
+- [Q1/Q4 homepage layout](tickets/17-q1-q4-homepage-layout.md) — one §1 hero card with
+  the countdown on top and the 5-row weekend schedule below (FP1 / FP2 / Quali / Sprint /
+  Race, local times, reuses `SessionChip` + `formatStart`); not a separate section, not
+  a pager card. §2 season aggregates unchanged. §3 favorites shape decided in ticket 18.
+- [Q2 podium shape lock](tickets/19-q2-podium-shape-locked.md) — `red = current/active
+  (LIVE only)`. Past-row `P1` chip stays text-only with no fill, no background, no
+  special color. P1 dominance is implicit (left-to-right scan order). The shape decision
+  (chip *shape* was the broken element, not the colors) is final after the 2027-01-15
+  three-iteration pass. ADR 0007.
+- [Q3 `Constructor` caption](tickets/20-q3-constructor-caption.md) — keep `Constructor`
+  on the §1 Team card. F1-orthodox, matches `ConstructorStanding` and Jolpica `Constructor`.
+  "My team" rejected (misleading when no favorites picked). "Team" rejected (loses F1
+  meaning). Glossary entry added to `lode/terminology.md` with rejected synonyms.
 
 ## Not yet specified
 
-- **v1 / MVP slice.** The destination describes the full app, but there's no decision
-  yet on what lands in a first release candidate vs. what stays a follow-up. The
-  favorites picker/UX (open ticket 12) and release/signing (ticket 15) feed that cut.
-  Ticket 13 enrichments are locked — headshots + team imagery in, weather + flags out.
-- **Error / empty / loading UX pattern.** Resolved: shared `OutcomeContent` family
-  (ADR 0002, `core/ui/OutcomeContent.kt`). Every screen maps `Outcome<T>` to
-  `SectionUiState<T>` at the VM seam; composables never import `Outcome`.
+- **Critique follow-through (v1 polish).** Open tickets: §3 favorites shape +
+  empty-state (ticket 18, blocked by 17), remaining minor observations batch
+  (ticket 22). Closed in this phase: team-accent source (ticket 16 →
+  `TeamColors.forId` for v1, Jolpica alpha migration noted), Q1/Q4 homepage
+  layout (ticket 17 → one §1 hero card), Q2 podium shape lock (ticket 19 →
+  ADR 0007, text-only `InlinePodium` final), Q3 `Constructor` caption
+  (ticket 20 → kept, glossary entry), edge-to-edge insets (ticket 21 →
+  ADR 0008, `navigationBarsPadding` only, top bleeds).
+- **Predictive back gesture handler (`PredictiveBackHandler`).** Design
+  question deferred to a separate session: do we want predictive back
+  animations in v1, which screens get them, and what animation shape?
+  The `edge-to-edge` skill flags this as required for API 35+, but the
+  default back behavior is acceptable for v1. Manifest flag
+  (`android:enableOnBackInvokedCallback="true"`) and contrast-enforced
+  flag (`window.isNavigationBarContrastEnforced = false`) shipped
+  2027-01-15 alongside ticket 21's resolution. See ticket 21 "Out of
+  scope" section.
 
 ## Out of scope
 

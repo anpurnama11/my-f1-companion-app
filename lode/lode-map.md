@@ -24,6 +24,8 @@ lode/
     0004-multi-backstack-tab-navigation.md   # Multi-backstack; per-tab NavBackStack avoids ViewModel destruction on tab switch
     0005-session-results-use-two-apis.md     # Session results: f1api.dev for R/Q/FP, Jolpica alpha for Sprint/SprintQuali
     0006-race-results-hybrid-source.md       # Race results: f1api.dev metadata/fastest-lap + Jolpica standard status/grid
+    0007-podium-shape-locked.md            # Past-row podium: text-only InlinePodium, no red P1 background; red = current/active (LIVE only) (ticket 19)
+    0008-screen-inset-bottom-only-top-bleeds.md  # Screen inset treatment: navigationBarsPadding only; top bleeds (ticket 21)
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # built — Foundation + Homepage §2 (pins UX family)
@@ -41,9 +43,9 @@ lode/
     countdown.md                   # CountdownWidget, CountdownWorker, NextRaceCache
   wayfinder/
     f1app/
-      map.md                         # destination spec + scope + fog patches
+      map.md                         # destination spec + scope + fog patches (v1 spec + v1 polish)
       homepage.md                    # Homepage three-section composition + data sources
-      past-list.md                   # Schedule>Past full-podium fetch strategy (ticket 10)
+      past-list.md                   # Schedule>Past full-podium fetch strategy (ticket 10) + locked visual treatment
       tickets/
         01-architecture-and-modules.md   # closed (single :app, Wiring DI, MVVM init-less, Nav3, Ktor/CIO)
         02-design-system-theme.md        # closed (dark-only M3 theme; also the only ticket shipped as code)
@@ -60,11 +62,19 @@ lode/
         13-additive-ui-enrichments.md               # OPEN (grilling — which ship, on which surfaces; 4 candidates: headshots, weather, race-control, team imagery)
         14-testing-scope.md                          # closed (strategy: pure mappings + VM transitions + MockEngine; Compose UI + macrobenchmark deferred to 15)
         15-release-signing-r8.md                    # closed (release build: PKCS12 keystore in ~/.android, signingConfigs from git-ignored keystore.properties, optimization.enable=true + android.r8.gradual.support; versionCode 1/versionName "1.0.0"; sideload APK; macrobenchmark rung folded in)
+        16-team-accent-source.md                    # closed (research; TeamColors.forId hardcoded map for v1, Jolpica alpha migration noted) — see team-accent.md
+        17-q1-q4-homepage-layout.md                 # closed (grilling; one §1 hero card with countdown on top and 5-row weekend schedule below)
+        18-section-3-favorites-shape.md             # OPEN (grilling; B side-by-side Row / C stacked / D single card + empty-state; blocked by 17)
+        19-q2-podium-shape-locked.md                # closed (task; text-only InlinePodium, no red P1 background, ADR 0007)
+        20-q3-constructor-caption.md                # closed (task; keep Constructor caption, terminology.md entry added)
+        21-edge-to-edge-insets-bug.md               # closed (task; navigationBarsPadding on Homepage + Schedule root Columns, top bleeds per ADR 0008)
+        22-remaining-minor-observations.md          # OPEN (task batch; a11y + visual polish + logic; 12 items; blocked by 17, 18)
       top-speed.md                     # top-speed/fastest-lap stat source + cost (ticket 08)
       top-speed-api-wrangling.md       # API wrangling detail for the top-speed stat (ticket 08)
       circuit-most-wins.md             # most-wins-at-circuit stat source + cost (ticket 09)
       circuit-most-wins-api-wrangling.md  # API wrangling detail for the most-wins-at-circuit stat (ticket 09)
       team-imagery.md                  # formula1.com CDN: two systems, slug maps, car/team renders (ticket 13 enrichment #4)
+      team-accent.md                   # TeamColors.forId hardcoded map: which API has it, why hardcoded v1, Jolpica alpha migration (ticket 16)
   tmp/                               # git-ignored session scraps
 ```
 

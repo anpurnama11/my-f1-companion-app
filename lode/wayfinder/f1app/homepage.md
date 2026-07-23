@@ -59,6 +59,21 @@ whatever subset is available; missing favorites just means fewer cards.
   client-side chronometer; the in-app card is a Compose live tick.
   Both pull from the same `GetNextRaceUseCase` / OpenF1 sources.
 
+### §1 hero — bleed-to-top (ADR 0008)
+
+The §1 hero card (countdown) and the §3 `CircuitCard`'s 6dp brand-accent
+strip are designed to sit at the visual top of the Homepage — the card's
+top edge is the screen's top edge, with the system clock floating over
+the card like a watermark. The screens therefore apply only
+`Modifier.navigationBarsPadding()` to their root `Column` (bottom safe
+only); the top stays edge-to-edge. The `edge-to-edge` skill's PREFERRED
+pattern is symmetric `Modifier.padding(innerPadding)`, but F1app
+deliberately deviates to preserve the hero's magazine-cover position.
+M3 `NavigationBar` in the `Scaffold`'s `bottomBar` slot handles its own
+`navigationBars` inset, so `navigationBarsPadding()` on the content
+correctly accounts for the bar's full 80dp + gesture-pill inset. See
+[../decisions/0008-screen-inset-bottom-only-top-bleeds.md](../decisions/0008-screen-inset-bottom-only-top-bleeds.md).
+
 ## Section 2 — Season progress (one card, left gauge + right stat column)
 
 A single `surfaceContainer` card holding the "Season 2026" headline and a
@@ -189,3 +204,5 @@ sections, so an observer would be dead code.
 - Ticket 08: `lode/wayfinder/f1app/top-speed.md` — top-speed API wrangling.
 - Architecture: `lode/architecture/architecture.md` — `Homepage` route,
   ViewModel pattern.
+- ADR 0008: `lode/decisions/0008-screen-inset-bottom-only-top-bleeds.md`
+  — screen inset treatment; bleed-to-top preserves the §1 hero position.

@@ -114,6 +114,28 @@ The manifest declares `android:name=".F1App"` so `LocalContext.current.applicati
 is safe; `HomepageScreen` reads `F1App.wiring.getSeason` from there via
 `homepageViewModelFactory(getSeason)`.
 
+## Inset contract (ADR 0008)
+
+`enableEdgeToEdge()` makes the app window draw under the system bars
+(mandatory on target SDK 36+). The screens inside `NavDisplay` are
+responsible for opting back into the safe area.
+
+- **Bottom safe:** every screen's root `Column` applies
+  `Modifier.navigationBarsPadding()`. This accounts for the M3
+  `NavigationBar` in the `Scaffold`'s `bottomBar` slot, which handles
+  its own `navigationBars` inset internally (80dp container + gesture
+  pill inset on a Pixel 7 with gesture nav).
+- **Top bleeds:** the top stays edge-to-edge so the §1 hero card and
+  the §3 `CircuitCard` brand-accent strip can sit at the visual top of
+  the Homepage with the system clock floating over them. The
+  `edge-to-edge` skill's PREFERRED pattern is symmetric
+  `Modifier.padding(innerPadding)`; F1app deliberately deviates. See
+  [lode/decisions/0008-screen-inset-bottom-only-top-bleeds.md](../decisions/0008-screen-inset-bottom-only-top-bleeds.md).
+
+`enableEdgeToEdge()` from `ComponentActivity` (not `WindowCompat`)
+auto-handles status-bar icon contrast, so the dark `surfaceContainer`
+background is safe behind light icons.
+
 ## Stand-in icons (ponytail)
 
 `NavigationBarItem.icon` takes a single uppercase letter glyph
