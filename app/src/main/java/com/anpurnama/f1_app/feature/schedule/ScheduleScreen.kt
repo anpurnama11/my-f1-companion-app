@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.datetime.LocalDate
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.ui.OutcomeContent
 import com.anpurnama.f1_app.core.ui.SectionUiState
@@ -50,14 +51,11 @@ import com.anpurnama.f1_app.ui.theme.Spacing
  * Schedule tab — **tab switcher** shape (revision 1 of ticket 03).
  * Two tabs at the top: **Upcoming** and **Past**. The active tab's
  * list is the only one in composition; switching tabs is instant
- * because the data is held in the VM (`podiums`, `circuitImages`).
+ * because the data is held in the VM (`podiums`).
  *
- *  - **Upcoming tab** — round, GP name, race date, city, circuit
- *    image (OpenF1 track layout, brand accent fallback if the fetch
- *    fails or there's no country for OpenF1 join).
+ *  - **Upcoming tab** — round, GP name, race date, city.
  *  - **Past tab** — same fields + podium winner cell (P1/P2/P3, with
- *    a retry row on per-row failure) + circuit image from OpenF1.
- *    No countdown.
+ *    a retry row on per-row failure). No countdown.
  *
  * Per the shared UX family: a past-row podium failure degrades to a
  * retry row and never blanks the rest of the schedule. Tapping any
@@ -65,7 +63,7 @@ import com.anpurnama.f1_app.ui.theme.Spacing
  * maps to `backStack.add(Route.RoundDetail(year, round))`.
  *
  * Pull-to-refresh on either tab re-fetches the season + every past
- * podium + every past circuit image. The VM owns all per-row loads;
+ * podium. The VM owns all per-row loads;
  * the screen has no per-row `LaunchedEffect`. This is by design:
  * `LaunchedEffect(race.round)` would not re-fire on same-key
  * re-render after a refresh, so the VM must be the one to re-fire.
@@ -113,7 +111,7 @@ fun ScheduleScreen(
             OutcomeContent(state = sections.season) { season ->
                 // `when` on the active tab — only the active tab's
                 // list is composed. The VM holds the data for both
-                // surfaces (podiums + circuitImages are pre-loaded
+                // surfaces (podiums are pre-loaded
                 // eagerly in `loadSeason`'s Content branch), so a
                 // tab switch re-composes the new list and reads the
                 // existing data — no re-fetch.
@@ -360,14 +358,28 @@ private fun PodiumChip(position: Int, name: String?, team: String?) {
     Spacer(Modifier.width(Spacing.xs))
 }
 
-/** "Sun 23 Mar · 15:00" — date + time as carried on the race session. */
+/**
+ * Renders the race day as `"Sat 2 Mar"`, e.g. `2024-03-02` → `"Sat 2 Mar"`.
+ * Date only — the race time lives on the Homepage countdown card, so the
+ * Schedule row keeps to a single glanceable line. Parses f1api.dev's
+ * raw `YYYY-MM-DD` string; returns `null` on missing or malformed input,
+ * which the caller already drops from the layout.
+ */
 private fun formatRaceDate(race: Race): String? {
-    val slot = race.schedule?.race ?: return null
-    val date = slot.date
-    return when {
-        date != null -> date
-        else -> null
-    }
+    val date = race.schedule?.race?.date ?: return null
+    return runCatching {
+        val parts = date.split('-')
+        val ld = LocalDate(
+            year = parts[0].toInt(),
+            monthNumber = parts[1].toInt(),
+            dayOfMonth = parts[2].toInt(),
+        )
+        val dow = ld.dayOfWeek.name.take(3)
+        val mon = ld.month.name.take(3)
+            .lowercase()
+            .replaceFirstChar(Char::uppercase)
+        "$dow ${ld.dayOfMonth} $mon"
+    }.getOrNull()
 }
 
 @Composable

@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Schedule tab ViewModel — drives both the Upcoming list and the Past
- * list, plus a per-race circuit image.
+ * list, plus per-row podium fetches.
  *
  *  - [GetSeasonUseCase] (ticket 01) feeds the whole tab; the season
  *    response carries the per-round past/upcoming split via
@@ -37,11 +37,9 @@ import kotlinx.coroutines.launch
  *    re-fetch.
  *
  *  Section independence is the contract: every surface has its own
- *  [SectionUiState] and no composite use case. Per-row podiums and
- *  per-row circuit images are independent — a single past round's
- *  `/race` failure is a retry row, not a screen blank; a single race's
- *  OpenF1 failure leaves the image cell empty (the row still renders
- *  its other fields).
+ *  [SectionUiState] and no composite use case. Per-row podiums are
+ *  independent — a single past round's `/race` failure is a retry row,
+ *  not a screen blank.
  *
  *  Init-less: first subscription triggers the warmUp; re-subscription
  *  within `WhileSubscribed(5_000)` reuses the cached state.
@@ -54,11 +52,10 @@ import kotlinx.coroutines.launch
  *  (revision 1: fix the refresh-nukes-content bug; see
  *  `ScheduleViewModelRefreshAfterContentTest`).
  *
- *  Concurrency: per-row writes to [podiumsState] / [circuitImagesState]
- *  use atomic `MutableStateFlow.update { }` (not non-atomic RMW), so
- *  concurrent `loadPodium` / `loadCircuitImage` calls on different
- *  rounds never lose updates (revision 1: fix the RMW race; see
- *  `ScheduleViewModelRmwRaceTest`).
+ *  Concurrency: per-row writes to [podiumsState] use atomic
+ *  `MutableStateFlow.update { }` (not non-atomic RMW), so concurrent
+ *  `loadPodium` calls on different rounds never lose updates
+ *  (revision 1: fix the RMW race; see `ScheduleViewModelRmwRaceTest`).
  */
 class ScheduleViewModel(
     private val getSeason: suspend (forceRefresh: Boolean) -> Outcome<Season>,
@@ -121,8 +118,7 @@ class ScheduleViewModel(
      * Public pull-to-refresh. Re-fires `/current` with
      * `forceRefresh = true` (NO_CACHE) and, in the Content branch,
      * re-fires every past round's `/race` and every race's OpenF1
-     * image. Upcoming rows have no podium fetch; circuit images are
-     * re-fired for all races (upcoming + past).
+     * `/race`. Upcoming rows have no podium fetch.
      */
     fun refresh() {
         viewModelScope.launch {
