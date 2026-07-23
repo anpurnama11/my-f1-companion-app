@@ -1,5 +1,9 @@
 package com.anpurnama.f1_app.feature.homepage
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -33,8 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -500,58 +508,148 @@ private fun formatStart(start: Instant): String {
 
 // ─── §2 Season progress ──────────────────────────────────────────────────
 
+/**
+ * §2 — season progress as one card. The circular gauge is the lead: a
+ * F1Primary arc on a faint outlineVariant track, sweeping from 12 o'clock
+ * clockwise. The right column stacks three cumulative stats (GPs / km /
+ * laps) as inline label+value rows rather than nested cards, so the
+ * gauge is the single visual anchor instead of one of four.
+ */
 @Composable
 private fun Section2Season(season: SectionUiState<Season>) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        OutcomeContent(state = season) { s ->
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    OutcomeContent(state = season) { s ->
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Column(
+                modifier = Modifier.padding(Spacing.normal),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
                 Text(
                     text = "Season ${s.year}",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                ProgressCard(percent = (s.progressPercent * 100).toInt())
-                StatCard(label = "GPs completed", value = s.completedGp.toString())
-                StatCard(label = "Total km covered", value = "%.1f".format(s.totalKm))
-                StatCard(label = "Total laps", value = s.totalLaps.toString())
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressGauge(
+                        percent = (s.progressPercent * 100).toInt(),
+                        modifier = Modifier.size(144.dp),
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                    ) {
+                        SeasonStatRow(
+                            label = "GPs completed",
+                            value = s.completedGp.toString(),
+                        )
+                        SeasonStatRow(
+                            label = "Total km covered",
+                            value = "%.1f".format(s.totalKm),
+                        )
+                        SeasonStatRow(
+                            label = "Total laps",
+                            value = s.totalLaps.toString(),
+                        )
+                    }
+                }
             }
         }
     }
 }
 
+/**
+ * Circular season-progress gauge. Two arcs (track + progress) drawn on a
+ * [Canvas] so stroke width, cap, and start angle are explicit: the
+ * progress arc starts at 12 o'clock and sweeps clockwise with a round
+ * cap, so small percentages stay legible and 100% closes the ring
+ * cleanly. The center holds the integer percent + a small "complete"
+ * caption — the gauge earns its place by carrying content, not by being
+ * decoration. Colors are read in composable scope and captured into the
+ * draw lambda so the [Canvas] block stays a [DrawScope] (no theme
+ * access in draw lambdas).
+ */
 @Composable
-private fun ProgressCard(percent: Int) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(Spacing.normal)) {
-            Text(
-                text = "Progress",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun CircularProgressGauge(
+    percent: Int,
+    modifier: Modifier = Modifier,
+) {
+    val target = percent.coerceIn(0, 100) / 100f
+    val animated by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        label = "seasonProgress",
+    )
+    val trackColor = MaterialTheme.colorScheme.outlineVariant
+    val progressColor = MaterialTheme.colorScheme.primary
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = size.minDimension * 0.08f
+            val pad = stroke / 2f
+            val arcSize = Size(size.width - stroke, size.height - stroke)
+            val topLeft = Offset(pad, pad)
+            drawArc(
+                color = trackColor,
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
+            drawArc(
+                color = progressColor,
+                startAngle = -90f,
+                sweepAngle = 360f * animated,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             Text(
                 text = "$percent%",
                 style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                color = onSurfaceColor,
+            )
+            Text(
+                text = "complete",
+                style = MaterialTheme.typography.labelSmall,
+                color = onSurfaceVariantColor,
             )
         }
     }
 }
 
 @Composable
-private fun StatCard(label: String, value: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(Spacing.normal)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+private fun SeasonStatRow(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
