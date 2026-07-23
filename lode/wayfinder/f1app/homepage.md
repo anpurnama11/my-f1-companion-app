@@ -59,10 +59,34 @@ whatever subset is available; missing favorites just means fewer cards.
   client-side chronometer; the in-app card is a Compose live tick.
   Both pull from the same `GetNextRaceUseCase` / OpenF1 sources.
 
-## Section 2 — Season progress (two vertical blocks)
+## Section 2 — Season progress (one card, left gauge + right stat column)
 
-Left: a **circular progress** showing season-completion percentage. Right:
-three cumulative stats — **GP completed, km covered, laps completed**.
+A single `surfaceContainer` card holding the "Season 2026" headline and a
+`Row` of two children: a **circular progress gauge** on the left and a
+**stat column** of three inline label+value rows on the right. The gauge
+is the visual lead; the stats are supporting context.
+
+- **Gauge:** custom `Canvas` (see "Gauge implementation" below) — not M3
+  `CircularProgressIndicator`. 144dp square, `F1Primary` arc on an
+  `outlineVariant` track, starting at 12 o'clock and sweeping clockwise
+  with round stroke caps. Center holds the integer percent (`headlineLarge`
+  bold) + a small "complete" caption (`labelSmall`). Animates from 0 to
+  the value with `tween(900ms, FastOutSlowInEasing)`.
+- **Stat column:** `weight(1f)` next to the gauge. Three rows
+  (`SeasonStatRow`) with `labelSmall` over `titleLarge` semibold — no
+  card chrome, so the gauge remains the single visual anchor instead of
+  one of four stacked cards. Labels: "GPs completed", "Total km covered",
+  "Total laps".
+- Data: `GetSeasonUseCase` → `Season` model with pre-computed aggregates
+  (`completedGp` / `totalKm` / `totalLaps` / `progressPercent`, per ticket 03).
+- `totalKm` and `totalLaps` are **client-side sums** over completed rounds.
+  Not a free API field. `circuitLength` arrives as `"<N>km"` on `/current*`
+  where the digits are **meters** (Bahrain `"5412km"` = 5.412 km, not 5412 km).
+  Strip non-digits then **divide by 1000** per race so `totalKm` is in real
+  km. `Season.totalKm` is `Double` to preserve three-decimal precision
+  across a season sum. Pre-computed in the `Season` mapping (ticket 03),
+  not a separate use case. Render as `%.1f` on the Homepage (label
+  "Total km covered" in `HomepageScreen.kt` §2).
 
 - Data: `GetSeasonUseCase` → `Season` model with pre-computed aggregates
   (`completedGp` / `totalKm` / `totalLaps` / `progressPercent`, per ticket 03).
@@ -74,8 +98,16 @@ three cumulative stats — **GP completed, km covered, laps completed**.
   across a season sum. Pre-computed in the `Season` mapping (ticket 03),
   not a separate use case. Render as `%.1f` on the Homepage (label
   "Total km covered" in `HomepageScreen.kt` §2).
-- `progressPercent` = `completedGp / scheduledGp`. Circular gauge UI from M3
-  or a custom `Canvas` arc — pick at implementation.
+- `progressPercent` = `completedGp / scheduledGp`.
+- **Gauge implementation (decided): custom `Canvas`, not M3
+  `CircularProgressIndicator`.** M3's component doesn't expose stroke cap,
+  stroke thickness as a fraction of the canvas, or center text; the
+  custom `Canvas` gives us round caps (so 0% reads as a faint ring and
+  100% closes cleanly), a proportional stroke (8% of `minDimension`),
+  and an explicit start angle of `-90°` (12 o'clock). Theme colors are
+  captured in composable scope and passed into the `DrawScope` lambda —
+  no theme access inside draw. The component is `CircularProgressGauge`
+  in `HomepageScreen.kt`; it takes `percent: Int` and a `Modifier`.
 
 ## Section 3 — Nearest-date GP info
 
@@ -147,8 +179,6 @@ sections, so an observer would be dead code.
   design says "record." OpenF1 `/v1/laps` cannot serve all-time across
   seasons without an N-year scan. Latest-session peak ships first; the
   all-time label is a follow-up or a stat-relabel. See [top-speed.md](top-speed.md).
-- **Circular gauge implementation** — M3 component vs custom `Canvas`. Pick
-  at implementation, not a spec decision.
 
 ## Cross-references
 
