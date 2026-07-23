@@ -142,10 +142,13 @@ Short term → meaning lines. Domain + project language.
   Countdown widget and written by CountdownWorker. Detail: [widget/countdown.md](widget/countdown.md).
 - **CountdownWorker** — periodic WorkManager worker that polls next race and updates
   NextRaceCache. Detail: [widget/countdown.md](widget/countdown.md).
-- **Season aggregates** — will be computed client-side in `GetSeasonUseCase` from
-  `/current` (full schedule): completedGp (count `winner != null`), totalKm (sum
-  `circuit.circuitLength` digits), totalLaps (sum `laps`), progressPercent. Exposed
-  on the `Season` model so ViewModels don't recompute.
+- **Season aggregates** — computed client-side in `GetSeasonUseCase` from
+  `/current` (full schedule): completedGp (count `winner != null`), totalKm
+  (sum of `circuit.circuitLength` digits **divided by 1000** — the wire
+  format `"<N>km"` is meters, e.g. Bahrain `"5412km"` = 5.412 km), totalLaps
+  (sum `laps`), progressPercent. Exposed on the `Season` model as
+  `totalKm: Double` (precision across a season sum) so ViewModels don't
+  recompute.
 - **SessionTime** — `[BUILT]` `f1/model/RaceWeekend.kt`; a single session of a
   race weekend. A GP always has exactly **five sessions**. Sprint weekends:
   FP1 → Sprint Quali → Sprint → Quali → Race. Non-sprint weekends:

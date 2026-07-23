@@ -66,11 +66,14 @@ three cumulative stats — **GP completed, km covered, laps completed**.
 
 - Data: `GetSeasonUseCase` → `Season` model with pre-computed aggregates
   (`completedGp` / `totalKm` / `totalLaps` / `progressPercent`, per ticket 03).
-- `totalKm` and `totalLaps` are **client-side sums** over completed rounds
-  (`circuitLength` × laps per completed race). Not a free API field.
-  `circuitLength` arrives as `"7004km"` on `/current*` — strip non-digits,
-  per ticket-03 schema noise. The pre-computation lives in the `Season`
-  model mapping, not in a new use case.
+- `totalKm` and `totalLaps` are **client-side sums** over completed rounds.
+  Not a free API field. `circuitLength` arrives as `"<N>km"` on `/current*`
+  where the digits are **meters** (Bahrain `"5412km"` = 5.412 km, not 5412 km).
+  Strip non-digits then **divide by 1000** per race so `totalKm` is in real
+  km. `Season.totalKm` is `Double` to preserve three-decimal precision
+  across a season sum. Pre-computed in the `Season` mapping (ticket 03),
+  not a separate use case. Render as `%.1f` on the Homepage (label
+  "Total km covered" in `HomepageScreen.kt` §2).
 - `progressPercent` = `completedGp / scheduledGp`. Circular gauge UI from M3
   or a custom `Canvas` arc — pick at implementation.
 

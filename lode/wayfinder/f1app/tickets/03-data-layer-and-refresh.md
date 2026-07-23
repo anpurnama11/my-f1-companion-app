@@ -110,8 +110,11 @@ reads, same instance via `Wiring`.
   String, don't parse.
 - **`birthday`** is dirty (ISO `2006-08-25` *and* `15/02/1998` mixed across drivers in
   the same response) — store as String, don't parse.
-- **`circuitLength: "7004km"` in `/current*` vs `7004` Int in `/circuits/{id}`** — parse
-  to Int by stripping non-digits when computing km aggregates.
+- **`circuitLength: "7004km"` in `/current*` vs `7004` Int in `/circuits/{id}`** — the
+  `"<N>km"` form encodes the **meter** value concatenated to a `"km"` suffix
+  (e.g. Bahrain `"5412km"` = 5.412 km). Strip non-digits and **divide by 1000**
+  to get real km. `Season.totalKm` is `Double` to preserve the per-circuit
+  precision across a season sum. See [homepage.md §2](../homepage.md).
 - **Envelope shape differs by endpoint:** `/current/next` → `race: [...]` array;
   `/current` → `races: [...]` array; `/{y}/{r}/race` → `races: {...}` object with
   `results: [...]`. Three different envelope DTOs.

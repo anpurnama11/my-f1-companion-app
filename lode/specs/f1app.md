@@ -468,7 +468,9 @@ flowchart LR
 - `birthday` is dirty (ISO `2006-08-25` *and* `15/02/1998` mixed across
   drivers) — store as String, don't parse.
 - `circuitLength: "7004km"` in `/current*` vs `7004` `Int` in
-  `/circuits/{id}` — strip non-digits when computing km aggregates.
+  `/circuits/{id}` — the `"<N>km"` form is **meters**, not km (Bahrain
+  `"5412km"` = 5.412 km). Strip non-digits and **divide by 1000** to
+  get real km; `Season.totalKm` is `Double` for precision.
 - Envelope shape differs by endpoint: `/current/next` → `race: [...]` array;
   `/current` → `races: [...]` array; `/{y}/{r}/race` → `races: {...}` object
   with `results: [...]`. Three different envelope DTOs.
