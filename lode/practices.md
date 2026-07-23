@@ -160,12 +160,33 @@ com.anpurnama.f1_app/
   assertions.
 - **Init-less VM tested via `Flow.take(2).toList()`.** The first 2
   emissions are `initialValue` (Loading) + first post-load emission
-  (Success/Failure). `WhileSubscribed(5_000)` keeps the flow alive between
-  subscribers, so a second `first()` after the first completes returns
-  the cached Success without re-firing the use case — that one-line
-  assertion is the config-change survival test.
+  (Success/Failure). `Lazily` keeps the flow alive for the entire
+  `viewModelScope` lifetime, so a second `first()` after the first
+  completes returns the cached Success without re-firing the use case —
+  that one-line assertion is the config-change survival test.
+  **Back-pop regression test:** subscribe → unsubscribe → advance
+  time by 60s (well past the previous `WhileSubscribed(5_000)` grace) →
+  resubscribe → assert call counts unchanged. Pins the `Lazily`
+  contract. See `RoundViewModelResubscribeAfterTimeoutTest` (Round
+  detail) and `ScheduleViewModelBackFromDetailTest` (Schedule, the
+  user-reported bug).
 - **Private suspend `load()`.** The VM's `load` is `private suspend` so
   the screen can trigger it via `onStart { load() }` (a suspend block),
   and the test exercises it through the public `uiState` subscription
   rather than calling it directly. No `viewModelScope.launch` timing
   dance in tests.
+- **`SharingStarted` policy — prefer `Lazily` for screen VMs whose data
+  is server-cached.** `Lazily` starts the cold upstream on the first
+  subscriber and never stops it for the holder's lifetime
+  (`viewModelScope`). Subsequent subscribers read the existing
+  `StateFlow` value; no re-fire. Safe when the data layer is cheap on
+  hot cache (10-min f1api.dev, 1-hr jolpica, OpenF1 uncached at
+  ~0.3s/call — see [terminology.md §"Init-less ViewModel"](terminology.md)
+  + [wayfinder/f1app/tickets/03-data-layer-and-refresh.md](wayfinder/f1app/tickets/03-data-layer-and-refresh.md)
+  §Caching). Reserve `WhileSubscribed` for genuinely expensive or
+  user-scoped streams. Never `Eagerly` for screen VMs — it bypasses
+  the first-subscriber gate and can fire on background-tab construction.
+  Was previously `WhileSubscribed(5_000)`; flipped to `Lazily` to fix
+  the "back from Round detail re-fires Schedule" regression (a >5s
+  Round read tripped the grace window and re-triggered `warmUp` on
+  re-subscribe).

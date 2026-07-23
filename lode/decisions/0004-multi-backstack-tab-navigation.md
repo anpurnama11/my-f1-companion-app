@@ -52,6 +52,31 @@ The new classes:
 - **Retain ViewModels at Activity scope** — never clears ViewModels, leaks memory
   for detail pages the user left hours ago.
 
+## Known interaction: `Lazily` upstream × multi-backstack
+
+Multi-backstack preserves the `ViewModelStore` of a tab's root entry
+across transient pushes (e.g. pushing `RoundDetail` onto the Schedule
+tab's stack). The Schedule `ViewModel` instance survives the push,
+so its `StateFlow` stays alive — but **only if its cold upstream is
+also alive**. The data-layer `SharingStarted` choice controls this:
+
+- `WhileSubscribed(5_000)` cancels the upstream 5s after the last
+  subscriber leaves; re-subscribe after that grace fires a fresh
+  `onStart { warmUp() }` → another `/current` call. This is the
+  "back from Round detail re-fires Schedule" bug (Round reads
+  routinely exceed 5s).
+- `Lazily` keeps the upstream alive for the entire `viewModelScope`
+  lifetime, so re-subscribe always reads the cached `StateFlow`
+  value. **F1app's policy (Jan 2027):** all three screen VMs
+  (`HomepageViewModel`, `ScheduleViewModel`, `RoundViewModel`) use
+  `Lazily` for their `stateIn`. Safe because the data layer is
+  server-cached — see
+  [lode/practices.md §"`SharingStarted` policy"](practices.md) and
+  the [terminology.md "Init-less ViewModel" entry](terminology.md).
+  Regression coverage in
+  `ScheduleViewModelBackFromDetailTest` and
+  `RoundViewModelResubscribeAfterTimeoutTest`.
+
 ## Key detail: decorator order
 
 `rememberSaveableStateHolderNavEntryDecorator` must come **before**

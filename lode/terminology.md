@@ -25,7 +25,16 @@ Short term → meaning lines. Domain + project language.
 - **UseCase** — function-reference seam between a `ViewModel` and data; e.g.
   `GetNextRaceUseCase`. ViewModels take them as `useCase::invoke`.
 - **Init-less ViewModel** — first load fires from `Flow.onStart { load() }`, not from a
-  `init {}` block. Re-fires on `ON_START` under `WhileSubscribed(5_000)`.
+  `init {}` block. The cold stream runs under `SharingStarted.Lazily` so the first load
+  fires once when the first subscriber appears, and subsequent subscribers read the
+  existing `StateFlow` value without re-firing. Re-fire is via `viewModel.refresh()`
+  (pull-to-refresh) only. Safe because the data layer is server-cached (10-min f1api.dev,
+  1-hr jolpica; OpenF1 uncached at ~0.3s/call — see
+  `lode/wayfinder/f1app/tickets/03-data-layer-and-refresh.md` §Caching). Was previously
+  `WhileSubscribed(5_000)`; flipped to `Lazily` to fix the "back from Round detail re-fires
+  Schedule" regression (a >5s Round read tripped the grace window and re-triggered
+  `warmUp` on re-subscribe). Cross-ref: [practices.md](practices.md) §"SharingStarted
+  policy".
 - **Domain-purity invariant** — `f1/` (domain + DTOs + repository interface + Ktor API
   extensions) must contain zero `android.*` imports. Enables a future KMP `:shared`
   module to be a move, not a rewrite.
