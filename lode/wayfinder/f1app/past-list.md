@@ -209,7 +209,10 @@ attempts are also a record of what the row does *not* want:
 **Rejected directions (do not revisit without a strong reason).**
 
 - P1 red chip (or any coloured background) — the chip *shape* is what
-  was broken; colour does not fix it.
+  was broken; colour does not fix it. **Locked** by ADR 0007
+  (`lode/decisions/0007-podium-shape-locked.md) and ticket 19. The
+  app-wide color rule is `red = current/active (LIVE only)`; no other
+  surface uses red as a fill or background.
 - `1st` / `2nd` / `3rd` (English ordinal) — chose `P1` / `P2` / `P3` for
   DtS orthodoxy; user explicitly picked this.
 - Team name on the row — long names (`Scuderia Ferrari`,
