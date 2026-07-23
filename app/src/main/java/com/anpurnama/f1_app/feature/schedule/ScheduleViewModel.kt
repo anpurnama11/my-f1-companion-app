@@ -41,8 +41,13 @@ import kotlinx.coroutines.launch
  *  independent — a single past round's `/race` failure is a retry row,
  *  not a screen blank.
  *
- *  Init-less: first subscription triggers the warmUp; re-subscription
- *  within `WhileSubscribed(5_000)` reuses the cached state.
+ *  Init-less: first subscription triggers the warmUp; the cold
+ *  stream is `stateIn(Lazily)` so the first load fires once and
+ *  subsequent subscribers read the hot `StateFlow` without
+ *  re-firing. Re-fire is via [refresh] (pull-to-refresh) only.
+ *  Backed by the server-cached data layer (10-min f1api.dev,
+ *  1-hr jolpica; OpenF1 uncached but ~0.3s/call) so a hot upstream
+ *  is cheap.
  *
  *  Refresh re-fires the season with `forceRefresh = true` and, in the
  *  Content branch, re-fires every past round's `/race` and every
@@ -100,7 +105,7 @@ class ScheduleViewModel(
         .onStart { warmUp() }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
+            started = SharingStarted.Lazily,
             initialValue = UiState.Sections(
                 season = SectionUiState.Loading,
                 year = 0,

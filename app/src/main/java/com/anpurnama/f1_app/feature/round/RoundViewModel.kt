@@ -24,12 +24,11 @@ import kotlinx.coroutines.launch
  * Round detail ViewModel — drives the race results and the
  * qualifying results as two independently-failing sections.
  *
- *  - **Init-less**: first subscription triggers [warmUp] which fires
- *    both `/race` and `/qualy` in parallel. Section independence is
- *    the contract — a results failure does NOT blank qualifying.
+ *  - **Init-less**: first subscription triggers [warmUp]; the cold
+ *    stream is `stateIn(Lazily)` so the first load fires once and
+ *    subsequent subscribers read the hot `StateFlow` without
+ *    re-firing. Re-fire is via [refresh] (pull-to-refresh) only.
  *  - **Pull-to-refresh** re-fires both with `forceRefresh = true`.
- *  - Re-subscription within `WhileSubscribed(5_000)` reuses cached
- *    state without re-firing.
  *
  * `year`/`round` are constructor params (not state) — they are
  * forwarded to both use cases on every fire.
@@ -61,7 +60,7 @@ class RoundViewModel(
         .onStart { warmUp() }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
+            started = SharingStarted.Lazily,
             initialValue = UiState.Sections(
                 results = SectionUiState.Loading,
                 qualifying = SectionUiState.Loading,

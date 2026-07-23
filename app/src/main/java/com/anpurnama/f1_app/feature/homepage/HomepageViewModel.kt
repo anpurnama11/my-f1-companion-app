@@ -149,7 +149,7 @@ class HomepageViewModel(
         .onStart { warmUp() }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
+            started = SharingStarted.Lazily,
             // Loading sentinel for the first frame so the screen has
             // something to show. The first real emission arrives when
             // `warmUp()` finishes.
