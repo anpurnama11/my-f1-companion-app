@@ -10,14 +10,12 @@ import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.core.ui.toSection
 import com.anpurnama.f1_app.f1.GetRoundQualifyingUseCase
 import com.anpurnama.f1_app.f1.GetRoundResultsUseCase
-import com.anpurnama.f1_app.f1.GetCircuitTopSpeedUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import com.anpurnama.f1_app.f1.model.Race
 import com.anpurnama.f1_app.f1.model.RoundQualifying
 import com.anpurnama.f1_app.f1.model.RoundResults
 import com.anpurnama.f1_app.f1.model.RoundMode
 import com.anpurnama.f1_app.f1.model.Season
-import com.anpurnama.f1_app.f1.model.TopSpeed
 import com.anpurnama.f1_app.f1.model.roundMode
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -48,7 +46,6 @@ class RoundViewModel(
     private val getRoundResults: suspend (Int, Int, Boolean) -> Outcome<RoundResults>,
     private val getRoundQualifying: suspend (Int, Int, Boolean) -> Outcome<RoundQualifying>,
     private val getSeason: (suspend (Int, Boolean) -> Outcome<Season>)? = null,
-    private val getCircuitTopSpeed: (suspend (String, String, Int, String) -> Outcome<TopSpeed?>)? = null,
     private val now: () -> Instant = { Clock.System.now() },
 ) : ViewModel() {
 
@@ -61,7 +58,6 @@ class RoundViewModel(
             val results: SectionUiState<RoundResults>,
             val qualifying: SectionUiState<RoundQualifying>,
             val season: SectionUiState<Season> = SectionUiState.Loading,
-            val topSpeed: SectionUiState<TopSpeed?> = SectionUiState.Loading,
             val race: Race? = null,
             val mode: RoundMode? = null,
         ) : UiState
@@ -74,19 +70,14 @@ class RoundViewModel(
             Season(0, emptyList(), 0, 0.0, 0, 0f)
         ) else SectionUiState.Loading
     )
-    private val topSpeedState = MutableStateFlow<SectionUiState<TopSpeed?>>(
-        if (getCircuitTopSpeed == null) SectionUiState.Content(null) else SectionUiState.Loading
-    )
-
     val uiState: StateFlow<UiState> = combine(
-        resultsState, qualifyingState, seasonState, topSpeedState,
-    ) { results, qualifying, season, topSpeed ->
+        resultsState, qualifyingState, seasonState,
+    ) { results, qualifying, season ->
         val race = (season as? SectionUiState.Content)?.data?.races?.firstOrNull { it.round == round }
         UiState.Sections(
             results = results,
             qualifying = qualifying,
             season = season,
-            topSpeed = topSpeed,
             race = race,
             mode = race?.let { roundMode(it, now()) },
         )
@@ -99,7 +90,6 @@ class RoundViewModel(
                 results = SectionUiState.Loading,
                 qualifying = SectionUiState.Loading,
                 season = seasonState.value,
-                topSpeed = topSpeedState.value,
             ),
         )
 
@@ -139,18 +129,6 @@ class RoundViewModel(
         seasonState.value = SectionUiState.Loading
         val outcome = useCase(year, forceRefresh)
         seasonState.value = outcome.toSection()
-        val race = (outcome as? Outcome.Success)?.data?.races?.firstOrNull { it.round == round }
-        if (race == null || getCircuitTopSpeed == null) {
-            topSpeedState.value = SectionUiState.Content(null)
-            return
-        }
-        val qualyDate = race.schedule?.qualy?.date
-        val country = race.circuit.country
-        if (qualyDate == null || country == null) {
-            topSpeedState.value = SectionUiState.Content(null)
-            return
-        }
-        topSpeedState.value = getCircuitTopSpeed(race.circuit.id, country, year, qualyDate).toSection()
     }
 }
 
@@ -166,7 +144,6 @@ fun roundViewModelFactory(
     getRoundResults: GetRoundResultsUseCase,
     getRoundQualifying: GetRoundQualifyingUseCase,
     getSeason: GetSeasonUseCase? = null,
-    getCircuitTopSpeed: GetCircuitTopSpeedUseCase? = null,
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         RoundViewModel(
@@ -175,7 +152,6 @@ fun roundViewModelFactory(
             getRoundResults = getRoundResults::invoke,
             getRoundQualifying = getRoundQualifying::invoke,
             getSeason = getSeason?.let { { requestedYear, forceRefresh -> it(requestedYear, forceRefresh) } },
-            getCircuitTopSpeed = getCircuitTopSpeed?.let { it::invoke },
         )
     }
 }

@@ -27,7 +27,7 @@ import java.io.File
  *  - [HttpCache] with a 10 MB [FileStorage] under `cacheDir/http_cache`.
  *    Honors server `max-age`/`max-stale` headers — f1api.dev sends
  *    `max-age=600` so cold offline launches serve from cache; sources
- *    without cache headers (OpenF1, added later) bypass the plugin.
+ *    without cache headers bypass the plugin.
  *  - [Logging] at `LogLevel.BODY` (request/response method + URL + headers +
  *    full body — the Ktor equivalent of OkHttp `HttpLoggingInterceptor.Level.BODY`).
  *    A custom [Logger] routes to `android.util.Log` under the `F1api` tag.

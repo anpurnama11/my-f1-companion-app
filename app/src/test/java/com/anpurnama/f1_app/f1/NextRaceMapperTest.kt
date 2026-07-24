@@ -11,10 +11,7 @@ import org.junit.Test
  * Rung 1 mapper test: DTO → domain. The mapper is `internal` so the test
  * can reach it from the same module. Pure mapping, no IO.
  *
- * The `NextRace` model is the only source of `country` + `raceDate` the
- * OpenF1 join in `GetCircuitTopSpeedUseCase` will use — those fields are
- * the load-bearing ones for §3. Verify them here so the join doesn't
- * silently fail later.
+ * The `NextRace` model carries the current race context used by Homepage.
  */
 class NextRaceMapperTest {
 
@@ -42,10 +39,6 @@ class NextRaceMapperTest {
                             date = "2026-07-26",
                             time = "13:00:00Z",
                         ),
-                        qualy = NextRaceResponseDto.NextRaceInnerDto.RaceScheduleDto.RaceSessionDto(
-                            date = "2026-07-25",
-                            time = "14:00:00Z",
-                        ),
                     ),
                 ),
             ),
@@ -62,9 +55,7 @@ class NextRaceMapperTest {
         assertEquals("hungaroring", next.circuit.id)
         assertEquals("Hungaroring", next.circuit.name)
         assertEquals("Hungary", next.circuit.country)
-        // The §3 OpenF1 join needs these.
         assertEquals("2026-07-26", next.raceDate)
-        assertEquals("2026-07-25", next.qualyDate)
         assertEquals("13:00:00Z", next.raceTime)
     }
 

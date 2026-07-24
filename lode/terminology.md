@@ -2,16 +2,11 @@
 
 Short term → meaning lines. Domain + project language.
 
-> **Most terms below describe the *planned* system, not built code.** Only the
-> theme-related terms (`F1appTheme`, `F1ColorScheme`, `F1Shapes`, `Spacing`,
-> `Circuits`, `Tyres`) and `F1app`/`PokeDV`/`Lode`/`Wayfinder map` correspond to code
-> in the repo today. Everything else (`Wiring`, `Outcome<T>`, the use cases,
-> `F1Api`, `NextRaceCache`, `CountdownWorker`, the deep link, favorites, multi-source
-> wiring) is a **locked design contract** the build works toward; their present-tense
-> phrasing is the spec, not a claim the code exists.
+> **Most terms below describe the current shipped system.** Historical ticket
+> terms remain where they explain a deliberate removal or boundary.
 
-- **F1app** — this app, package `com.anpurnama.f1_app`, Android Compose, dark-first. `[BUILT]` greenfield scaffold + dark-only theme + foundation slice (ticket 01) + Homepage §1+§3 (ticket 02) + Schedule tab + Round detail (ticket 03).
-- **FavoritesCache** — `[BUILT]` `DataStore<Preferences>` wrapper (mirrors `NextRaceCache` in shape, even though not called that way) with typed keys `FAV_DRIVER_1: String`, `FAV_DRIVER_2: String`, `FAV_TEAM: String`, one atomic `edit` block. Written from My Team's picker (later) and from `HomepageViewModel`'s first-launch seed; read by `HomepageViewModel` §1. The `seedIfEmpty(topTeamId, topDriverIds)` is partial-fill safe — it only writes into slots the user hasn't filled yet. `circuitId` translation map (f1api.dev → OpenF1 short name) is **NOT** used (see deviation note in `lode/wayfinder/f1app/tickets/11-...md` — we use the date match on `qualyDate` instead, no translation map needed).
+- **F1app** — this app, package `com.anpurnama.f1_app`, Android Compose, dark-first. `[BUILT]` greenfield scaffold + dark-only theme + Homepage, Schedule, Leaderboard, My Team, Round detail, and Session Result surfaces.
+- **FavoritesCache** — `[BUILT]` `DataStore<Preferences>` wrapper with typed driver/team keys and one atomic `edit` block. Written by My Team's picker and first-launch seeding; read by Homepage and My Team.
 - **PokeDV** — `PokemonDataViewer`, the developer's prior project; architecture
   reference for F1app (single module, manual Wiring DI, sealed Outcome, MVVM init-less,
   Navigation 3).
@@ -29,7 +24,7 @@ Short term → meaning lines. Domain + project language.
   fires once when the first subscriber appears, and subsequent subscribers read the
   existing `StateFlow` value without re-firing. Re-fire is via `viewModel.refresh()`
   (pull-to-refresh) only. Safe because the data layer is server-cached (10-min f1api.dev,
-  1-hr jolpica; OpenF1 uncached at ~0.3s/call — see
+  1-hr jolpica — see
   `lode/wayfinder/f1app/tickets/03-data-layer-and-refresh.md` §Caching). Was previously
   `WhileSubscribed(5_000)`; flipped to `Lazily` to fix the "back from Round detail re-fires
   Schedule" regression (a >5s Round read tripped the grace window and re-triggered
@@ -59,31 +54,18 @@ Short term → meaning lines. Domain + project language.
 - **Tour/race/round** — an F1 race weekend. "Round" = a numbered race in a season
   (`RoundDetail(year, round)` route). "Next race" = `/current/next` endpoint from f1api.dev.
 - **CircuitDetail** — NavKey route `CircuitDetail(circuitId: String)`, opened from
-  RoundDetail's circuit block + Homepage §3's nearest-GP card. The screen home for the
-  two circuit-scoped research stats: top-speed (ticket 08, OpenF1 `st_speed`) and
-  most-wins-at-circuit (ticket 09, jolpica). Backed by the `getCircuit(id)` extension
-  on `F1Api.kt` specified in ticket 03.
+  RoundDetail's circuit block + Homepage §3's nearest-GP card. The screen home for
+  most-wins-at-circuit (Jolpica) and other circuit metadata. Top speed is not a v1
+  feature.
 - **Deep link (custom scheme)** — `f1app://round/{year}/{round}` is the only deep link
   in scope. Countdown widget builds a `PendingIntent` over `Intent.ACTION_VIEW` with
   that data (args from `NextRaceCache`); `MainActivity` parses the URI into a `RoundDetail`
   nav key and pushes it on Homepage as backstack root. Single-app custom scheme.
 - **f1api.dev** — primary free F1 API (schedule, standings, results, circuit metadata,
   pre-joined driver+team). Zero auth.
-- **OpenF1** — free secondary API; `[BUILT ticket 02]` for top speed via
-  `/v1/laps` `st_speed` (natively kph), 2023+. Join key is
-  `country_name + year + qualyDate match` (ticket 11 + ticket 02 deviation) —
-  the date match is on f1api.dev's `schedule.qualy.date` (Qualifying day), not
-  `schedule.race.date` (race day). Ticket 11 research claimed the date
-  matched race day; live probes during ticket 02 build showed OpenF1's
-  `date_start` is Qualifying day, which is 1 day before the race (or 2 days
-  for sprint weekends). `country_name` alone is insufficient for US (3
-  circuits), Spain (2 circuits 2026+), and Italy (2 circuits 2023–2025);
-  the date match is the unique disambiguator. One country string diverges
-  (`Great Britain` vs `United Kingdom` for Silverstone) → 1-entry
-  `F1API_TO_OPENF1_COUNTRY` fallback map, applied only when literal returns 0.
-  Sends **no cache headers** (nginx, no CDN) → HttpCache skips it; accepted
-  uncached (~0.3s/call). Driver headshots / weather / race-control flags remain
-  parked additive enrichments.
+- **OpenF1** — retired runtime API dependency. Ticket 10 deliberately removes
+  its production imports, URLs, DTOs, use cases, joins, and artwork fallback.
+  Do not reintroduce it as a fallback without a new decision record.
 - **jolpica** — free Ergast-successor API; **design-locked (ticket 04, not yet built)** for all-time
   most-wins-at-circuit via `/circuits/{id}/results/1.json` (1 call, ~25KB,
   client-aggregated top driver + top team). `driverId`/`constructorId` match
@@ -109,8 +91,8 @@ Short term → meaning lines. Domain + project language.
 - **Tyres** — `object` in `Color.kt`; six Pirelli compounds as text+background pairs
   (Tyres.Soft + Tyres.SoftBg ... Tyres.Wet + Tyres.WetBg, plus Unknown/UnknownBg).
   Always pair the two halves.
-- **F1Api** — Ktor endpoint extensions and base URL constants for f1api.dev, OpenF1,
-  and jolpica. Detail: [core/network.md](core/network.md).
+- **F1Api** — Ktor endpoint extensions and base URL constants for f1api.dev and
+  Jolpica. Detail: [core/network.md](core/network.md).
 - **HttpClientFactory** — builds the shared Ktor `HttpClient` used by all use cases
   and the widget. Detail: [core/network.md](core/network.md).
 - **Route** — sealed `NavKey` hierarchy in `core/navigation/Routes.kt`. The 4
@@ -175,8 +157,8 @@ Short term → meaning lines. Domain + project language.
   FP1 → FP2 → FP3 → Quali → Race. Aliases: **Quali** = **Qualifying** =
   **Race Qualification**; **Sprint Quali** = **Sprint Qualifying** = **SQuali**.
   Fields: `label` (long form "Practice 1"), `shortLabel` (chip form "FP1"),
-  `start: kotlinx.datetime.Instant` (UTC). Driven by the OpenF1 `date_start`
-  ISO-8601 string. Drives the Homepage §1 countdown card.
+  `start: kotlinx.datetime.Instant` (UTC). Converted from f1api.dev schedule
+  slots. Drives the Homepage §1 countdown card.
 - **WeekendSchedule** — `[BUILT]` `f1/model/RaceWeekend.kt`; the full list of
   weekend sessions, sorted ascending by `start`. Exposes `nextUpcoming(now:
   Instant): SessionTime?` — the earliest session whose start is still in
@@ -185,7 +167,7 @@ Short term → meaning lines. Domain + project language.
 - **RoundDetail** — `[BUILT ticket 03]` `Route.RoundDetail(year, round)`,
   the Round detail screen (`feature/round/RoundScreen.kt`). One route with
   two modes driven by the Race session start time: **upcoming** shows circuit
-  stats (length, laps, turns, top speed) + the five-session race weekend
+  stats (length, laps, turns) + the five-session race weekend
   schedule; **past** shows circuit stats + a Results tab + per-session rows
   (Race, Qualifying, Sprint, SQuali, FP1/2/3 as scheduled). The circuit stats are always
   visible regardless of mode. The Highlights tab and Driver of the Day are out
@@ -194,8 +176,8 @@ Short term → meaning lines. Domain + project language.
 - **SessionResult** — `[BUILT ticket 03]` `Route.SessionResult(year, round, session)` full result
   list for one session. Race results include a podium chip header (top 3),
   Fastest Lap, and Fastest Pitstop standout cards. Fastest Lap is derived from
-  f1api.dev `fastLap` fields. Fastest Pitstop comes from OpenF1
-  (`/pit`, `stop_duration`, stationary time). If no pit-stop data exists for the
+  f1api.dev `fastLap` fields. Fastest Pitstop comes from Jolpica
+  (`/pitstops.json`, duration). If no pit-stop data exists for the
   round (e.g., pre-2024 US GP), the card is hidden. Other sessions show their
   session-specific result table (Quali/SprintQuali = Q1/Q2/Q3; Sprint = same as
   Race; FP = time-ordered fastest lap).
@@ -214,13 +196,13 @@ Short term → meaning lines. Domain + project language.
   data). Revision 1 of the Schedule tab renders only the `race` slot
   (date + time as a one-liner); the 5-session breakdown was dropped to
   match the Homepage §3 card shape. Distinct from `WeekendSchedule`
-  (which is the OpenF1 Instant-based, `nextUpcoming`-aware model
+  (which is the Instant-based, `nextUpcoming`-aware model
   driving the Homepage §1 countdown).
 - **SessionSlot** — `[BUILT ticket 03]` `f1/model/Season.kt`; a
   `date: String?, time: String?` pair from f1api.dev's
   `SessionDto`. Kept as raw strings (e.g. `"2024-03-02"`,
   `"15:00:00Z"`) — the screen formats them. Distinct from
-  `SessionTime` (OpenF1 Instant-based).
+  `SessionTime` (typed Instant-based).
 - **RoundPodium** — `[BUILT ticket 03]` `f1/GetRoundPodiumUseCase.kt`;
   the Schedule > Past list's per-row podium. `data class
   RoundPodium(val topThree: List<RoundResult>)` with

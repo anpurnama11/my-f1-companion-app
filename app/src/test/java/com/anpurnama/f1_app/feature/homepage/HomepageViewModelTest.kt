@@ -73,7 +73,7 @@ class HomepageViewModelTest {
             id = "hungaroring", name = "Hungaroring", circuitLengthRaw = "4381km",
             corners = 14, city = "Mogyorod", country = "Hungary",
         ),
-        raceDate = "2026-07-26", qualyDate = "2026-07-25", raceTime = "13:00:00Z",
+        raceDate = "2026-07-26", raceTime = "13:00:00Z",
     )
     private val TOP_TEAM = ConstructorStanding(
         teamId = "mercedes", position = 1, points = 358, wins = 8,
@@ -95,19 +95,13 @@ class HomepageViewModelTest {
     private fun fakeVm(
         getSeason: suspend (Boolean) -> Outcome<Season> = { Outcome.Success(SEASON) },
         getNextRace: suspend (Boolean) -> Outcome<NextRace?> = { Outcome.Success(NEXT_RACE) },
-        getRaceWeekend: suspend (Int, String) -> Outcome<WeekendSchedule?> = { _, _ -> Outcome.Success(null) },
         getDrivers: suspend (Boolean) -> Outcome<List<DriverStanding>> = { Outcome.Success(TOP_DRIVERS) },
         getConstructors: suspend (Boolean) -> Outcome<List<ConstructorStanding>> = { Outcome.Success(listOf(TOP_TEAM)) },
-        getTopSpeed: suspend (String, String, Int, String) -> Outcome<com.anpurnama.f1_app.f1.model.TopSpeed?> = { _, _, _, _ -> Outcome.Success(null) },
-        getCircuitImage: suspend (Int, String) -> Outcome<String?> = { _, _ -> Outcome.Success(null) },
     ) = HomepageViewModel(
         getSeason = getSeason,
         getNextRace = getNextRace,
-        getRaceWeekendSchedule = getRaceWeekend,
         getDriversStandings = getDrivers,
         getConstructorsStandings = getConstructors,
-        getCircuitTopSpeed = getTopSpeed,
-        getCircuitImage = getCircuitImage,
         favoritesFlow = flowOf(Favorites(null, null, null)),
         seedIfEmpty = { _, _ -> },
     )
@@ -141,24 +135,11 @@ class HomepageViewModelTest {
         assertTrue(sections.drivers is SectionUiState.Content)
         assertTrue(sections.constructors is SectionUiState.Content)
         assertTrue(sections.nextRace is SectionUiState.Content)
-        // §3 top speed must load on first open (warmUp fires every use
-        // case on first subscription, not just on refresh). The Hungaroring
-        // next race has Hungary/Hungary + qualyDate=2026-07-25 so the fake
-        // use case resolves.
-        assertTrue(
-            "topSpeed should be loaded on first open, not stuck on Loading",
-            sections.topSpeed is SectionUiState.Content,
-        )
-        // §1 weekend schedule must also load on first open — the fake
-        // returns Success(null) (no schedule on the fakes), proving the
-        // use case fired from warmUp, not just from refresh.
+        // §1 weekend schedule is derived from Season + NextRace and is
+        // valid empty data when the fake season has no matching round.
         assertTrue(
             "weekendSchedule should be loaded on first open, not stuck on Loading",
             sections.weekendSchedule is SectionUiState.Content,
-        )
-        assertTrue(
-            "circuitImage should be loaded on first open, not stuck on Loading",
-            sections.circuitImage is SectionUiState.Content,
         )
     }
 

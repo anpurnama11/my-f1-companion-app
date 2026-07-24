@@ -92,7 +92,6 @@ data class NextRaceResponseDto(
         @Serializable
         data class RaceScheduleDto(
             val race: RaceSessionDto? = null,
-            val qualy: RaceSessionDto? = null,
         ) {
             @Serializable
             data class RaceSessionDto(
@@ -194,48 +193,6 @@ data class CurrentTeamDto(
     val firstAppeareance: Int? = null,
     val constructorsChampionships: Int? = null,
     val driversChampionships: Int? = null,
-)
-
-// OpenF1 /v1/sessions — lowercase-no-underscore field names; @SerialName
-// maps each to the snake_case-as-camel Kotlin val. The test harness reuses
-// the same `ignoreUnknownKeys` JSON so any extras are absorbed.
-@Serializable
-data class OpenF1SessionDto(
-    @SerialName("session_key") val sessionKey: Int = 0,
-    @SerialName("session_name") val sessionName: String? = null,
-    @SerialName("date_start") val dateStart: String? = null,
-    @SerialName("country_name") val countryName: String? = null,
-    val year: Int = 0,
-    @SerialName("is_cancelled") val isCancelled: Boolean = false,
-)
-
-// OpenF1 /v1/laps — only `st_speed` is read (the others ride along in the
-// response but the top-speed cell doesn't surface them).
-@Serializable
-data class OpenF1LapDto(
-    @SerialName("session_key") val sessionKey: Int = 0,
-    @SerialName("driver_number") val driverNumber: Int = 0,
-    @SerialName("lap_number") val lapNumber: Int = 0,
-    @SerialName("st_speed") val stSpeed: Int? = null,
-)
-
-@Serializable
-data class OpenF1PitStopDto(
-    @SerialName("session_key") val sessionKey: Int = 0,
-    @SerialName("driver_number") val driverNumber: Int = 0,
-    @SerialName("stop_duration") val stopDuration: Double? = null,
-)
-
-// OpenF1 /v1/meetings — only `circuit_image` is read for the countdown
-// card decorative track layout. `country_flag` rides along for future use.
-@Serializable
-data class OpenF1MeetingDto(
-    @SerialName("meeting_key") val meetingKey: Int = 0,
-    @SerialName("meeting_name") val meetingName: String? = null,
-    @SerialName("country_name") val countryName: String? = null,
-    val year: Int = 0,
-    @SerialName("circuit_image") val circuitImage: String? = null,
-    @SerialName("country_flag") val countryFlag: String? = null,
 )
 
 // f1api.dev /{year}/{round}/race envelope — `races` is an *object* here
@@ -457,6 +414,33 @@ data class JolpicaRaceResultsResponseDto(
     data class DriverDto(
         val driverId: String? = null,
         val permanentNumber: String? = null,
+    )
+}
+
+// Jolpica Ergast-compatible /{year}/{round}/pitstops.json envelope.
+@Serializable
+data class JolpicaPitStopsResponseDto(
+    @SerialName("MRData") val mrData: MrDataDto = MrDataDto(),
+) {
+    @Serializable
+    data class MrDataDto(
+        @SerialName("RaceTable") val raceTable: RaceTableDto = RaceTableDto(),
+    )
+
+    @Serializable
+    data class RaceTableDto(
+        @SerialName("Races") val races: List<RaceDto> = emptyList(),
+    )
+
+    @Serializable
+    data class RaceDto(
+        @SerialName("PitStops") val pitStops: List<PitStopDto> = emptyList(),
+    )
+
+    @Serializable
+    data class PitStopDto(
+        val driverId: String? = null,
+        val duration: String? = null,
     )
 }
 

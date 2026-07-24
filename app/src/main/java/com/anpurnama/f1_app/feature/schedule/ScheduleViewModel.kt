@@ -8,7 +8,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.core.ui.toSection
-import com.anpurnama.f1_app.f1.GetCircuitImageUseCase
 import com.anpurnama.f1_app.f1.GetRoundPodiumUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import com.anpurnama.f1_app.f1.RoundPodium
@@ -31,10 +30,6 @@ import kotlinx.coroutines.launch
  *    `Race.winnerId`.
  *  - [GetRoundPodiumUseCase] drives per-row past-row podiums (one
  *    `/race` call per past round).
- *  - [GetCircuitImageUseCase] (homepage §3 reuse) drives a per-round
- *    OpenF1 track-layout image — pre-loaded eagerly in the VM so the
- *    tab switch from Upcoming to Past (and back) is instant with no
- *    re-fetch.
  *
  *  Section independence is the contract: every surface has its own
  *  [SectionUiState] and no composite use case. Per-row podiums are
@@ -46,12 +41,12 @@ import kotlinx.coroutines.launch
  *  subsequent subscribers read the hot `StateFlow` without
  *  re-firing. Re-fire is via [refresh] (pull-to-refresh) only.
  *  Backed by the server-cached data layer (10-min f1api.dev,
- *  1-hr jolpica; OpenF1 uncached but ~0.3s/call) so a hot upstream
+ *  1-hr jolpica) so a hot upstream
  *  is cheap.
  *
  *  Refresh re-fires the season with `forceRefresh = true` and, in the
  *  Content branch, re-fires every past round's `/race` and every
- *  race's OpenF1 image call. This is the only path that re-loads
+ *  race data. This is the only path that re-loads
  *  per-row state — the screen's `LaunchedEffect(race.round)` does NOT
  *  re-fire on a same-key re-render, so the VM must own the re-fire
  *  (revision 1: fix the refresh-nukes-content bug; see
@@ -122,8 +117,7 @@ class ScheduleViewModel(
     /**
      * Public pull-to-refresh. Re-fires `/current` with
      * `forceRefresh = true` (NO_CACHE) and, in the Content branch,
-     * re-fires every past round's `/race` and every race's OpenF1
-     * `/race`. Upcoming rows have no podium fetch.
+     * re-fires every past round's `/race`. Upcoming rows have no podium fetch.
      */
     fun refresh() {
         viewModelScope.launch {

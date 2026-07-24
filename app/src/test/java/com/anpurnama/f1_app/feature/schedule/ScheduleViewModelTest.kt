@@ -32,7 +32,6 @@ import org.junit.Test
  *     and clears every per-row map.
  *  3. **Revision 1 — warmUp eagerly fires per-row loads.** After
  *     the season resolves, the VM fires `loadPodium` for every
- *     past round and `loadCircuitImage` for every race
  *     (country-bearing). Past rounds + circuit images are all
  *     resolved to Content after warmUp. This is the fix for the
  *     refresh-nukes-content bug: a refresh that only wrote the
@@ -41,12 +40,12 @@ import org.junit.Test
  *     re-fire on a same-key re-render.
  *  4. **Revision 1 — RMW race is fixed.** Per-row writes use
  *     atomic `MutableStateFlow.update { }`, so concurrent
- *     `loadPodium` / `loadCircuitImage` calls on different rounds
+ *     `loadPodium` calls on different rounds
  *     never lose updates.
  *  5. `retryPodium(round)` re-fires the failing round only.
  *  6. Pull-to-refresh re-fires the season use case with
  *     `forceRefresh = true`, then re-fires every past round's
- *     `/race` and every race's OpenF1 image.
+ *     `/race` for each past round.
  *
  * The use cases are hand-rolled fakes — `suspend (...) -> Outcome<…>`
  * lambdas. No mocking library.
@@ -346,10 +345,4 @@ class ScheduleViewModelTest {
             (state.podiums[2] as SectionUiState.Content).data.topThree[0].driverId == "perez")
     }
 
-    // ponytail: a `loadCircuitImage` RMW test would be redundant —
-    // the new code uses the same atomic `MutableStateFlow.update { }`
-    // pattern as the fixed `loadPodium`, and `loadCircuitImage` has
-    // no historical bug to pin. The `loadPodium` RMW test above
-    // covers the pattern. Reflecting into a private `suspend` method
-    // to add a parallel test would be a smell for no extra coverage.
 }

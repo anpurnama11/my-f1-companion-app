@@ -3,8 +3,8 @@
 `com.anpurnama.f1_app` — dark-first Jetpack Compose F1 app. Greenfield scaffold
 (`F1appTheme`, `Circuits`/`Tyres` palettes, Navigation 3 multi-backstack `NavShell`)
 plus Homepage foundation with three sections (§1 upcoming-session countdown,
-§2 season aggregates, §3 combined favorites + nearest-GP circuit cards with
-top-speed line) and the Schedule tab (Material 3 `SecondaryTabRow` plus
+§2 season aggregates, §3 combined favorites + nearest-GP circuit cards) and
+the Schedule tab (Material 3 `SecondaryTabRow` plus
 `HorizontalPager` switching between **Upcoming** and **Past**; Upcoming rows
 mirror the §3 card shape — round/GP name/date/city/circuit image; Past rows add
 a P1/P2/P3 podium cell with per-row retry).
@@ -18,9 +18,10 @@ while My Team manages two favorite drivers and one favorite constructor through
 a standings-backed bottom-sheet picker. Driver IDs are unique across the two
 slots, enforced atomically in `FavoritesCache`; the shared cache updates
 Homepage §3 reactively.
-Data from f1api.dev primary, OpenF1 for top speed and optional pit-stop
-enrichment, Jolpica standard for race status/grid and alpha for sprint
-sessions. Manual `Wiring` DI, MVVM
+Data from f1api.dev primary, Jolpica standard for race status/grid and
+pit-stop enrichment, and Jolpica alpha for sprint sessions. Circuit artwork
+is bundled from a pinned F1DB revision; no runtime artwork service is used.
+Manual `Wiring` DI, MVVM
 init-less, sealed `Outcome<T>`/`SectionUiState<T>` with shared `OutcomeContent`
 renderer (ADR 0002). Single `:app` module; KMP `:shared` extraction deferred.
 Session start labels are converted from API UTC to the device’s local timezone;

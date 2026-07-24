@@ -31,4 +31,23 @@ class SessionResultPresentationTest {
         assertEquals(-2, result("2", "4").positionChange())
         assertEquals(0, result("2", "2").positionChange())
     }
+
+    @Test
+    fun `pit-stop presentation joins by driver id`() {
+        val winner = result("2", "1").copy(
+            driverId = "leclerc",
+            driverShortName = "LEC",
+        )
+        val session = SessionResult(
+            year = 2026,
+            round = 1,
+            raceName = "Bahrain GP",
+            circuit = Circuit("bahrain", "Bahrain", "5412km", 15, "Sakhir", "Bahrain"),
+            session = SessionType.Race,
+            raceResults = listOf(winner),
+        )
+
+        assertEquals(winner, session.driverForPitstop(FastestPitstop("leclerc", 1.9)))
+        assertNull(session.driverForPitstop(FastestPitstop("verstappen", 1.9)))
+    }
 }

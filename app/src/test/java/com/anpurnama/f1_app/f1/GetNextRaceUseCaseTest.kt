@@ -33,7 +33,7 @@ import org.junit.Test
  *
  * Verifies:
  *  - 200 + valid envelope → Success(NextRace) with the inlined circuit
- *    country + race date (the OpenF1 join keys).
+ *    and race date.
  *  - 200 + empty `race` array → Success(null) (off-season is a success
  *    with no payload; the screen renders the empty state).
  *  - 4xx/5xx → Failure with the expected status-coded message.
@@ -73,8 +73,7 @@ class GetNextRaceUseCaseTest {
                   "circuitLength": "4381km", "corners": 14
                 },
                 "schedule": {
-                  "race":  { "date": "2026-07-26", "time": "13:00:00Z" },
-                  "qualy": { "date": "2026-07-25", "time": "14:00:00Z" }
+                  "race":  { "date": "2026-07-26", "time": "13:00:00Z" }
                 }
               }]
             }
@@ -87,7 +86,6 @@ class GetNextRaceUseCaseTest {
         assertEquals("Hungaroring", next.circuit.name)
         assertEquals("Hungary", next.circuit.country)
         assertEquals("2026-07-26", next.raceDate)
-        assertEquals("2026-07-25", next.qualyDate)
     }
 
     @Test

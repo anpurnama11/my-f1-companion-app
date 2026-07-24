@@ -38,10 +38,6 @@ class GetNextRaceUseCase(private val client: HttpClient) {
 }
 
 /**
- * DTO → domain mapping. The `NextRace` carries the country + Qualifying
- * date the OpenF1 join in `GetCircuitTopSpeedUseCase` reads — those are
- * load-bearing for §3.
- *
  * `internal` so the test can reach it from the same module, but it stays
  * off the public API surface. Per the existing convention from ticket 01.
  */
@@ -61,7 +57,6 @@ internal fun NextRaceResponseDto.toNextRace(): NextRace? = race.firstOrNull()?.l
             country = inner.circuit.country,
         ),
         raceDate = inner.schedule.race?.date,
-        qualyDate = inner.schedule.qualy?.date,
         raceTime = inner.schedule.race?.time,
     )
 }

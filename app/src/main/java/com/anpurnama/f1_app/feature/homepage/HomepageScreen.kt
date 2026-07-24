@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -58,7 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import androidx.compose.ui.res.painterResource
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.ui.OutcomeContent
 import com.anpurnama.f1_app.core.ui.SectionUiState
@@ -68,8 +69,8 @@ import com.anpurnama.f1_app.f1.model.DriverStanding
 import com.anpurnama.f1_app.f1.model.NextRace
 import com.anpurnama.f1_app.f1.model.Season
 import com.anpurnama.f1_app.f1.model.SessionTime
-import com.anpurnama.f1_app.f1.model.TopSpeed
 import com.anpurnama.f1_app.f1.model.WeekendSchedule
+import com.anpurnama.f1_app.ui.artwork.CircuitArtwork
 import com.anpurnama.f1_app.ui.theme.Circuits
 import com.anpurnama.f1_app.ui.theme.Spacing
 import kotlinx.datetime.Clock
@@ -86,7 +87,7 @@ private val RACE_DURATION = 3.hours
  *
  *  - §1 Next-race countdown card
  *  - §2 Season progress aggregates (carried over from ticket 01)
- *  - §3 Favorites card plus nearest GP card with top speed
+ *  - §3 Favorites card plus nearest GP card
  *
  * The screen reads the VM's `UiState.Sections` and renders each section
  * via the shared `OutcomeContent` family — Loading/Failure/Success, each
@@ -110,9 +111,7 @@ fun HomepageScreen(
         sections.nextRace is SectionUiState.Loading ||
         sections.drivers is SectionUiState.Loading ||
         sections.constructors is SectionUiState.Loading ||
-        sections.topSpeed is SectionUiState.Loading ||
-        sections.weekendSchedule is SectionUiState.Loading ||
-        sections.circuitImage is SectionUiState.Loading
+        sections.weekendSchedule is SectionUiState.Loading
 
     PullToRefreshBox(
         isRefreshing = anyLoading,
@@ -129,7 +128,6 @@ fun HomepageScreen(
             Section1Countdown(
                 nextRace = sections.nextRace,
                 weekendSchedule = sections.weekendSchedule,
-                circuitImage = sections.circuitImage,
             )
             Section2Season(sections.season)
             Section3NearestGp(
@@ -138,7 +136,6 @@ fun HomepageScreen(
                 constructors = sections.constructors,
                 onPickFavorites = onPickFavorites,
                 nextRace = sections.nextRace,
-                topSpeed = sections.topSpeed,
                 onClickCircuit = { circuitId ->
                     onCircuitClick(circuitId)
                 },
@@ -153,14 +150,12 @@ fun HomepageScreen(
 private fun Section1Countdown(
     nextRace: SectionUiState<NextRace?>,
     weekendSchedule: SectionUiState<WeekendSchedule?>,
-    circuitImage: SectionUiState<String?>,
 ) {
     OutcomeContent(state = nextRace) { race ->
         if (race != null) {
             CountdownCard(
                 race = race,
                 schedule = (weekendSchedule as? SectionUiState.Content)?.data,
-                circuitImageUrl = (circuitImage as? SectionUiState.Content)?.data,
             )
         }
     }
@@ -328,7 +323,6 @@ private fun FavoriteEntry(
 private fun CountdownCard(
     race: NextRace,
     schedule: WeekendSchedule?,
-    circuitImageUrl: String?,
 ) {
     // Tick `now` every 30s so a card the user is reading updates without
     // waiting for the next state push. `LaunchedEffect(Unit)` keys on
@@ -426,23 +420,21 @@ private fun CountdownCard(
                         }
                     }
                 }
-                if (circuitImageUrl != null) {
-                    AsyncImage(
-                        model = circuitImageUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .padding(start = Spacing.sm)
-                            .width(140.dp)
-                            .height(120.dp),
-                        contentScale = ContentScale.Fit,
-                        colorFilter = ColorFilter.tint(
-                            Circuits.forId(race.circuit.id),
-                            BlendMode.SrcIn,
-                        ),
-                    )
-                }
+                val artwork = CircuitArtwork.forId(race.circuit.id)
+                Image(
+                    painter = painterResource(artwork.resourceId),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(start = Spacing.sm)
+                        .width(140.dp)
+                        .height(120.dp),
+                    contentScale = ContentScale.Fit,
+                    colorFilter = if (artwork.tintable) {
+                        ColorFilter.tint(Circuits.forId(race.circuit.id), BlendMode.SrcIn)
+                    } else null,
+                )
             }
-    }
+        }
 }
 
 @Composable
@@ -689,7 +681,6 @@ private fun Section3NearestGp(
     constructors: SectionUiState<List<ConstructorStanding>>,
     onPickFavorites: () -> Unit,
     nextRace: SectionUiState<NextRace?>,
-    topSpeed: SectionUiState<TopSpeed?>,
     onClickCircuit: (circuitId: String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -735,7 +726,6 @@ private fun Section3NearestGp(
             } else {
                 CircuitCard(
                     race = race,
-                    topSpeed = topSpeed,
                     onClick = { onClickCircuit(race.circuit.id) },
                 )
             }
@@ -746,7 +736,6 @@ private fun Section3NearestGp(
 @Composable
 private fun CircuitCard(
     race: NextRace,
-    topSpeed: SectionUiState<TopSpeed?>,
     onClick: () -> Unit,
 ) {
     Card(
@@ -767,80 +756,34 @@ private fun CircuitCard(
                 .padding(Spacing.normal),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            // Circuit brand-accent strip (small bar, full-bleed at top).
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
                     .background(Circuits.forId(race.circuit.id)),
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Round ${race.round}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = race.circuit.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (race.raceDate != null) {
                     Text(
-                        text = "Round ${race.round}",
-                        style = MaterialTheme.typography.labelMedium,
+                        text = "${race.raceDate} · ${race.laps ?: "—"} laps · ${race.circuit.corners ?: "—"} corners",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(
-                        text = race.circuit.name,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (race.raceDate != null) {
-                        Text(
-                            text = "${race.raceDate} · ${race.laps ?: "—"} laps · ${race.circuit.corners ?: "—"} corners",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Top speed",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    when (val ts = topSpeed) {
-                        is SectionUiState.Content -> {
-                            if (ts.data != null) {
-                                Text(
-                                    text = "${ts.data.speedKph} km/h",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            } else {
-                                // Spacer only — pre-2023 round or no Qualifying
-                                // session on the OpenF1 calendar. Not a value
-                                // placeholder; "no data" is the truth and the
-                                // cell stays empty (per the ticket 02 spec).
-                                Box(modifier = Modifier.height(28.dp))
-                            }
-                        }
-                        is SectionUiState.Error -> {
-                            Text(
-                                text = "—",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        is SectionUiState.Loading -> {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        }
-                    }
                 }
             }
         }
     }
 }
-
 // ─── helpers ──────────────────────────────────────────────────────────────
 
 /**
@@ -856,11 +799,8 @@ private fun rememberHomepageViewModel(): HomepageViewModel {
         factory = homepageViewModelFactory(
             getSeason = wiring.getSeason,
             getNextRace = wiring.getNextRace,
-            getRaceWeekendSchedule = wiring.getRaceWeekendSchedule,
             getDriversStandings = wiring.getDriversStandings,
             getConstructorsStandings = wiring.getConstructorsStandings,
-            getCircuitTopSpeed = wiring.getCircuitTopSpeed,
-            getCircuitImage = wiring.getCircuitImage,
             favoritesCache = wiring.favoritesCache,
         )
     )

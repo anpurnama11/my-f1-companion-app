@@ -14,14 +14,14 @@ else is the agreed contract the build works toward, written present-tense as the
 to implement against. Flip a section to `[BUILT]` as it lands.
 
 **Still pending:** the widget (`CountdownWidget` + `CountdownWorker` + `NextRaceCache`),
-top-speed and most-wins-at-circuit, and ticket 04's remaining
-multi-source `HttpClient` extensions (jolpica + OpenF1). Leaderboard plus
+and most-wins-at-circuit. Leaderboard plus
 Driver/Team detail is now `[BUILT]`: standings are reused by the tab and joined
 to current driver/team metadata for detail pages. Round detail and the Schedule
 tab are `[BUILT]`: `RoundScreen` derives upcoming/past mode from the race slot,
 uses the year-specific season schedule, and pushes `SessionResult`; session
-results normalize f1api.dev, Jolpica standard/alpha, and optional OpenF1 pit
-data through `Wiring`. `CircuitDetail` remains the slice-06 placeholder.
+results normalize f1api.dev, Jolpica standard/alpha, and optional Jolpica
+pit-stop data through `Wiring`. Circuit artwork is a pinned F1DB build-time
+asset catalog; `CircuitDetail` remains the slice-06 placeholder.
 
 My Team is `[BUILT]`: `feature/myteam/` renders the three `FavoritesCache`
 slots and uses a `ModalBottomSheet` over current standings for explicit
@@ -96,7 +96,7 @@ com.anpurnama.f1_app/
     {GetNextRaceUseCase, GetSeasonUseCase, GetDriversStandingsUseCase,
      GetConstructorsStandingsUseCase, GetDriverDetailUseCase, GetTeamDetailUseCase,
      GetRoundResultsUseCase, GetRoundQualifyingUseCase,
-     GetCircuitTopSpeedUseCase, GetCircuitMostWinsUseCase,
+     GetCircuitMostWinsUseCase,
      GetRoundPodiumUseCase}.kt
   ui/theme/{Color,Theme,Type}.kt    # dark-only M3 theme — ticket 02. No Tokens.kt: F1 palettes (Circuits, Tyres, result accents) are grouped objects in Color.kt, not a separate file.
   feature/
@@ -124,10 +124,10 @@ com.anpurnama.f1_app/
   are a separate question, decided in ticket 04.
 - **Scope:** 3 top-level navs (Homepage, Schedule, Leaderboard) + Driver/Team/Round
   detail pages + 1 Countdown widget. 7 secondary widget types and Driver Comparison
-  are out, not deferred. Three data gaps not served by f1api.dev (top speed → OpenF1,
-  most wins at circuit → jolpica, podium on Past list → f1api.dev full-podium) were
-  researched in tickets 08/09/10 and are **design-locked** under ticket 04's
-  multi-source contract (11 use cases total) — none built yet.
+  are out, not deferred. Two data gaps not served by f1api.dev (most wins at
+  circuit → jolpica, podium on Past list → f1api.dev full-podium) remain
+  explicitly scoped; top speed is absent from v1 rather than replaced by an
+  unsupported metric.
 
 ## Test assertions (JVM unit) `[BUILT]` `[from ticket 01]`
 
@@ -183,8 +183,8 @@ com.anpurnama.f1_app/
   subscriber and never stops it for the holder's lifetime
   (`viewModelScope`). Subsequent subscribers read the existing
   `StateFlow` value; no re-fire. Safe when the data layer is cheap on
-  hot cache (10-min f1api.dev, 1-hr jolpica, OpenF1 uncached at
-  ~0.3s/call — see [terminology.md §"Init-less ViewModel"](terminology.md)
+  hot cache (10-min f1api.dev, 1-hr jolpica — see
+  [terminology.md §"Init-less ViewModel"](terminology.md)
   + [wayfinder/f1app/tickets/03-data-layer-and-refresh.md](wayfinder/f1app/tickets/03-data-layer-and-refresh.md)
   §Caching). Reserve `WhileSubscribed` for genuinely expensive or
   user-scoped streams. Never `Eagerly` for screen VMs — it bypasses

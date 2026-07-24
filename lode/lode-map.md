@@ -43,6 +43,7 @@ lode/
       07-countdown-widget.md                    # ready — blocked by 02,03
       08-enrichments-headshots-and-team-imagery.md # ready — pending 04/05; Homepage §3 rows exist
       09-testing-cut.md                         # partial — shipped-slice unit/lifecycle coverage; widget reducer/full instrumentation remain
+      10-remove-openf1-runtime-dependency.md   # shipped — f1api/Jolpica/local F1DB artwork source cut
   release/
     build-and-signing.md           # release buildType, signing, R8 (AGP 9 DSL), versioning, output (ticket 15)
   widget/
@@ -80,6 +81,8 @@ lode/
       top-speed-api-wrangling.md       # API wrangling detail for the top-speed stat (ticket 08)
       circuit-most-wins.md             # most-wins-at-circuit stat source + cost (ticket 09)
       circuit-most-wins-api-wrangling.md  # API wrangling detail for the most-wins-at-circuit stat (ticket 09)
+      openf1-removal.md                # accepted runtime source replacement plan (ADR 0009)
+      f1db-data.md                     # F1DB coverage for Driver of the Day and fastest laps
       team-imagery.md                  # formula1.com CDN: two systems, slug maps, car/team renders (ticket 13 enrichment #4)
       team-accent.md                   # TeamColors.forId hardcoded map: which API has it, why hardcoded v1, Jolpica alpha migration (ticket 16)
   tmp/                               # git-ignored session scraps

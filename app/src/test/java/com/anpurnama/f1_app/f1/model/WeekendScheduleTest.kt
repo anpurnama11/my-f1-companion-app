@@ -17,12 +17,12 @@ class WeekendScheduleTest {
         val now = Instant.parse("2026-07-24T10:00:00Z")
         val schedule = WeekendSchedule(
             listOf(
-                SessionTime("FP1", "FP1", Instant.parse("2026-07-24T11:30:00Z")),
-                SessionTime("FP2", "FP2", Instant.parse("2026-07-24T15:00:00Z")),
-                SessionTime("Race", "RACE", Instant.parse("2026-07-26T13:00:00Z")),
+                SessionTime(SessionType.FP1, Instant.parse("2026-07-24T11:30:00Z")),
+                SessionTime(SessionType.FP2, Instant.parse("2026-07-24T15:00:00Z")),
+                SessionTime(SessionType.Race, Instant.parse("2026-07-26T13:00:00Z")),
             )
         )
-        assertEquals("FP1", schedule.nextUpcoming(now)?.label)
+        assertEquals("Practice 1", schedule.nextUpcoming(now)?.label)
     }
 
     @Test
@@ -30,8 +30,8 @@ class WeekendScheduleTest {
         val now = Instant.parse("2026-07-26T14:00:00Z")
         val schedule = WeekendSchedule(
             listOf(
-                SessionTime("FP1", "FP1", Instant.parse("2026-07-24T11:30:00Z")),
-                SessionTime("Race", "RACE", Instant.parse("2026-07-26T13:00:00Z")),
+                SessionTime(SessionType.FP1, Instant.parse("2026-07-24T11:30:00Z")),
+                SessionTime(SessionType.Race, Instant.parse("2026-07-26T13:00:00Z")),
             )
         )
         assertNull(schedule.nextUpcoming(now))

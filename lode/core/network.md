@@ -22,18 +22,16 @@ Held by `Wiring`; one client per process, shared by the widget.
 `f1/data/F1Api.kt` holds base URL consts and Ktor endpoint extensions:
 
 - `F1API_BASE` — f1api.dev primary
-- `OPENF1_BASE` — OpenF1 secondary
 - `JOLPICA_BASE` — jolpica (ticket 04)
 
 Extensions: `getCurrent`, `getNextRace`, `getDriversChampionship`,
-`getConstructorsChampionship`, `getOpenF1Sessions`, `getOpenF1Laps`.
+`getConstructorsChampionship`, `getJolpicaPitStops`, and the existing
+f1api.dev/Jolpica result extensions.
 Pure Kotlin, zero `android.*` imports (domain-purity invariant).
 
-f1api.dev extensions take a `forceRefresh` flag and add `Cache-Control: no-cache`
-when true. OpenF1 extensions don't (no cache to bust).
-
-Also holds `F1API_TO_OPENF1_COUNTRY` (1-entry Silverstone fix) and
-`F1API_TO_JOLPICA_CIRCUIT` (5-entry map).
+f1api.dev and Jolpica extensions take a `forceRefresh` flag and add
+`Cache-Control: no-cache` when true. Circuit artwork is resolved from the
+Android UI-layer local catalog, not from this network layer.
 
 ## Cross-references
 

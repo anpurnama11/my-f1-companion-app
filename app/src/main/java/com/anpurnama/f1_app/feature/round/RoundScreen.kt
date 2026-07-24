@@ -32,7 +32,6 @@ import com.anpurnama.f1_app.f1.model.Race
 import com.anpurnama.f1_app.f1.model.RoundMode
 import com.anpurnama.f1_app.f1.model.ScheduledSession
 import com.anpurnama.f1_app.f1.model.SessionType
-import com.anpurnama.f1_app.f1.model.TopSpeed
 import com.anpurnama.f1_app.f1.model.toDeviceLocalLabel
 import com.anpurnama.f1_app.ui.theme.Spacing
 
@@ -78,7 +77,6 @@ fun RoundScreen(
                 CircuitStatsCard(
                     circuit = circuit,
                     race = sections.race,
-                    topSpeed = sections.topSpeed,
                     onClick = { onCircuitClick(circuit.id) },
                 )
             }
@@ -121,7 +119,6 @@ private fun RoundHeader(round: Int, name: String, race: Race?) {
 private fun CircuitStatsCard(
     circuit: Circuit,
     race: Race?,
-    topSpeed: SectionUiState<TopSpeed?>,
     onClick: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -137,7 +134,6 @@ private fun CircuitStatsCard(
                     Stat("Length", formatLength(circuit.circuitLengthRaw))
                     Stat("Laps", race?.laps?.toString() ?: "—")
                     Stat("Turns", circuit.corners?.toString() ?: "—")
-                    Stat("Top speed", (topSpeed as? SectionUiState.Content)?.data?.let { "${it.speedKph} km/h" } ?: "—")
                 }
             }
         }
@@ -231,7 +227,6 @@ private fun rememberRoundViewModel(year: Int, round: Int): RoundViewModel {
             getRoundResults = wiring.getRoundResults,
             getRoundQualifying = wiring.getRoundQualifying,
             getSeason = wiring.getSeason,
-            getCircuitTopSpeed = wiring.getCircuitTopSpeed,
         ),
     )
 }

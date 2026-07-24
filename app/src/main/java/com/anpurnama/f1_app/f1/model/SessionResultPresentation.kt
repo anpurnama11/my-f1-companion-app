@@ -17,6 +17,10 @@ fun RoundResult.positionChange(): Int? {
     return gridPosition - finishingPosition
 }
 
+/** Joins the optional pit-stop card to the race result by canonical driver ID. */
+fun SessionResult.driverForPitstop(stop: FastestPitstop): RoundResult? =
+    raceResults.firstOrNull { it.driverId == stop.driverId }
+
 private fun String?.isDns(): Boolean {
     val normalized = orEmpty().lowercase().replace('_', ' ')
     return normalized.contains("did not start") || normalized.contains("not started") || normalized == "dns"

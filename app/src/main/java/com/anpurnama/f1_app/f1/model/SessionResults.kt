@@ -32,6 +32,6 @@ data class FastestLap(
 )
 
 data class FastestPitstop(
-    val driverNumber: Int,
+    val driverId: String,
     val durationSeconds: Double,
 )

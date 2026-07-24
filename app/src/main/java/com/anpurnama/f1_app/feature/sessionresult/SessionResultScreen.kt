@@ -33,6 +33,7 @@ import com.anpurnama.f1_app.f1.model.SessionResult
 import com.anpurnama.f1_app.f1.model.SessionType
 import com.anpurnama.f1_app.f1.model.displayGrid
 import com.anpurnama.f1_app.f1.model.displayStatusOrTime
+import com.anpurnama.f1_app.f1.model.driverForPitstop
 import com.anpurnama.f1_app.f1.model.positionChange
 import com.anpurnama.f1_app.ui.theme.Spacing
 
@@ -116,8 +117,8 @@ private fun Standout(title: String, driver: String, value: String) {
 
 @Composable
 private fun PitstopCard(stop: FastestPitstop, result: SessionResult) {
-    val driver = result.raceResults.firstOrNull { it.driverNumber == stop.driverNumber }
-    Standout("Fastest pitstop", driver?.driverShortName ?: "Car ${stop.driverNumber}", "%.3f s".format(stop.durationSeconds))
+    val driver = result.driverForPitstop(stop)
+    Standout("Fastest pit-stop duration", driver?.driverShortName ?: stop.driverId, "%.3f s".format(stop.durationSeconds))
 }
 
 @Composable

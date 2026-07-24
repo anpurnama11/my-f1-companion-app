@@ -43,13 +43,14 @@ modes, 5-session weekend, Results push); Session results (Race / Quali /
 Sprint / SQuali / FP); Homepage §2 season aggregates; combined favorites card
 (Homepage §3); deep link `f1app://round/{year}/{round}` from widget.
 
-Queued for v1: Leaderboard (04), My Team (05), Circuit Detail (06), additive
-enrichments (08 — headshots/weather/race-control/team-imagery, scope being
-grilled per ticket 13).
+Queued for v1: Circuit Detail (06), additive enrichments (08 —
+headshots/weather/race-control/team-imagery, scope being grilled per ticket
+13). Leaderboard and My Team are built.
 
 Confirmed technical constraints (not product): single `:app` module; manual
 Wiring DI; MVVM init-less; sealed `Outcome<T>` → `SectionUiState<T>`;
-f1api.dev primary, OpenF1 for top speed, jolpica for most-wins-at-circuit;
+f1api.dev primary, Jolpica for result companions and pit-stop duration, local
+F1DB artwork; top speed is absent from v1;
 `f1/` has zero `android.*` imports (future KMP `:shared` extraction stays a
 move, not a rewrite).
 
@@ -73,7 +74,8 @@ M3 defaults.
 
 ## Evidence on Hand
 
-F1 data is fetched live from f1api.dev, OpenF1, and jolpica. No synthetic
+F1 data is fetched live from f1api.dev and jolpica. Circuit artwork is bundled
+from a pinned F1DB revision; no runtime image service is used. No synthetic
 fixtures; no fabricated driver/team stats; no invented testimonials or
 benchmarks. Design source for the theme: `~/Downloads/boxbox-club-DESIGN.md`
 (lives outside the repo), transcribed into `lode/design-system/theme.md`.

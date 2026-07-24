@@ -241,7 +241,7 @@ private fun EmptyState(message: String) {
  *  - Header: round number + GP name
  *  - City / country line
  *  - Race date (race slot only — the v1 5-session breakdown is gone)
- *  - Circuit image (right column, decorative; OpenF1 with brand
+ *  - Circuit identity (right column, decorative; local artwork with brand
  *    accent as fallback)
  *  - Podium cell (Past only)
  */
