@@ -49,7 +49,6 @@ fun NavShell() {
     val entryProvider = entryProvider {
         entry<Route.Homepage> {
             HomepageScreen(
-                onCircuitClick = { id -> navigator.navigate(Route.CircuitDetail(id)) },
                 onPickFavorites = { navigator.navigate(Route.MyTeam) },
             )
         }

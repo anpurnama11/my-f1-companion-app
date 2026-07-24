@@ -96,7 +96,6 @@ private val RACE_DURATION = 3.hours
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomepageScreen(
-    onCircuitClick: (String) -> Unit = {},
     onPickFavorites: () -> Unit = {},
     viewModel: HomepageViewModel = rememberHomepageViewModel(),
 ) {
@@ -134,11 +133,7 @@ fun HomepageScreen(
                 favorites = sections.favorites,
                 drivers = sections.drivers,
                 constructors = sections.constructors,
-                onPickFavorites = onPickFavorites,
-                nextRace = sections.nextRace,
-                onClickCircuit = { circuitId ->
-                    onCircuitClick(circuitId)
-                },
+                onPickFavorites = onPickFavorites
             )
         }
     }
@@ -679,9 +674,7 @@ private fun Section3NearestGp(
     favorites: SectionUiState<Favorites>,
     drivers: SectionUiState<List<DriverStanding>>,
     constructors: SectionUiState<List<ConstructorStanding>>,
-    onPickFavorites: () -> Unit,
-    nextRace: SectionUiState<NextRace?>,
-    onClickCircuit: (circuitId: String) -> Unit,
+    onPickFavorites: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         when {
@@ -714,76 +707,9 @@ private fun Section3NearestGp(
                 CircularProgressIndicator()
             }
         }
-
-        OutcomeContent(state = nextRace) { race ->
-            if (race == null) {
-                // Off-season.
-                Text(
-                    text = "No upcoming race",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                CircuitCard(
-                    race = race,
-                    onClick = { onClickCircuit(race.circuit.id) },
-                )
-            }
-        }
     }
 }
 
-@Composable
-private fun CircuitCard(
-    race: NextRace,
-    onClick: () -> Unit,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics(mergeDescendants = true) {
-                contentDescription = "Open ${race.circuit.name} circuit details"
-            },
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.normal),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .background(Circuits.forId(race.circuit.id)),
-            )
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Round ${race.round}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = race.circuit.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (race.raceDate != null) {
-                    Text(
-                        text = "${race.raceDate} · ${race.laps ?: "—"} laps · ${race.circuit.corners ?: "—"} corners",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
 // ─── helpers ──────────────────────────────────────────────────────────────
 
 /**
