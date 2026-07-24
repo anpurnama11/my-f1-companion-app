@@ -18,9 +18,13 @@ while My Team manages two favorite drivers and one favorite constructor through
 a standings-backed bottom-sheet picker. Driver IDs are unique across the two
 slots, enforced atomically in `FavoritesCache`; the shared cache updates
 Homepage §3 reactively.
-Data from f1api.dev primary, OpenF1 for top speed, Jolpica standard for race status/grid and most-wins. Manual `Wiring` DI, MVVM
+Data from f1api.dev primary, OpenF1 for top speed and optional pit-stop
+enrichment, Jolpica standard for race status/grid and alpha for sprint
+sessions. Manual `Wiring` DI, MVVM
 init-less, sealed `Outcome<T>`/`SectionUiState<T>` with shared `OutcomeContent`
 renderer (ADR 0002). Single `:app` module; KMP `:shared` extraction deferred.
+Session start labels are converted from API UTC to the device’s local timezone;
+elapsed lap and race result times remain unconverted durations.
 
 **Multi-backstack (revision 2):** each tab has its own persistent
 `NavBackStack` — switching tabs no longer destroys ViewModels.

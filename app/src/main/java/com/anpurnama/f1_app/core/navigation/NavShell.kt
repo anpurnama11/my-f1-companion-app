@@ -19,6 +19,7 @@ import com.anpurnama.f1_app.feature.driver.DriverScreen
 import com.anpurnama.f1_app.feature.leaderboard.LeaderboardScreen
 import com.anpurnama.f1_app.feature.myteam.MyTeamScreen
 import com.anpurnama.f1_app.feature.round.RoundScreen
+import com.anpurnama.f1_app.feature.sessionresult.SessionResultScreen
 import com.anpurnama.f1_app.feature.schedule.ScheduleScreen
 import com.anpurnama.f1_app.feature.team.TeamScreen
 
@@ -70,6 +71,16 @@ fun NavShell() {
                 year = key.year,
                 round = key.round,
                 onCircuitClick = { id -> navigator.navigate(Route.CircuitDetail(id)) },
+                onSessionResultClick = { year, round, session ->
+                    navigator.navigate(Route.SessionResult(year, round, session))
+                },
+            )
+        }
+        entry<Route.SessionResult> { key ->
+            SessionResultScreen(
+                year = key.year,
+                round = key.round,
+                session = key.session,
             )
         }
         entry<Route.DriverDetail> { key ->

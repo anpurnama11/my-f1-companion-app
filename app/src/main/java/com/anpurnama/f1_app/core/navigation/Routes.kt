@@ -1,13 +1,14 @@
 package com.anpurnama.f1_app.core.navigation
 
 import androidx.navigation3.runtime.NavKey
+import com.anpurnama.f1_app.f1.model.SessionType
 import kotlinx.serialization.Serializable
 
 /**
  * Top-level navigation routes. The 4 tabs of the [NavShell] are the
  * 4 `data object`s here; detail routes (`DriverDetail`, `TeamDetail`,
- * `RoundDetail`, `CircuitDetail`) land alongside these in the same route
- * hierarchy. SessionResult remains a contract-only follow-up route.
+ * `RoundDetail`, `SessionResult`, `CircuitDetail`) land alongside these in the same route
+ * hierarchy.
  *
  * Each route is `@Serializable` and implements [NavKey] so the
  * Navigation 3 `entryProvider` can route by type.
@@ -51,9 +52,16 @@ sealed interface Route : NavKey {
      * Detail page for a single round. Opened from a Schedule row tap
      * and (in the future, ticket 07) from the Countdown widget's
      * custom-scheme deep link. Lands in this slice (ticket 03): the
-     * page shows the race results, the qualifying results, and a
-     * circuit block that links to [CircuitDetail].
+     * page shows mode-specific weekend sessions, circuit stats, and
+     * links to [SessionResult] and [CircuitDetail].
      */
     @Serializable
     data class RoundDetail(val year: Int, val round: Int) : Route
+
+    @Serializable
+    data class SessionResult(
+        val year: Int,
+        val round: Int,
+        val session: SessionType,
+    ) : Route
 }

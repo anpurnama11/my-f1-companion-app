@@ -2,6 +2,8 @@ package com.anpurnama.f1_app.f1
 
 import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.f1.data.RoundResultsResponseDto
+import com.anpurnama.f1_app.f1.data.JolpicaRaceResultsResponseDto
+import com.anpurnama.f1_app.f1.data.getJolpicaRaceResults
 import com.anpurnama.f1_app.f1.data.getRoundResults
 import com.anpurnama.f1_app.f1.model.Circuit
 import com.anpurnama.f1_app.f1.model.RoundResult
@@ -11,7 +13,8 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
 
 /**
- * Per-round race results from f1api.dev `/{year}/{round}/race`. Drives
+ * Per-round race results from f1api.dev `/{year}/{round}/race`, enriched by
+ * Jolpica's authoritative `results.json` status/grid response. Drives
  * two surfaces (per the ticket 03 spec):
  *  - Round detail full grid (the page uses [RoundResults.results]
  *    directly, in finishing-position order).
@@ -37,7 +40,12 @@ class GetRoundResultsUseCase(private val client: HttpClient) {
         forceRefresh: Boolean = false,
     ): Outcome<RoundResults> = try {
         val dto = client.getRoundResults(year, round, forceRefresh = forceRefresh)
-        Outcome.Success(dto.toRoundResults())
+        // Jolpica is an authority/enrichment, not a reason to blank the
+        // result table when its independent endpoint is unavailable.
+        val authority = runCatching {
+            client.getJolpicaRaceResults(year, round, forceRefresh = forceRefresh)
+        }.getOrNull()
+        Outcome.Success(dto.toRoundResults(authority))
     } catch (e: ClientRequestException) {
         Outcome.Failure("Request failed (${e.response.status.value})")
     } catch (e: ServerResponseException) {
@@ -58,9 +66,15 @@ class GetRoundResultsUseCase(private val client: HttpClient) {
  * stays off the public API surface. Per the existing convention
  * from ticket 01.
  */
-internal fun RoundResultsResponseDto.toRoundResults(): RoundResults {
+internal fun RoundResultsResponseDto.toRoundResults(
+    authority: JolpicaRaceResultsResponseDto? = null,
+): RoundResults {
     val racesDto = races
     val firstCircuit = racesDto.circuit.firstOrNull()
+    val authoritativeRows = authority?.mrData?.raceTable?.races
+        ?.firstOrNull()
+        ?.results
+        .orEmpty()
     return RoundResults(
         year = season,
         round = racesDto.round?.toIntOrNull() ?: 0,
@@ -75,14 +89,24 @@ internal fun RoundResultsResponseDto.toRoundResults(): RoundResults {
             city = firstCircuit?.city,
             country = firstCircuit?.country,
         ),
-        results = racesDto.results.map { it.toRoundResult() },
+        results = racesDto.results.map { result ->
+            val authorityRow = authoritativeRows.firstOrNull { row ->
+                val f1Number = result.driver.number?.toString()
+                f1Number != null && (row.number == f1Number || row.driver.permanentNumber == f1Number)
+            } ?: authoritativeRows.firstOrNull { row ->
+                row.driver.driverId != null && row.driver.driverId == result.driver.driverId
+            }
+            result.toRoundResult(authorityRow)
+        },
     )
 }
 
-private fun RoundResultsResponseDto.RacesDto.ResultDto.toRoundResult(): RoundResult = RoundResult(
+private fun RoundResultsResponseDto.RacesDto.ResultDto.toRoundResult(
+    authority: JolpicaRaceResultsResponseDto.ResultDto? = null,
+): RoundResult = RoundResult(
     position = position.orEmpty(),
     points = points,
-    grid = grid.orEmpty(),
+    grid = authority?.grid ?: grid.orEmpty(),
     time = time,
     driverId = driver.driverId,
     driverName = listOfNotNull(driver.name, driver.surname)
@@ -93,4 +117,6 @@ private fun RoundResultsResponseDto.RacesDto.ResultDto.toRoundResult(): RoundRes
     driverNumber = driver.number,
     teamId = team.teamId,
     teamName = team.teamName.orEmpty(),
+    status = authority?.status,
+    fastLap = fastLap,
 )

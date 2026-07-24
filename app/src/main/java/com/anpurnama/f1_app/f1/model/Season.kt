@@ -1,5 +1,8 @@
 package com.anpurnama.f1_app.f1.model
 
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+
 // Domain model for a season. The aggregates are pre-computed at mapping time
 // (in `SeasonResponseDto.toSeason()`) so the ViewModel never re-walks the
 // list — matches the contract from ticket 03.
@@ -45,11 +48,42 @@ data class RaceSchedule(
     val fp1: SessionSlot? = null,
     val fp2: SessionSlot? = null,
     val fp3: SessionSlot? = null,
+    val sprintQualy: SessionSlot? = null,
+    val sprintRace: SessionSlot? = null,
     val qualy: SessionSlot? = null,
     val race: SessionSlot? = null,
-)
+) {
+    /** The five sessions advertised by this weekend, in track order. */
+    fun activeSessions(): List<ScheduledSession> {
+        val sprint = sprintQualy != null || sprintRace != null
+        val ordered = if (sprint) {
+            listOf(
+                SessionType.FP1 to fp1,
+                SessionType.SprintQuali to sprintQualy,
+                SessionType.Sprint to sprintRace,
+                SessionType.Quali to qualy,
+                SessionType.Race to race,
+            )
+        } else {
+            listOf(
+                SessionType.FP1 to fp1,
+                SessionType.FP2 to fp2,
+                SessionType.FP3 to fp3,
+                SessionType.Quali to qualy,
+                SessionType.Race to race,
+            )
+        }
+        return ordered.mapNotNull { (type, slot) -> slot?.let { ScheduledSession(type, it) } }
+    }
+}
 
 data class SessionSlot(val date: String?, val time: String?)
+
+fun SessionSlot.toInstantOrNull(): Instant? = runCatching {
+    Instant.parse("${date.orEmpty()}T${time.orEmpty()}")
+}.getOrNull()
+
+data class ScheduledSession(val type: SessionType, val slot: SessionSlot)
 
 data class Circuit(
     val id: String,
@@ -59,3 +93,13 @@ data class Circuit(
     val city: String?,
     val country: String?,
 )
+
+fun roundMode(race: Race, now: Instant = Clock.System.now()): RoundMode {
+    val raceStart = race.schedule?.race?.toInstantOrNull()
+    return when {
+        raceStart != null && raceStart > now -> RoundMode.Upcoming
+        raceStart != null -> RoundMode.Past
+        race.winnerId == null -> RoundMode.Upcoming
+        else -> RoundMode.Past
+    }
+}

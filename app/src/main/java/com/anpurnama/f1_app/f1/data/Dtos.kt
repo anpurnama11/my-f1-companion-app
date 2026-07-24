@@ -28,6 +28,8 @@ data class RaceScheduleDto(
     val fp1: SessionDto? = null,
     val fp2: SessionDto? = null,
     val fp3: SessionDto? = null,
+    val sprintQualy: SessionDto? = null,
+    val sprintRace: SessionDto? = null,
     val qualy: SessionDto? = null,
     val race: SessionDto? = null,
 )
@@ -217,6 +219,13 @@ data class OpenF1LapDto(
     @SerialName("st_speed") val stSpeed: Int? = null,
 )
 
+@Serializable
+data class OpenF1PitStopDto(
+    @SerialName("session_key") val sessionKey: Int = 0,
+    @SerialName("driver_number") val driverNumber: Int = 0,
+    @SerialName("stop_duration") val stopDuration: Double? = null,
+)
+
 // OpenF1 /v1/meetings — only `circuit_image` is read for the countdown
 // card decorative track layout. `country_flag` rides along for future use.
 @Serializable
@@ -358,3 +367,168 @@ data class RoundQualifyingResponseDto(
         }
     }
 }
+
+// f1api.dev /{year}/{round}/fp1|fp2|fp3. The endpoint changes only the
+// result-array property, so one tolerant DTO handles all three responses.
+@Serializable
+data class PracticeResponseDto(
+    val season: Int = 0,
+    val races: PracticeRaceDto = PracticeRaceDto(),
+) {
+    @Serializable
+    data class PracticeRaceDto(
+        val round: String? = null,
+        val raceName: String? = null,
+        val circuit: PracticeCircuitDto = PracticeCircuitDto(),
+        val fp1Results: List<PracticeResultDto> = emptyList(),
+        val fp2Results: List<PracticeResultDto> = emptyList(),
+        val fp3Results: List<PracticeResultDto> = emptyList(),
+    )
+
+    @Serializable
+    data class PracticeCircuitDto(
+        val circuitId: String = "",
+        val circuitName: String? = null,
+        val circuitLength: String = "",
+        val corners: Int? = null,
+        val city: String? = null,
+        val country: String? = null,
+    )
+
+    @Serializable
+    data class PracticeResultDto(
+        val driverId: String = "",
+        val teamId: String = "",
+        val time: String? = null,
+        val driver: DriverDto = DriverDto(),
+        val team: TeamDto = TeamDto(),
+    ) {
+        @Serializable
+        data class DriverDto(
+            val driverId: String = "",
+            val number: Int? = null,
+            val shortName: String? = null,
+            val name: String? = null,
+            val surname: String? = null,
+        )
+
+        @Serializable
+        data class TeamDto(
+            val teamId: String = "",
+            val teamName: String? = null,
+        )
+    }
+}
+
+// Jolpica standard Ergast-compatible race result envelope.
+@Serializable
+data class JolpicaRaceResultsResponseDto(
+    @SerialName("MRData") val mrData: MrDataDto = MrDataDto(),
+) {
+    @Serializable
+    data class MrDataDto(
+        @SerialName("RaceTable") val raceTable: RaceTableDto = RaceTableDto(),
+    )
+
+    @Serializable
+    data class RaceTableDto(
+        val season: String? = null,
+        val round: String? = null,
+        @SerialName("Races") val races: List<RaceDto> = emptyList(),
+    )
+
+    @Serializable
+    data class RaceDto(
+        val season: String? = null,
+        val round: String? = null,
+        @SerialName("Results") val results: List<ResultDto> = emptyList(),
+    )
+
+    @Serializable
+    data class ResultDto(
+        val number: String? = null,
+        val position: String? = null,
+        val grid: String? = null,
+        val status: String? = null,
+        @SerialName("Driver") val driver: DriverDto = DriverDto(),
+    )
+
+    @Serializable
+    data class DriverDto(
+        val driverId: String? = null,
+        val permanentNumber: String? = null,
+    )
+}
+
+// Jolpica alpha result envelope. The alpha API uses opaque round IDs and
+// nests session components under keys such as GRID, FLAP, Q1 and SQ1.
+@Serializable
+data class JolpicaAlphaRoundsResponseDto(
+    val data: List<AlphaRoundDto> = emptyList(),
+)
+
+@Serializable
+data class AlphaRoundDto(
+    val id: String = "",
+    val number: Int = 0,
+    val name: String? = null,
+)
+
+@Serializable
+data class JolpicaAlphaResultsResponseDto(
+    val data: AlphaResultsDto = AlphaResultsDto(),
+)
+
+@Serializable
+data class AlphaResultsDto(
+    val code: String = "",
+    val title: String? = null,
+    val season: AlphaSeasonDto = AlphaSeasonDto(),
+    val round: AlphaRoundDto = AlphaRoundDto(),
+    val results: List<AlphaResultDto> = emptyList(),
+)
+
+@Serializable
+data class AlphaSeasonDto(val year: Int = 0)
+
+@Serializable
+data class AlphaResultDto(
+    val driver: AlphaDriverDto = AlphaDriverDto(),
+    val team: AlphaTeamDto = AlphaTeamDto(),
+    val position: Int? = null,
+    val positionText: String? = null,
+    val time: String? = null,
+    val status: String? = null,
+    val points: Double? = null,
+    @SerialName("car_number") val carNumber: Int? = null,
+    val components: AlphaComponentsDto = AlphaComponentsDto(),
+)
+
+@Serializable
+data class AlphaDriverDto(
+    val id: String = "",
+    val abbreviation: String? = null,
+    @SerialName("given_name") val givenName: String? = null,
+    @SerialName("family_name") val familyName: String? = null,
+)
+
+@Serializable
+data class AlphaTeamDto(val id: String = "", val name: String? = null)
+
+@Serializable
+data class AlphaComponentsDto(
+    @SerialName("GRID") val grid: AlphaComponentDto? = null,
+    @SerialName("FLAP") val fastestLap: AlphaComponentDto? = null,
+    @SerialName("Q1") val q1: AlphaComponentDto? = null,
+    @SerialName("Q2") val q2: AlphaComponentDto? = null,
+    @SerialName("Q3") val q3: AlphaComponentDto? = null,
+    @SerialName("SQ1") val sq1: AlphaComponentDto? = null,
+    @SerialName("SQ2") val sq2: AlphaComponentDto? = null,
+    @SerialName("SQ3") val sq3: AlphaComponentDto? = null,
+)
+
+@Serializable
+data class AlphaComponentDto(
+    val position: Int? = null,
+    val time: String? = null,
+)

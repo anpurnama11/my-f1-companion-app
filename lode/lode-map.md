@@ -36,7 +36,7 @@ lode/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)
       02-homepage-section-1-and-section-3.md    # shipped — Homepage §1 countdown + §3 combined favorites/nearest-GP cards (2027-01-15)
-      03-schedule-tab-and-round-detail.md       # partial — Schedule tab + basic Round detail; SessionResult/hybrid result follow-up remains
+      03-schedule-tab-and-round-detail.md       # shipped — Schedule + two-mode Round detail + SessionResult/hybrid results
       04-leaderboard-and-driver-team-detail.md  # shipped — leaderboard + driver/team detail
       05-my-team-tab-and-favorites-picker.md    # shipped — My Team slots + bottom-sheet picker
       06-circuit-detail.md                      # ready — blocked by 02,03

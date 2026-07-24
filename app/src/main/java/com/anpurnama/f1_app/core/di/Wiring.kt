@@ -9,11 +9,16 @@ import com.anpurnama.f1_app.f1.GetCircuitTopSpeedUseCase
 import com.anpurnama.f1_app.f1.GetConstructorsStandingsUseCase
 import com.anpurnama.f1_app.f1.GetDriverDetailUseCase
 import com.anpurnama.f1_app.f1.GetDriversStandingsUseCase
+import com.anpurnama.f1_app.f1.GetFastestPitstopUseCase
 import com.anpurnama.f1_app.f1.GetNextRaceUseCase
+import com.anpurnama.f1_app.f1.GetPracticeResultUseCase
 import com.anpurnama.f1_app.f1.GetRaceWeekendScheduleUseCase
 import com.anpurnama.f1_app.f1.GetRoundPodiumUseCase
 import com.anpurnama.f1_app.f1.GetRoundQualifyingUseCase
 import com.anpurnama.f1_app.f1.GetRoundResultsUseCase
+import com.anpurnama.f1_app.f1.GetSessionResultUseCase
+import com.anpurnama.f1_app.f1.GetSprintQualifyingResultUseCase
+import com.anpurnama.f1_app.f1.GetSprintResultUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import com.anpurnama.f1_app.f1.GetTeamDetailUseCase
 import io.ktor.client.HttpClient
@@ -48,6 +53,17 @@ class Wiring(context: Context) {
     val getRoundResults: GetRoundResultsUseCase = GetRoundResultsUseCase(httpClient)
     val getRoundQualifying: GetRoundQualifyingUseCase = GetRoundQualifyingUseCase(httpClient)
     val getRoundPodium: GetRoundPodiumUseCase = GetRoundPodiumUseCase(getRoundResults)
+    val getPracticeResult: GetPracticeResultUseCase = GetPracticeResultUseCase(httpClient)
+    val getSprintResult: GetSprintResultUseCase = GetSprintResultUseCase(httpClient)
+    val getSprintQualifyingResult: GetSprintQualifyingResultUseCase = GetSprintQualifyingResultUseCase(httpClient)
+    val getSessionResult: GetSessionResultUseCase = GetSessionResultUseCase(
+        getRoundResults = getRoundResults,
+        getRoundQualifying = getRoundQualifying,
+        getPractice = getPracticeResult,
+        getSprint = getSprintResult,
+        getSprintQualifying = getSprintQualifyingResult,
+    )
+    val getFastestPitstop: GetFastestPitstopUseCase = GetFastestPitstopUseCase(httpClient)
 
     val favoritesCache: FavoritesCache = FavoritesCache(
         PreferenceDataStoreFactory.create {

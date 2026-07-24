@@ -30,6 +30,10 @@ data class RoundResult(
     val driverNumber: Int?,
     val teamId: String,
     val teamName: String,
+    /** Authoritative Jolpica status when available. */
+    val status: String? = null,
+    /** f1api.dev fastest-lap time, retained for the Race standout card. */
+    val fastLap: String? = null,
 )
 
 /**

@@ -17,14 +17,11 @@ to implement against. Flip a section to `[BUILT]` as it lands.
 top-speed and most-wins-at-circuit, and ticket 04's remaining
 multi-source `HttpClient` extensions (jolpica + OpenF1). Leaderboard plus
 Driver/Team detail is now `[BUILT]`: standings are reused by the tab and joined
-to current driver/team metadata for detail pages. Round detail
-(`Route.RoundDetail` + `RoundViewModel`/`RoundScreen`, fed by
-`GetRoundResultsUseCase` + `GetRoundQualifyingUseCase`) and the Schedule tab
-(`ScheduleViewModel`/`ScheduleScreen` reusing `GetSeasonUseCase` for the list and
-`GetRoundPodiumUseCase` for per-row past podiums) are now `[BUILT]`. Detail
-`RoundDetail` is wired but its destination page is the
-ticket-03-built `RoundScreen`, and `CircuitDetail` remains the slice-06
-placeholder.
+to current driver/team metadata for detail pages. Round detail and the Schedule
+tab are `[BUILT]`: `RoundScreen` derives upcoming/past mode from the race slot,
+uses the year-specific season schedule, and pushes `SessionResult`; session
+results normalize f1api.dev, Jolpica standard/alpha, and optional OpenF1 pit
+data through `Wiring`. `CircuitDetail` remains the slice-06 placeholder.
 
 My Team is `[BUILT]`: `feature/myteam/` renders the three `FavoritesCache`
 slots and uses a `ModalBottomSheet` over current standings for explicit

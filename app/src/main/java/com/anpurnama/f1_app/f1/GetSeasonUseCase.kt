@@ -3,6 +3,7 @@ package com.anpurnama.f1_app.f1
 import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.f1.data.SeasonResponseDto
 import com.anpurnama.f1_app.f1.data.getCurrent
+import com.anpurnama.f1_app.f1.data.getSeason
 import com.anpurnama.f1_app.f1.model.Circuit
 import com.anpurnama.f1_app.f1.model.Race
 import com.anpurnama.f1_app.f1.model.RaceSchedule
@@ -25,6 +26,16 @@ class GetSeasonUseCase(private val client: HttpClient) {
     suspend operator fun invoke(forceRefresh: Boolean = false): Outcome<Season> = try {
         val dto = client.getCurrent(forceRefresh = forceRefresh)
         Outcome.Success(dto.toSeason())
+    } catch (e: ClientRequestException) {
+        Outcome.Failure("Request failed (${e.response.status.value})")
+    } catch (e: ServerResponseException) {
+        Outcome.Failure("Server error (${e.response.status.value})")
+    } catch (e: Exception) {
+        Outcome.Failure(e.message ?: "Network error")
+    }
+
+    suspend operator fun invoke(year: Int, forceRefresh: Boolean = false): Outcome<Season> = try {
+        Outcome.Success(client.getSeason(year, forceRefresh).toSeason())
     } catch (e: ClientRequestException) {
         Outcome.Failure("Request failed (${e.response.status.value})")
     } catch (e: ServerResponseException) {
@@ -91,11 +102,15 @@ private fun com.anpurnama.f1_app.f1.data.RaceDto.toRace(): Race = Race(
  * screen can render "no schedule" instead of a row of empty cells.
  */
 private fun com.anpurnama.f1_app.f1.data.RaceScheduleDto.toSchedule(): RaceSchedule? {
-    if (fp1 == null && fp2 == null && fp3 == null && qualy == null && race == null) return null
+    if (fp1 == null && fp2 == null && fp3 == null && sprintQualy == null &&
+        sprintRace == null && qualy == null && race == null
+    ) return null
     return RaceSchedule(
         fp1 = fp1?.toSlot(),
         fp2 = fp2?.toSlot(),
         fp3 = fp3?.toSlot(),
+        sprintQualy = sprintQualy?.toSlot(),
+        sprintRace = sprintRace?.toSlot(),
         qualy = qualy?.toSlot(),
         race = race?.toSlot(),
     )

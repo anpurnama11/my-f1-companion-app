@@ -2,7 +2,7 @@
 id: 03
 title: Schedule tab + Round detail
 type: task
-status: partial
+status: shipped
 blocked_by: [01]
 owner: ""
 ---
@@ -17,14 +17,15 @@ past shows circuit stats + per-session result rows and a
 `Route.SessionResult` destination. The planned SessionResult screen covers
 race, qualifying, practice, sprint, hybrid status/grid handling, and fastest
 standouts. The circuit block links to `CircuitDetail` (destination page in
-slice 06). The implementation is being landed incrementally: Schedule and a
-basic RoundDetail are shipped, while the result-session expansion remains
-open follow-up work.
+slice 06). Schedule and the Round/SessionResult surfaces ship together in
+this ticket; CircuitDetail itself remains the next slice.
 
 **Blocked by:** 01 — Foundation (reuses `Wiring`, `F1Api` patterns/Observables, Navigation 3 detail routes, UX family).
 
-**Status:** `partial` — Schedule tab + basic Round detail landed; the
-SessionResult, sprint, hybrid-result, and richer two-mode work is not shipped.
+**Status:** `shipped` — Schedule, two-mode Round detail, normalized session
+results, sprint support, optional pit-stop standout, and the hybrid race
+result source are implemented. Weekend session start labels use device-local
+time; elapsed result times remain raw durations.
 
 ## Done when
 
@@ -35,10 +36,10 @@ SessionResult, sprint, hybrid-result, and richer two-mode work is not shipped.
 - [x] `ScheduleViewModel` + `ScheduleScreen` (init-less, pull-to-refresh `NO_CACHE`)
 - [x] `RoundDetail(year, round)` route + `RoundViewModel`/`RoundScreen`: basic race and qualifying result blocks, independently-failing loading/error states, and a circuit block linking to `CircuitDetail`
 - [x] Past-list podium failure degrades to a retry row, never blanks the whole schedule (shared UX family)
-- [ ] `RoundDetail` upcoming/past modes with the full weekend schedule, session rows, and circuit stats
-- [ ] `SessionResult(year, round, session)` route + screen with race/qualifying/practice/sprint tables and standout cards
-- [ ] `GetPracticeResultUseCase`, sprint use cases, `GetSessionResultUseCase`, and `GetFastestPitstopUseCase`
-- [ ] Hybrid race-result source and authoritative DNF/DNS/grid/PL handling (revision 3)
+- [x] `RoundDetail` upcoming/past modes with the full weekend schedule, session rows, and circuit stats
+- [x] `SessionResult(year, round, session)` route + screen with race/qualifying/practice/sprint tables and standout cards
+- [x] `GetPracticeResultUseCase`, sprint use cases, `GetSessionResultUseCase`, and `GetFastestPitstopUseCase`
+- [x] Hybrid race-result source and authoritative DNF/DNS/grid/PL handling (revision 3)
 
 Spec cross-ref: `lode/specs/f1app.md` (Use cases table, Schedule contract, envelope diffs, **Schedule surface shape**), `lode/wayfinder/f1app/past-list.md`.
 
@@ -86,7 +87,8 @@ Spec cross-ref: `lode/specs/f1app.md` (Use cases table, Schedule contract, envel
 
 **Not changed:** Schedule tab shape, deep link, pull-to-refresh behavior, per-row podium retry UX, `CircuitDetail` destination page still in slice 06.
 
-**Status:** [REVISION 2 DESIGN LOCKED] — pending implementation.
+**Status:** [REVISION 2 BUILT] — implemented in `feature/round/` and
+`feature/sessionresult/`.
 
 ## Revision 3 — Race result status, grid handling, and circuit stats (domain-model lock)
 
@@ -106,15 +108,16 @@ Spec cross-ref: `lode/specs/f1app.md` (Use cases table, Schedule contract, envel
 
 **Not changed:** Schedule tab shape, deep link, pull-to-refresh behavior, per-row podium retry UX, `CircuitDetail` destination page still in slice 06, Jolpica alpha still used for Sprint/Sprint Quali raw data.
 
-**Status:** [REVISION 3 DESIGN LOCKED] — pending implementation.
+**Status:** [REVISION 3 BUILT] — hybrid mapping and result-row presentation are
+implemented; Jolpica failures degrade to the f1api.dev result table.
 
 **Done when (revision 3):**
-- [ ] `RoundDetail` circuit stats card shows length, laps, turns, top speed (no elevation)
-- [ ] `GetRoundResultsUseCase` is updated to the hybrid f1api.dev + Jolpica standard source
-- [ ] `RoundResult` domain model carries a `status` field mapped from Jolpica
-- [ ] Race `SessionResult` renders DNF/DNS labels and "PL" for pit-lane starts
-- [ ] Race `SessionResult` hides the grid-change arrow for `grid: "0"`
-- [ ] DNF/DNS rows still compute and display the position-change arrow
-- [ ] Sprint `SessionResult` applies the same DNF/DNS/PL logic
-- [ ] Qualifying and Sprint Qualifying `SessionResult` show only Q1/Q2/Q3 times and grid position
-- [ ] ADR `0006-race-results-hybrid-source.md` is referenced from the spec and ticket
+- [x] `RoundDetail` circuit stats card shows length, laps, turns, top speed (no elevation)
+- [x] `GetRoundResultsUseCase` is updated to the hybrid f1api.dev + Jolpica standard source
+- [x] `RoundResult` domain model carries a `status` field mapped from Jolpica
+- [x] Race `SessionResult` renders DNF/DNS labels and "PL" for pit-lane starts
+- [x] Race `SessionResult` hides the grid-change arrow for `grid: "0"`
+- [x] DNF/DNS rows still compute and display the position-change arrow when a numeric finish position exists
+- [x] Sprint `SessionResult` applies the same DNF/DNS/PL logic
+- [x] Qualifying and Sprint Qualifying `SessionResult` show only Q1/Q2/Q3 times and grid position
+- [x] ADR `0006-race-results-hybrid-source.md` is referenced from the spec and ticket

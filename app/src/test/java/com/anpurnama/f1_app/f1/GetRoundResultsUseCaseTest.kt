@@ -99,13 +99,13 @@ class GetRoundResultsUseCaseTest {
 
     @Test
     fun `invoke hits the expected URL`() = runTest {
-        var requestedPath: String? = null
+        val requestedPaths = mutableListOf<String>()
         val out = useCase { req ->
-            requestedPath = req.url.fullPath
+            requestedPaths += req.url.fullPath
             jsonOk(SAMPLE_BODY)
         }.invoke(year = 2024, round = 5)
         assertTrue(out is Outcome.Success)
-        assertEquals("/api/2024/5/race", requestedPath)
+        assertTrue("f1api race request missing: $requestedPaths", "/api/2024/5/race" in requestedPaths)
     }
 
     @Test

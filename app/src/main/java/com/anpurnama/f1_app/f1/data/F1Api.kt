@@ -26,12 +26,25 @@ const val F1API_BASE = "https://f1api.dev/api"
  */
 const val OPENF1_BASE = "https://api.openf1.org/v1"
 
+const val JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1"
+const val JOLPICA_ALPHA_BASE = "https://api.jolpi.ca/f1/alpha"
+
 /**
  * Full-season schedule + sessions. Used by Homepage §2 aggregates and the
  * Schedule tab.
  */
 suspend fun HttpClient.getCurrent(forceRefresh: Boolean = false): SeasonResponseDto {
     val response = get("$F1API_BASE/current") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+suspend fun HttpClient.getSeason(
+    year: Int,
+    forceRefresh: Boolean = false,
+): SeasonResponseDto {
+    val response = get("$F1API_BASE/$year") {
         if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body()
@@ -122,6 +135,13 @@ suspend fun HttpClient.getOpenF1Laps(sessionKey: Int): List<OpenF1LapDto> {
     return response.body()
 }
 
+suspend fun HttpClient.getOpenF1PitStops(sessionKey: Int): List<OpenF1PitStopDto> {
+    val response = get("$OPENF1_BASE/pit") {
+        parameter("session_key", sessionKey)
+    }
+    return response.body()
+}
+
 /**
  * OpenF1 meetings filtered by year + country. `GetCircuitImageUseCase`
  * reads `circuit_image` for the countdown card track-layout image.
@@ -161,6 +181,59 @@ suspend fun HttpClient.getRoundResults(
     forceRefresh: Boolean = false,
 ): RoundResultsResponseDto {
     val response = get("$F1API_BASE/$year/$round/race") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+/** Jolpica's authoritative status/grid companion for f1api.dev race data. */
+suspend fun HttpClient.getJolpicaRaceResults(
+    year: Int,
+    round: Int,
+    forceRefresh: Boolean = false,
+): JolpicaRaceResultsResponseDto {
+    val response = get("$JOLPICA_BASE/$year/$round/results.json") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+/** One of f1api.dev's three practice result endpoints. */
+suspend fun HttpClient.getPracticeResults(
+    year: Int,
+    round: Int,
+    session: String,
+    forceRefresh: Boolean = false,
+): PracticeResponseDto {
+    require(session in setOf("fp1", "fp2", "fp3"))
+    val response = get("$F1API_BASE/$year/$round/$session") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+/** Resolve Jolpica alpha's opaque round ID from a season + round number. */
+suspend fun HttpClient.getJolpicaAlphaRoundId(
+    year: Int,
+    round: Int,
+    forceRefresh: Boolean = false,
+): String? {
+    val response = get("$JOLPICA_ALPHA_BASE/core/rounds/") {
+        parameter("year", year)
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body<JolpicaAlphaRoundsResponseDto>().data
+        .firstOrNull { it.number == round }
+        ?.id
+}
+
+suspend fun HttpClient.getJolpicaAlphaResults(
+    roundId: String,
+    filter: String,
+    forceRefresh: Boolean = false,
+): JolpicaAlphaResultsResponseDto {
+    require(filter in setOf("SR", "SQ"))
+    val response = get("$JOLPICA_ALPHA_BASE/results/$roundId/$filter/") {
         if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body()

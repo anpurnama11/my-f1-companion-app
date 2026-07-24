@@ -1,7 +1,7 @@
 ---
 id: f1app
 topic: F1app — dark-first Jetpack Compose F1 data app
-status: design-locked / partial build
+status: design-locked / ticket 03 shipped; later slices remain
 lode-cross-refs:
   - ../summary.md
   - ../terminology.md
@@ -290,10 +290,10 @@ Two `DataStore<Preferences>` wrappers in `Wiring`, both using one atomic
 - `data class TeamDetail(val teamId: String) : NavKey` — wired from
   Leaderboard constructor rows and DriverDetail team links.
 - `data class RoundDetail(val year: Int, val round: Int) : NavKey` — wired;
-  current implementation shows basic race/qualifying results and a circuit
-  block, while the richer two-mode/session-result design remains pending.
+  the screen derives upcoming/past mode, renders circuit stats and weekend
+  sessions, and links each past session to its result page.
 - `data class SessionResult(val year: Int, val round: Int, val session: SessionType) : NavKey` —
-  reserved in the contract; not wired until the SessionResult follow-up lands.
+  wired to the normalized race, qualifying, practice, sprint, and standout UI.
 - `data class CircuitDetail(val circuitId: String) : NavKey` — wired as the
   Homepage §3 navigation edge; the destination page remains a placeholder.
 
@@ -340,11 +340,8 @@ Cross-ref: `lode/plans/f1app-build/tickets/03-schedule-tab-and-round-detail.md` 
 
 ### Round detail + Session result
 
-This section is the remaining ticket 03 design contract, not a claim that the
-current build has shipped every row. The current `RoundDetail` implementation
-has basic race/qualifying result blocks and a circuit link; the two-mode
-schedule, `SessionResult` route, sprint support, fastest standouts, and hybrid
-race-result handling remain follow-up work.
+Ticket 03 is shipped. `RoundDetail` is two-mode and `SessionResult` is wired;
+the implementation below is the current behavior contract.
 
 `Route.RoundDetail(year, round)` is one screen with two modes driven by the
 Race session start time:
@@ -702,17 +699,15 @@ imagery in; weather + flags out for v1.
 ### Current build status and sequence signal
 
 Foundation + Homepage §2 (ticket 01), Homepage §1 countdown + §3 favorites /
-nearest-GP polish (ticket 02), Schedule with per-row podium retry, and
-Leaderboard with Driver/Team detail navigation are shipped. Round detail is
-partial: basic race/qualifying result blocks and the circuit link exist, while
-the SessionResult route, sprint results, hybrid race-result source, and richer
-upcoming/past modes remain follow-up work. Circuit detail is still a
-placeholder; enrichments and the widget remain planned. My Team is built with
+nearest-GP polish (ticket 02), Schedule with per-row podium retry, Leaderboard
+with Driver/Team detail navigation, and ticket 03's full Round/SessionResult
+slice are shipped. Circuit detail is still a placeholder; enrichments and the
+widget remain planned. My Team is built with
 three cache-backed slots and standings-backed bottom-sheet pickers.
 
 Build proceeds down the dependency chain: Architecture → Data layer → API
-client → Navigation → Homepage slices → Schedule / basic Round detail →
-Leaderboard / Driver-Team detail → remaining Round result work → widget →
+client → Navigation → Homepage slices → Schedule / Round detail →
+Leaderboard / Driver-Team detail → widget →
 research-backed stats → Favorites picker → Enrichments → Testing. Local
 verification for the shipped slices passes JVM unit tests, debug android-test
 Kotlin compilation and instrumentation on the Pixel AVD, debug/release
