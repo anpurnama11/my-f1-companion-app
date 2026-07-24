@@ -2,6 +2,10 @@ package com.anpurnama.f1_app.f1
 
 import com.anpurnama.f1_app.f1.data.F1API_BASE
 import com.anpurnama.f1_app.f1.data.getCurrent
+import com.anpurnama.f1_app.f1.data.getCurrentDrivers
+import com.anpurnama.f1_app.f1.data.getCurrentTeams
+import com.anpurnama.f1_app.f1.data.getConstructorsChampionship
+import com.anpurnama.f1_app.f1.data.getDriversChampionship
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -133,5 +137,46 @@ class F1ApiTest {
             "expected no Cache-Control header on a normal request, was: $cacheControl",
             cacheControl == null,
         )
+    }
+
+    @Test
+    fun `detail endpoints decode live list envelopes and force refresh headers`() = runTest {
+        val paths = mutableListOf<String>()
+        val cacheControls = mutableListOf<String?>()
+        val client = client { req ->
+            paths += req.url.fullPath
+            cacheControls += req.headers[HttpHeaders.CacheControl]
+            if (req.url.fullPath.endsWith("/drivers")) {
+                jsonOk("""{"season":2026,"drivers":[{"driverId":"antonelli","teamId":"mercedes","number":12}]}""")
+            } else {
+                jsonOk("""{"season":2026,"teams":[{"teamId":"mercedes","teamName":"Mercedes Formula 1 Team"}]}""")
+            }
+        }
+
+        val drivers = client.getCurrentDrivers(forceRefresh = true)
+        val teams = client.getCurrentTeams()
+
+        assertEquals("antonelli", drivers.drivers.single().driverId)
+        assertEquals("mercedes", teams.teams.single().teamId)
+        assertEquals(listOf("/api/current/drivers", "/api/current/teams"), paths)
+        assertTrue(cacheControls[0]?.contains("no-cache", ignoreCase = true) == true)
+        assertEquals(null, cacheControls[1])
+    }
+
+    @Test
+    fun `championship endpoints decode the live underscored keys`() = runTest {
+        val client = client { req ->
+            if (req.url.fullPath.endsWith("drivers-championship")) {
+                jsonOk("""{"drivers_championship":[{"driverId":"antonelli"}]}""")
+            } else {
+                jsonOk("""{"constructors_championship":[{"teamId":"mercedes"}]}""")
+            }
+        }
+
+        val drivers = client.getDriversChampionship()
+        val teams = client.getConstructorsChampionship()
+
+        assertEquals("antonelli", drivers.driversChampionship.single().driverId)
+        assertEquals("mercedes", teams.constructorsChampionship.single().teamId)
     }
 }

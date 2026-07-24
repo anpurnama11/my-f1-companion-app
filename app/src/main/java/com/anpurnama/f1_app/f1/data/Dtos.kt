@@ -105,7 +105,7 @@ data class NextRaceResponseDto(
 @Serializable
 data class DriversChampionshipResponseDto(
     val season: Int = 0,
-    val driverschampionship: List<DriversChampionshipEntryDto> = emptyList(),
+    @SerialName("drivers_championship") val driversChampionship: List<DriversChampionshipEntryDto> = emptyList(),
 ) {
     @Serializable
     data class DriversChampionshipEntryDto(
@@ -115,6 +115,7 @@ data class DriversChampionshipResponseDto(
         val position: Int = 0,
         val wins: Int = 0,
         val driver: DriverInfoDto = DriverInfoDto(),
+        val team: TeamInfoDto = TeamInfoDto(),
     )
 
     @Serializable
@@ -125,13 +126,19 @@ data class DriversChampionshipResponseDto(
         val nationality: String? = null,
         val number: Int? = null,
     )
+
+    @Serializable
+    data class TeamInfoDto(
+        val teamName: String? = null,
+        val country: String? = null,
+    )
 }
 
 // f1api.dev /current/constructors-championship envelope.
 @Serializable
 data class ConstructorsChampionshipResponseDto(
     val season: Int = 0,
-    val constructorschampionship: List<ConstructorsChampionshipEntryDto> = emptyList(),
+    @SerialName("constructors_championship") val constructorsChampionship: List<ConstructorsChampionshipEntryDto> = emptyList(),
 ) {
     @Serializable
     data class ConstructorsChampionshipEntryDto(
@@ -148,6 +155,44 @@ data class ConstructorsChampionshipResponseDto(
         val country: String? = null,
     )
 }
+
+// f1api.dev /current/drivers envelope. The detail endpoint is a separate
+// list from the championship endpoint, so the use case joins it by driverId.
+@Serializable
+data class CurrentDriversResponseDto(
+    val season: Int = 0,
+    val drivers: List<CurrentDriverDto> = emptyList(),
+)
+
+@Serializable
+data class CurrentDriverDto(
+    val driverId: String = "",
+    val name: String? = null,
+    val surname: String? = null,
+    val nationality: String? = null,
+    val birthday: String? = null,
+    val number: Int? = null,
+    val shortName: String? = null,
+    val teamId: String = "",
+)
+
+// f1api.dev /current/teams envelope. `firstAppeareance` is the API's
+// spelling and is intentionally kept at the wire boundary.
+@Serializable
+data class CurrentTeamsResponseDto(
+    val season: Int = 0,
+    val teams: List<CurrentTeamDto> = emptyList(),
+)
+
+@Serializable
+data class CurrentTeamDto(
+    val teamId: String = "",
+    val teamName: String? = null,
+    val teamNationality: String? = null,
+    val firstAppeareance: Int? = null,
+    val constructorsChampionships: Int? = null,
+    val driversChampionships: Int? = null,
+)
 
 // OpenF1 /v1/sessions — lowercase-no-underscore field names; @SerialName
 // maps each to the snake_case-as-camel Kotlin val. The test harness reuses

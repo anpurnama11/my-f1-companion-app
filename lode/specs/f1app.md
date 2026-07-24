@@ -277,7 +277,7 @@ Two `DataStore<Preferences>` wrappers in `Wiring`, both using one atomic
   timestamp keys (explicit replace makes them unnecessary). Written from My
   Team's picker, read by HomepageViewModel (§3) + MyTeamViewModel.
 
-### Navigation routes (9 in the contract; 6 currently wired)
+### Navigation routes (9 in the contract; 8 currently wired)
 
 `@Serializable` `NavKey` route objects in `core/navigation/`:
 
@@ -285,10 +285,10 @@ Two `DataStore<Preferences>` wrappers in `Wiring`, both using one atomic
 - `data object Schedule : NavKey`
 - `data object Leaderboard : NavKey`
 - `data object MyTeam : NavKey` (rightmost)
-- `data class DriverDetail(val driverId: String) : NavKey` — reserved in the
-  contract; not wired in the current route file.
-- `data class TeamDetail(val teamId: String) : NavKey` — reserved in the
-  contract; not wired in the current route file.
+- `data class DriverDetail(val driverId: String) : NavKey` — wired from
+  Leaderboard driver rows and DriverDetail team links.
+- `data class TeamDetail(val teamId: String) : NavKey` — wired from
+  Leaderboard constructor rows and DriverDetail team links.
 - `data class RoundDetail(val year: Int, val round: Int) : NavKey` — wired;
   current implementation shows basic race/qualifying results and a circuit
   block, while the richer two-mode/session-result design remains pending.
@@ -702,17 +702,17 @@ imagery in; weather + flags out for v1.
 ### Current build status and sequence signal
 
 Foundation + Homepage §2 (ticket 01), Homepage §1 countdown + §3 favorites /
-nearest-GP polish (ticket 02), and the Schedule tab with per-row podium retry
-(the implemented portion of ticket 03) are shipped. Round detail is partial:
-basic race/qualifying result blocks and the circuit link exist, while the
-SessionResult route, sprint results, hybrid race-result source, and richer
-upcoming/past modes remain follow-up work. Circuit detail, Leaderboard, My
-Team picker, enrichments, and the widget remain planned or placeholder scope.
+nearest-GP polish (ticket 02), Schedule with per-row podium retry, and
+Leaderboard with Driver/Team detail navigation are shipped. Round detail is
+partial: basic race/qualifying result blocks and the circuit link exist, while
+the SessionResult route, sprint results, hybrid race-result source, and richer
+upcoming/past modes remain follow-up work. Circuit detail is still a
+placeholder; My Team picker, enrichments, and the widget remain planned.
 
 Build proceeds down the dependency chain: Architecture → Data layer → API
 client → Navigation → Homepage slices → Schedule / basic Round detail →
-remaining Round result work → widget → research-backed stats → Favorites
-picker → Enrichments → Testing. Local verification for the shipped slices
-passed JVM unit tests, debug android-test Kotlin compilation, debug assembly,
-and `git diff --check`; instrumentation execution remained unavailable without
-a device or emulator.
+Leaderboard / Driver-Team detail → remaining Round result work → widget →
+research-backed stats → Favorites picker → Enrichments → Testing. Local
+verification for the shipped slices passes JVM unit tests, debug android-test
+Kotlin compilation and instrumentation on the Pixel AVD, debug/release
+assembly, and `git diff --check`.

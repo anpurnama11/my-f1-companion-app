@@ -46,7 +46,7 @@ class GetConstructorsStandingsUseCaseTest {
     fun `invoke returns Success list on 200`() = runTest {
         val body = """
             { "season": 2026,
-              "constructorschampionship": [
+              "constructors_championship": [
                 { "teamId": "mercedes", "position": 1, "points": 358, "wins": 8,
                   "team": { "teamName": "Mercedes Formula 1 Team", "country": "Germany" } }
               ]

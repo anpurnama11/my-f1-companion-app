@@ -72,6 +72,22 @@ suspend fun HttpClient.getConstructorsChampionship(forceRefresh: Boolean = false
     return response.body()
 }
 
+/** Current driver metadata used by the Driver detail page. */
+suspend fun HttpClient.getCurrentDrivers(forceRefresh: Boolean = false): CurrentDriversResponseDto {
+    val response = get("$F1API_BASE/current/drivers") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+/** Current constructor metadata used by the Team detail page. */
+suspend fun HttpClient.getCurrentTeams(forceRefresh: Boolean = false): CurrentTeamsResponseDto {
+    val response = get("$F1API_BASE/current/teams") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
 /**
  * OpenF1 sessions filtered by year + country + session name. Used to
  * resolve the `session_key` for `GetCircuitTopSpeedUseCase`. Returns all

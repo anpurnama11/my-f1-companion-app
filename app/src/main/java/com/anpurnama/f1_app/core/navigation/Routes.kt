@@ -6,8 +6,8 @@ import kotlinx.serialization.Serializable
 /**
  * Top-level navigation routes. The 4 tabs of the [NavShell] are the
  * 4 `data object`s here; detail routes (`DriverDetail`, `TeamDetail`,
- * `RoundDetail`, `CircuitDetail` — per ticket 05) land alongside these
- * in later slices.
+ * `RoundDetail`, `CircuitDetail`) land alongside these in the same route
+ * hierarchy. SessionResult remains a contract-only follow-up route.
  *
  * Each route is `@Serializable` and implements [NavKey] so the
  * Navigation 3 `entryProvider` can route by type.
@@ -40,6 +40,12 @@ sealed interface Route : NavKey {
      */
     @Serializable
     data class CircuitDetail(val circuitId: String) : Route
+
+    @Serializable
+    data class DriverDetail(val driverId: String) : Route
+
+    @Serializable
+    data class TeamDetail(val teamId: String) : Route
 
     /**
      * Detail page for a single round. Opened from a Schedule row tap

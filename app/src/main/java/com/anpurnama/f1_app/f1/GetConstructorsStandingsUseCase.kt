@@ -27,7 +27,7 @@ class GetConstructorsStandingsUseCase(private val client: HttpClient) {
 }
 
 internal fun ConstructorsChampionshipResponseDto.toConstructorStandings(): List<ConstructorStanding> =
-    constructorschampionship.map { entry ->
+    constructorsChampionship.map { entry ->
         ConstructorStanding(
             teamId = entry.teamId,
             position = entry.position,

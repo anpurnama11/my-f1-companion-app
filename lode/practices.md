@@ -14,15 +14,15 @@ else is the agreed contract the build works toward, written present-tense as the
 to implement against. Flip a section to `[BUILT]` as it lands.
 
 **Still pending:** the widget (`CountdownWidget` + `CountdownWorker` + `NextRaceCache`),
-the remaining use cases (driver/team standings, top-speed, most-wins-at-circuit),
-the placeholder tabs (Leaderboard/MyTeam), and ticket 04's
-multi-source `HttpClient` extensions (jolpica + OpenF1). Round detail
+top-speed and most-wins-at-circuit, My Team, and ticket 04's remaining
+multi-source `HttpClient` extensions (jolpica + OpenF1). Leaderboard plus
+Driver/Team detail is now `[BUILT]`: standings are reused by the tab and joined
+to current driver/team metadata for detail pages. Round detail
 (`Route.RoundDetail` + `RoundViewModel`/`RoundScreen`, fed by
 `GetRoundResultsUseCase` + `GetRoundQualifyingUseCase`) and the Schedule tab
 (`ScheduleViewModel`/`ScheduleScreen` reusing `GetSeasonUseCase` for the list and
 `GetRoundPodiumUseCase` for per-row past podiums) are now `[BUILT]`. Detail
-routes (`DriverDetail`/`TeamDetail`) land with the screens that open them, per
-ticket 05; `RoundDetail` is wired but its destination page is the
+`RoundDetail` is wired but its destination page is the
 ticket-03-built `RoundScreen`, and `CircuitDetail` remains the slice-06
 placeholder.
 

@@ -30,7 +30,7 @@ class GetDriversStandingsUseCase(private val client: HttpClient) {
 }
 
 internal fun DriversChampionshipResponseDto.toDriverStandings(): List<DriverStanding> =
-    driverschampionship.map { entry ->
+    driversChampionship.map { entry ->
         DriverStanding(
             driverId = entry.driverId,
             teamId = entry.teamId,
@@ -42,5 +42,6 @@ internal fun DriversChampionshipResponseDto.toDriverStandings(): List<DriverStan
                 .ifBlank { entry.driver.shortName.orEmpty() },
             driverShortName = entry.driver.shortName,
             driverNumber = entry.driver.number,
+            teamName = entry.team.teamName,
         )
     }

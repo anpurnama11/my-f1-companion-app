@@ -36,6 +36,7 @@ data class DriverStanding(
     val driverName: String,
     val driverShortName: String?,
     val driverNumber: Int?,
+    val teamName: String? = null,
 )
 
 // Constructors' championship row. Used by the first-launch default seed to
@@ -48,6 +49,28 @@ data class ConstructorStanding(
     val wins: Int,
     val teamName: String,
     val country: String?,
+)
+
+data class DriverDetail(
+    val driverId: String,
+    val name: String,
+    val shortName: String?,
+    val nationality: String?,
+    val birthday: String?,
+    val number: Int?,
+    val teamId: String,
+    val teamName: String,
+    val standing: DriverStanding?,
+)
+
+data class TeamDetail(
+    val teamId: String,
+    val wordmark: String,
+    val country: String?,
+    val firstAppearance: Int?,
+    val constructorsChampionships: Int?,
+    val driversChampionships: Int?,
+    val standing: ConstructorStanding?,
 )
 
 // Top speed (km/h) for a circuit. `null` is the "we don't know" state

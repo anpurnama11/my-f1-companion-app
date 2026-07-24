@@ -14,7 +14,7 @@ class DriverStandingsMapperTest {
     fun `toDriverStandings maps every entry into a domain model`() {
         val dto = DriversChampionshipResponseDto(
             season = 2026,
-            driverschampionship = listOf(
+            driversChampionship = listOf(
                 DriversChampionshipResponseDto.DriversChampionshipEntryDto(
                     driverId = "antonelli",
                     teamId = "mercedes",
@@ -68,7 +68,7 @@ class DriverStandingsMapperTest {
         // The schema has `name` and `surname` both optional; a partial
         // row should not crash the mapper. Trim the trailing space.
         val dto = DriversChampionshipResponseDto(
-            driverschampionship = listOf(
+            driversChampionship = listOf(
                 DriversChampionshipResponseDto.DriversChampionshipEntryDto(
                     driverId = "x",
                     teamId = "y",

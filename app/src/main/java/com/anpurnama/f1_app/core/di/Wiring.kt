@@ -7,6 +7,7 @@ import com.anpurnama.f1_app.feature.favorites.FavoritesCache
 import com.anpurnama.f1_app.f1.GetCircuitImageUseCase
 import com.anpurnama.f1_app.f1.GetCircuitTopSpeedUseCase
 import com.anpurnama.f1_app.f1.GetConstructorsStandingsUseCase
+import com.anpurnama.f1_app.f1.GetDriverDetailUseCase
 import com.anpurnama.f1_app.f1.GetDriversStandingsUseCase
 import com.anpurnama.f1_app.f1.GetNextRaceUseCase
 import com.anpurnama.f1_app.f1.GetRaceWeekendScheduleUseCase
@@ -14,6 +15,7 @@ import com.anpurnama.f1_app.f1.GetRoundPodiumUseCase
 import com.anpurnama.f1_app.f1.GetRoundQualifyingUseCase
 import com.anpurnama.f1_app.f1.GetRoundResultsUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
+import com.anpurnama.f1_app.f1.GetTeamDetailUseCase
 import io.ktor.client.HttpClient
 import java.io.File
 
@@ -39,6 +41,8 @@ class Wiring(context: Context) {
     val getRaceWeekendSchedule: GetRaceWeekendScheduleUseCase = GetRaceWeekendScheduleUseCase(httpClient)
     val getDriversStandings: GetDriversStandingsUseCase = GetDriversStandingsUseCase(httpClient)
     val getConstructorsStandings: GetConstructorsStandingsUseCase = GetConstructorsStandingsUseCase(httpClient)
+    val getDriverDetail: GetDriverDetailUseCase = GetDriverDetailUseCase(httpClient)
+    val getTeamDetail: GetTeamDetailUseCase = GetTeamDetailUseCase(httpClient)
     val getCircuitTopSpeed: GetCircuitTopSpeedUseCase = GetCircuitTopSpeedUseCase(httpClient)
     val getCircuitImage: GetCircuitImageUseCase = GetCircuitImageUseCase(httpClient)
     val getRoundResults: GetRoundResultsUseCase = GetRoundResultsUseCase(httpClient)

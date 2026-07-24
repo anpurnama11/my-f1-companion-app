@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -28,12 +30,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -52,8 +52,8 @@ import com.anpurnama.f1_app.ui.theme.Spacing
 
 /**
  * Schedule tab — **tab switcher** shape (revision 1 of ticket 03).
- * Two tabs at the top: **Upcoming** and **Past**. The active tab's
- * list is the only one in composition; switching tabs is instant
+ * Two tabs at the top: **Upcoming** and **Past**. The visible page's
+ * list is rendered by a horizontal pager; switching pages is instant
  * because the data is held in the VM (`podiums`).
  *
  *  - **Upcoming tab** — round, GP name, race date, city.
@@ -80,7 +80,7 @@ fun ScheduleScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val sections = (state as? ScheduleViewModel.UiState.Sections) ?: return
 
-    var activeTab by rememberSaveable { mutableStateOf(ScheduleTab.Upcoming) }
+    val pagerState = rememberPagerState(pageCount = { ScheduleTab.entries.size })
 
     // Season is the single loading signal for the pull affordance.
     // Per-row pods / images each have their own state; refreshing
@@ -95,53 +95,57 @@ fun ScheduleScreen(
             onRefresh = { viewModel.refresh() },
         ) {
             Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.normal)
-                .padding(top = Spacing.normal),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) {
-            SecondaryTabRow(
-                selectedTabIndex = activeTab.ordinal,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.normal)
+                    .padding(top = Spacing.normal),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                ScheduleTab.entries.forEach { tab ->
-                    Tab(
-                        selected = activeTab == tab,
-                        onClick = { activeTab = tab },
-                        text = { Text(tab.label) },
-                    )
+                SecondaryTabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                ) {
+                    ScheduleTab.entries.forEach { tab ->
+                        Tab(
+                            selected = pagerState.currentPage == tab.ordinal,
+                            onClick = { scope.launch { pagerState.animateScrollToPage(tab.ordinal) } },
+                            text = { Text(tab.label) },
+                        )
+                    }
                 }
-            }
 
-            OutcomeContent(state = sections.season) { season ->
-                // `when` on the active tab — only the active tab's
-                // list is composed. The VM holds the data for both
-                // surfaces (podiums are pre-loaded
-                // eagerly in `loadSeason`'s Content branch), so a
-                // tab switch re-composes the new list and reads the
-                // existing data — no re-fetch.
-                when (activeTab) {
-                    ScheduleTab.Upcoming -> UpcomingList(
-                        season = season,
-                        year = sections.year,
-                        onRoundClick = onRoundClick,
-                    )
-                    ScheduleTab.Past -> PastList(
-                        season = season,
-                        year = sections.year,
-                        podiums = sections.podiums,
-                        onRoundClick = onRoundClick,
-                        onRetryPodium = {
-                            if (!viewModel.retryPodium(it)) {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Schedule is still loading")
-                                }
-                            }
-                        },
-                    )
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("schedule-tab-pager"),
+                ) { page ->
+                    OutcomeContent(state = sections.season) { season ->
+                        // The pager composes the visible page and may prefetch
+                        // its neighbor. Both lists are held by the VM, so
+                        // swiping reads existing data without re-fetching.
+                        when (ScheduleTab.entries[page]) {
+                            ScheduleTab.Upcoming -> UpcomingList(
+                                season = season,
+                                year = sections.year,
+                                onRoundClick = onRoundClick,
+                            )
+                            ScheduleTab.Past -> PastList(
+                                season = season,
+                                year = sections.year,
+                                podiums = sections.podiums,
+                                onRoundClick = onRoundClick,
+                                onRetryPodium = {
+                                    if (!viewModel.retryPodium(it)) {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Schedule is still loading")
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
-            }
             }
         }
         SnackbarHost(

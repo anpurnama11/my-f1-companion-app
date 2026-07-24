@@ -46,7 +46,7 @@ class GetDriversStandingsUseCaseTest {
     fun `invoke returns Success list on 200`() = runTest {
         val body = """
             { "season": 2026,
-              "driverschampionship": [
+              "drivers_championship": [
                 { "driverId": "antonelli", "teamId": "mercedes", "position": 1, "points": 204, "wins": 6,
                   "driver": { "name": "Andrea", "surname": "Kimi Antonelli", "shortName": "ANT", "number": 12 } }
               ]

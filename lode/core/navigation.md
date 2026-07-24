@@ -35,10 +35,10 @@ with parameters that the deserializer reads from `data` on the intent / deeplink
 |---|---|---|---|
 | `Route.Homepage` | `data object` | `HomepageScreen` (real, §2 aggregates) | [BUILT] |
 | `Route.Schedule` | `data object` | `PlaceholderScreen("Schedule")` | [BUILT] placeholder |
-| `Route.Leaderboard` | `data object` | `PlaceholderScreen("Leaderboard")` | [BUILT] placeholder |
+| `Route.Leaderboard` | `data object` | `LeaderboardScreen` | [BUILT] ticket 04 |
 | `Route.MyTeam` | `data object` | `PlaceholderScreen("My Team")` | [BUILT] placeholder |
-| `Route.DriverDetail(driverId)` | `data class` | — | ticket 04 (with standings) |
-| `Route.TeamDetail(teamId)` | `data class` | — | ticket 04 |
+| `Route.DriverDetail(driverId)` | `data class` | `DriverScreen` | [BUILT] ticket 04 |
+| `Route.TeamDetail(teamId)` | `data class` | `TeamScreen` | [BUILT] ticket 04 |
 | `Route.RoundDetail(year, round)` | `data class` | — | ticket 03 |
 | `Route.CircuitDetail(circuitId)` | `data class` | — | ticket 06 |
 

@@ -15,8 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.anpurnama.f1_app.feature.homepage.HomepageScreen
+import com.anpurnama.f1_app.feature.driver.DriverScreen
+import com.anpurnama.f1_app.feature.leaderboard.LeaderboardScreen
 import com.anpurnama.f1_app.feature.round.RoundScreen
 import com.anpurnama.f1_app.feature.schedule.ScheduleScreen
+import com.anpurnama.f1_app.feature.team.TeamScreen
 
 /**
  * The 4-tab app shell using Navigation 3's multi-backstack pattern.
@@ -53,7 +56,12 @@ fun NavShell() {
                 onRoundClick = { y, r -> navigator.navigate(Route.RoundDetail(y, r)) },
             )
         }
-        entry<Route.Leaderboard> { PlaceholderScreen("Leaderboard") }
+        entry<Route.Leaderboard> {
+            LeaderboardScreen(
+                onDriverClick = { id -> navigator.navigate(Route.DriverDetail(id)) },
+                onTeamClick = { id -> navigator.navigate(Route.TeamDetail(id)) },
+            )
+        }
         entry<Route.MyTeam> { PlaceholderScreen("My Team") }
         entry<Route.CircuitDetail> { PlaceholderScreen("Circuit") }
         entry<Route.RoundDetail> { key ->
@@ -63,6 +71,13 @@ fun NavShell() {
                 onCircuitClick = { id -> navigator.navigate(Route.CircuitDetail(id)) },
             )
         }
+        entry<Route.DriverDetail> { key ->
+            DriverScreen(
+                driverId = key.driverId,
+                onTeamClick = { id -> navigator.navigate(Route.TeamDetail(id)) },
+            )
+        }
+        entry<Route.TeamDetail> { key -> TeamScreen(teamId = key.teamId) }
     }
 
     Scaffold(

@@ -119,8 +119,10 @@ Short term → meaning lines. Domain + project language.
   entry exists so §3's tap-target pushes a valid route; the page itself is a
   placeholder until slice 06 lands. `[BUILT ticket 03]` `data class RoundDetail(year: Int, round: Int)` —
   pushed from the Schedule tab row tap; opens the Round detail screen
-  (circuit stats + weekend schedule / result session rows). `DriverDetail`/`TeamDetail` land
-  with the screens that open them, per ticket 05. `data class SessionResult(year: Int, round: Int, session: SessionType)` —
+  (circuit stats + weekend schedule / result session rows). `[BUILT ticket 04]`
+  `data class DriverDetail(driverId: String)` and
+  `data class TeamDetail(teamId: String)` open the current detail joins from
+  Leaderboard rows. `data class SessionResult(year: Int, round: Int, session: SessionType)` —
   full result list for one session (Race, Qualifying, Sprint, SQuali, FP1);
   pushed from a RoundDetail session row.
 - **SessionType** — enum of the possible session types across all GPs:

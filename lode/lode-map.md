@@ -15,8 +15,10 @@ lode/
     network.md                       # Ktor HttpClient factory + F1Api extensions
   design-system/
     theme.md                         # dark-only M3 theme + Circuits/Tyres/Shapes/Spacing (ticket 02)
+  leaderboard/
+    summary.md                       # standings tab + driver/team detail joins (ticket 04)
   specs/
-    f1app.md                         # full F1app design contract + current partial-build status
+    f1app.md                         # full F1app design contract + current build status
   testing/
     scope.md                         # testing scope + libs + placement + KMP portability rule (ticket 14)
   decisions/
@@ -33,7 +35,7 @@ lode/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)
       02-homepage-section-1-and-section-3.md    # shipped — Homepage §1 countdown + §3 combined favorites/nearest-GP cards (2027-01-15)
       03-schedule-tab-and-round-detail.md       # partial — Schedule tab + basic Round detail; SessionResult/hybrid result follow-up remains
-      04-leaderboard-and-driver-team-detail.md  # ready — blocked by 01
+      04-leaderboard-and-driver-team-detail.md  # shipped — leaderboard + driver/team detail
       05-my-team-tab-and-favorites-picker.md    # ready — dependency 02 shipped
       06-circuit-detail.md                      # ready — blocked by 02,03
       07-countdown-widget.md                    # ready — blocked by 02,03

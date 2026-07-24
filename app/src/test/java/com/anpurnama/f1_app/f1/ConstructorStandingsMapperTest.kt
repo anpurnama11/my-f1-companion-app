@@ -14,7 +14,7 @@ class ConstructorStandingsMapperTest {
     fun `toConstructorStandings maps every entry into a domain model`() {
         val dto = ConstructorsChampionshipResponseDto(
             season = 2026,
-            constructorschampionship = listOf(
+            constructorsChampionship = listOf(
                 ConstructorsChampionshipResponseDto.ConstructorsChampionshipEntryDto(
                     teamId = "mercedes",
                     points = 358,
