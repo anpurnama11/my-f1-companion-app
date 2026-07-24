@@ -707,7 +707,8 @@ Leaderboard with Driver/Team detail navigation are shipped. Round detail is
 partial: basic race/qualifying result blocks and the circuit link exist, while
 the SessionResult route, sprint results, hybrid race-result source, and richer
 upcoming/past modes remain follow-up work. Circuit detail is still a
-placeholder; My Team picker, enrichments, and the widget remain planned.
+placeholder; enrichments and the widget remain planned. My Team is built with
+three cache-backed slots and standings-backed bottom-sheet pickers.
 
 Build proceeds down the dependency chain: Architecture → Data layer → API
 client → Navigation → Homepage slices → Schedule / basic Round detail →

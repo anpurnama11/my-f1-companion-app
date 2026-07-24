@@ -17,6 +17,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.anpurnama.f1_app.feature.homepage.HomepageScreen
 import com.anpurnama.f1_app.feature.driver.DriverScreen
 import com.anpurnama.f1_app.feature.leaderboard.LeaderboardScreen
+import com.anpurnama.f1_app.feature.myteam.MyTeamScreen
 import com.anpurnama.f1_app.feature.round.RoundScreen
 import com.anpurnama.f1_app.feature.schedule.ScheduleScreen
 import com.anpurnama.f1_app.feature.team.TeamScreen
@@ -62,7 +63,7 @@ fun NavShell() {
                 onTeamClick = { id -> navigator.navigate(Route.TeamDetail(id)) },
             )
         }
-        entry<Route.MyTeam> { PlaceholderScreen("My Team") }
+        entry<Route.MyTeam> { MyTeamScreen() }
         entry<Route.CircuitDetail> { PlaceholderScreen("Circuit") }
         entry<Route.RoundDetail> { key ->
             RoundScreen(

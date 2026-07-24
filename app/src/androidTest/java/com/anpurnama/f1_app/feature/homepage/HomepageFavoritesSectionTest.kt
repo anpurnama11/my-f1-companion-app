@@ -63,7 +63,7 @@ class HomepageFavoritesSectionTest {
     }
 
     @Test
-    fun selectedButUnavailableFavorite_isNotShownAsAddPrompt() {
+    fun selectedButUnavailableFavorite_isDistinctFromEmptySlotPrompt() {
         composeRule.setContent {
             F1appTheme {
                 FavoritesSection(
@@ -75,8 +75,9 @@ class HomepageFavoritesSectionTest {
             }
         }
 
-        composeRule.onNodeWithText("Unavailable").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Add a driver").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Unavailable").assertCountEquals(1)
+        composeRule.onAllNodesWithText("Add a driver").assertCountEquals(1)
+        composeRule.onNodeWithText("Selected driver is not in current standings").assertIsDisplayed()
     }
 
     @Test

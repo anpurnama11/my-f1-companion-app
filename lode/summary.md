@@ -14,7 +14,10 @@ tapping **Results** pushes `Route.SessionResult` for a full session result list.
 The circuit block links to `CircuitDetail`. Four bottom tabs
 (Homepage, Schedule, Leaderboard, My Team); Leaderboard has Drivers and
 Constructors sub-tabs and drills into Driver and Constructor detail pages,
-while My Team remains a placeholder.
+while My Team manages two favorite drivers and one favorite constructor through
+a standings-backed bottom-sheet picker. Driver IDs are unique across the two
+slots, enforced atomically in `FavoritesCache`; the shared cache updates
+Homepage §3 reactively.
 Data from f1api.dev primary, OpenF1 for top speed, Jolpica standard for race status/grid and most-wins. Manual `Wiring` DI, MVVM
 init-less, sealed `Outcome<T>`/`SectionUiState<T>` with shared `OutcomeContent`
 renderer (ADR 0002). Single `:app` module; KMP `:shared` extraction deferred.

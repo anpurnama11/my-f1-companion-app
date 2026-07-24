@@ -17,6 +17,8 @@ lode/
     theme.md                         # dark-only M3 theme + Circuits/Tyres/Shapes/Spacing (ticket 02)
   leaderboard/
     summary.md                       # standings tab + driver/team detail joins (ticket 04)
+  my-team/
+    summary.md                       # 3-slot favorites management + atomic uniqueness (ticket 05)
   specs/
     f1app.md                         # full F1app design contract + current build status
   testing/
@@ -36,7 +38,7 @@ lode/
       02-homepage-section-1-and-section-3.md    # shipped — Homepage §1 countdown + §3 combined favorites/nearest-GP cards (2027-01-15)
       03-schedule-tab-and-round-detail.md       # partial — Schedule tab + basic Round detail; SessionResult/hybrid result follow-up remains
       04-leaderboard-and-driver-team-detail.md  # shipped — leaderboard + driver/team detail
-      05-my-team-tab-and-favorites-picker.md    # ready — dependency 02 shipped
+      05-my-team-tab-and-favorites-picker.md    # shipped — My Team slots + bottom-sheet picker
       06-circuit-detail.md                      # ready — blocked by 02,03
       07-countdown-widget.md                    # ready — blocked by 02,03
       08-enrichments-headshots-and-team-imagery.md # ready — pending 04/05; Homepage §3 rows exist

@@ -40,7 +40,7 @@ Short term → meaning lines. Domain + project language.
   module to be a move, not a rewrite.
 - **Countdown widget** — home-screen Glance widget showing countdown to next race.
   Detail: [widget/countdown.md](widget/countdown.md).
-- **My Team** — 4th top-level NavKey tab (rightmost); the favorites management
+- **My Team** — `[BUILT ticket 05]` 4th top-level NavKey tab (rightmost); the favorites management
   surface. Three slots: 2 favorite drivers + 1 favorite constructor team.
   Tap a filled slot → selection screen/dialog to pick or replace (driver↔team
   decoupled — drivers need not be from the favorited constructor). Backed by

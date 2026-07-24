@@ -37,11 +37,19 @@ class FavoritesCache(private val dataStore: DataStore<Preferences>) {
     }
 
     suspend fun setDriver1(driverId: String) {
-        dataStore.edit { it[FAV_DRIVER_1] = driverId }
+        dataStore.edit { prefs ->
+            if (prefs[FAV_DRIVER_2] != driverId) {
+                prefs[FAV_DRIVER_1] = driverId
+            }
+        }
     }
 
     suspend fun setDriver2(driverId: String) {
-        dataStore.edit { it[FAV_DRIVER_2] = driverId }
+        dataStore.edit { prefs ->
+            if (prefs[FAV_DRIVER_1] != driverId) {
+                prefs[FAV_DRIVER_2] = driverId
+            }
+        }
     }
 
     suspend fun setTeam(teamId: String) {
@@ -63,11 +71,11 @@ class FavoritesCache(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { prefs ->
             if (prefs[FAV_TEAM] == null) prefs[FAV_TEAM] = topTeamId
             val d1 = topDriverIds.getOrNull(0)
-            if (prefs[FAV_DRIVER_1] == null && d1 != null) {
+            if (prefs[FAV_DRIVER_1] == null && d1 != null && prefs[FAV_DRIVER_2] != d1) {
                 prefs[FAV_DRIVER_1] = d1
             }
             val d2 = topDriverIds.getOrNull(1)
-            if (prefs[FAV_DRIVER_2] == null && d2 != null) {
+            if (prefs[FAV_DRIVER_2] == null && d2 != null && prefs[FAV_DRIVER_1] != d2) {
                 prefs[FAV_DRIVER_2] = d2
             }
         }

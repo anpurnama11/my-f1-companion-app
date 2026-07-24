@@ -14,7 +14,7 @@ else is the agreed contract the build works toward, written present-tense as the
 to implement against. Flip a section to `[BUILT]` as it lands.
 
 **Still pending:** the widget (`CountdownWidget` + `CountdownWorker` + `NextRaceCache`),
-top-speed and most-wins-at-circuit, My Team, and ticket 04's remaining
+top-speed and most-wins-at-circuit, and ticket 04's remaining
 multi-source `HttpClient` extensions (jolpica + OpenF1). Leaderboard plus
 Driver/Team detail is now `[BUILT]`: standings are reused by the tab and joined
 to current driver/team metadata for detail pages. Round detail
@@ -25,6 +25,12 @@ to current driver/team metadata for detail pages. Round detail
 `RoundDetail` is wired but its destination page is the
 ticket-03-built `RoundScreen`, and `CircuitDetail` remains the slice-06
 placeholder.
+
+My Team is `[BUILT]`: `feature/myteam/` renders the three `FavoritesCache`
+slots and uses a `ModalBottomSheet` over current standings for explicit
+replacement. Driver uniqueness is enforced inside each atomic cache edit, not
+only against a potentially stale ViewModel snapshot. See
+[my-team/summary.md](my-team/summary.md).
 
 ## Build floor `[BUILT]` `[from ticket 02]`
 

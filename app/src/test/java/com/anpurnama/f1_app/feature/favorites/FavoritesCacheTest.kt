@@ -4,7 +4,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -74,6 +76,46 @@ class FavoritesCacheTest {
         assertEquals("a", fav.driver1Id)
         assertEquals("b", fav.driver2Id)
         assertEquals("d", fav.teamId)
+    }
+
+    @Test
+    fun `a driver cannot occupy both slots`() = runTest {
+        val (cache, _) = newCache()
+        cache.setDriver1("antonelli")
+
+        cache.setDriver2("antonelli")
+
+        val fav = cache.read().first()
+        assertEquals("antonelli", fav.driver1Id)
+        assertNull(fav.driver2Id)
+    }
+
+    @Test
+    fun `duplicate rejection works when driver 2 was selected first`() = runTest {
+        val (cache, _) = newCache()
+        cache.setDriver2("russell")
+
+        cache.setDriver1("russell")
+
+        val fav = cache.read().first()
+        assertNull(fav.driver1Id)
+        assertEquals("russell", fav.driver2Id)
+    }
+
+    @Test
+    fun `concurrent writes cannot put the same driver in both slots`() = runTest {
+        val (cache, _) = newCache()
+        cache.setDriver1("antonelli")
+        cache.setDriver2("russell")
+
+        coroutineScope {
+            launch { cache.setDriver1("hamilton") }
+            launch { cache.setDriver2("hamilton") }
+        }
+
+        val fav = cache.read().first()
+        assertEquals(1, listOf(fav.driver1Id, fav.driver2Id).count { it == "hamilton" })
+        assertTrue(fav.driver1Id != fav.driver2Id)
     }
 
     @Test
