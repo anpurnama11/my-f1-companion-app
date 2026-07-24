@@ -189,7 +189,10 @@ Short term → meaning lines. Domain + project language.
 - **RaceSchedule** — `[BUILT ticket 03]` `f1/model/Season.kt`; the
   per-session date+time block carried on `Race` from f1api.dev `/current`
   (`RaceScheduleDto`). Fields: `fp1`/`fp2`/`fp3`/`sprintQualy`/`sprintRace`/
-  `qualy`/`race`, each a nullable `SessionSlot(date, time)`. Its
+  `qualy`/`race`, each a nullable `SessionSlot(date, time)`. Empty session
+  DTO objects (`{ date: null, time: null }`) normalize to null at
+  `GetSeasonUseCase.toSchedule()`, matching truly absent fields; this keeps
+  non-sprint weekends from advertising Sprint Quali/Sprint rows. Its
   `activeSessions()` helper selects the five non-sprint or sprint slots. The
   screen converts slot UTC values to device-local date/time labels. The whole `RaceSchedule` is
   `null` when the DTO's schedule block is empty (older seasons, partial

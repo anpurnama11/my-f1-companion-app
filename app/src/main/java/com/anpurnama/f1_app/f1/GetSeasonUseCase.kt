@@ -96,24 +96,32 @@ private fun com.anpurnama.f1_app.f1.data.RaceDto.toRace(): Race = Race(
 )
 
 /**
- * Maps the f1api.dev `/current` `RaceScheduleDto` (which has all-null
- * defaults when the endpoint doesn't carry it) to the domain
- * [RaceSchedule]. Returns null when every slot is absent so the
- * screen can render "no schedule" instead of a row of empty cells.
+ * Maps the f1api.dev `/current` `RaceScheduleDto` to the domain
+ * [RaceSchedule]. The API may omit slots or send semantically empty
+ * objects (`{ "date": null, "time": null }`); both forms normalize to
+ * null. Returns null when every slot is absent so the screen can render
+ * "no schedule" instead of a row of empty cells.
  */
 private fun com.anpurnama.f1_app.f1.data.RaceScheduleDto.toSchedule(): RaceSchedule? {
-    if (fp1 == null && fp2 == null && fp3 == null && sprintQualy == null &&
-        sprintRace == null && qualy == null && race == null
-    ) return null
-    return RaceSchedule(
-        fp1 = fp1?.toSlot(),
-        fp2 = fp2?.toSlot(),
-        fp3 = fp3?.toSlot(),
-        sprintQualy = sprintQualy?.toSlot(),
-        sprintRace = sprintRace?.toSlot(),
-        qualy = qualy?.toSlot(),
-        race = race?.toSlot(),
+    val normalized = RaceSchedule(
+        fp1 = fp1?.toSlotOrNull(),
+        fp2 = fp2?.toSlotOrNull(),
+        fp3 = fp3?.toSlotOrNull(),
+        sprintQualy = sprintQualy?.toSlotOrNull(),
+        sprintRace = sprintRace?.toSlotOrNull(),
+        qualy = qualy?.toSlotOrNull(),
+        race = race?.toSlotOrNull(),
     )
+    if (normalized.fp1 == null && normalized.fp2 == null && normalized.fp3 == null &&
+        normalized.sprintQualy == null && normalized.sprintRace == null &&
+        normalized.qualy == null && normalized.race == null
+    ) return null
+    return normalized
+}
+
+private fun com.anpurnama.f1_app.f1.data.SessionDto.toSlotOrNull(): SessionSlot? {
+    if (date.isNullOrBlank() && time.isNullOrBlank()) return null
+    return toSlot()
 }
 
 private fun com.anpurnama.f1_app.f1.data.SessionDto.toSlot(): SessionSlot =

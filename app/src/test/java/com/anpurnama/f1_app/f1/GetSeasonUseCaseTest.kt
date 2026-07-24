@@ -2,6 +2,7 @@ package com.anpurnama.f1_app.f1
 
 import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.f1.data.F1API_BASE
+import com.anpurnama.f1_app.f1.model.SessionType
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -95,6 +96,38 @@ class GetSeasonUseCaseTest {
         val races = (out as Outcome.Success).data.races
         assertEquals(1, races.count { it.winnerId != null })
         assertEquals(1, races.count { it.winnerId == null })
+    }
+
+    @Test
+    fun `invoke ignores semantically empty sprint slots when building active sessions`() = runTest {
+        val body = """
+            { "season": 2026,
+              "races": [
+                { "round": 1, "raceName": "Australian GP",
+                  "circuit": { "circuitId": "albert_park", "circuitName": "Albert Park" },
+                  "schedule": {
+                    "fp1": { "date": "2026-03-06", "time": "01:30:00Z" },
+                    "fp2": { "date": "2026-03-06", "time": "05:00:00Z" },
+                    "fp3": { "date": "2026-03-07", "time": "01:30:00Z" },
+                    "sprintQualy": { "date": null, "time": null },
+                    "sprintRace": { "date": null, "time": null },
+                    "qualy": { "date": "2026-03-07", "time": "05:00:00Z" },
+                    "race": { "date": "2026-03-08", "time": "04:00:00Z" }
+                  } }
+              ]
+            }
+        """.trimIndent()
+
+        val out = useCase { jsonOk(body) }.invoke()
+
+        assertTrue("expected Success, was $out", out is Outcome.Success)
+        val sessions = (out as Outcome.Success).data.races.single().schedule?.activeSessions()
+            .orEmpty()
+            .map { it.type }
+        assertEquals(
+            listOf(SessionType.FP1, SessionType.FP2, SessionType.FP3, SessionType.Quali, SessionType.Race),
+            sessions,
+        )
     }
 
     @Test
