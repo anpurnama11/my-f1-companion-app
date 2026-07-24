@@ -15,6 +15,8 @@ lode/
     network.md                       # Ktor HttpClient factory + F1Api extensions
   design-system/
     theme.md                         # dark-only M3 theme + Circuits/Tyres/Shapes/Spacing (ticket 02)
+  specs/
+    f1app.md                         # full F1app design contract + current partial-build status
   testing/
     scope.md                         # testing scope + libs + placement + KMP portability rule (ticket 14)
   decisions/
@@ -28,15 +30,15 @@ lode/
     0008-screen-inset-bottom-only-top-bleeds.md  # Screen inset treatment: navigationBarsPadding only; top bleeds (ticket 21)
   plans/
     f1app-build/tickets/
-      01-foundation-and-homepage-section-2.md   # built — Foundation + Homepage §2 (pins UX family)
-      02-homepage-section-1-and-section-3.md    # built — Homepage §1 favorites pager + §3 top speed (2027-01-15)
-      03-schedule-tab-and-round-detail.md       # built — Schedule tab (Upcoming/Past + podium retry) + Round detail two-mode + SessionResult (Rev 3 design locked)
+      01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)
+      02-homepage-section-1-and-section-3.md    # shipped — Homepage §1 countdown + §3 combined favorites/nearest-GP cards (2027-01-15)
+      03-schedule-tab-and-round-detail.md       # partial — Schedule tab + basic Round detail; SessionResult/hybrid result follow-up remains
       04-leaderboard-and-driver-team-detail.md  # ready — blocked by 01
-      05-my-team-tab-and-favorites-picker.md    # ready — blocked by 02
+      05-my-team-tab-and-favorites-picker.md    # ready — dependency 02 shipped
       06-circuit-detail.md                      # ready — blocked by 02,03
       07-countdown-widget.md                    # ready — blocked by 02,03
-      08-enrichments-headshots-and-team-imagery.md # ready — blocked by 02,04,05
-      09-testing-cut.md                         # ready — blocked by 02,07
+      08-enrichments-headshots-and-team-imagery.md # ready — pending 04/05; Homepage §3 rows exist
+      09-testing-cut.md                         # partial — shipped-slice unit/lifecycle coverage; widget reducer/full instrumentation remain
   release/
     build-and-signing.md           # release buildType, signing, R8 (AGP 9 DSL), versioning, output (ticket 15)
   widget/

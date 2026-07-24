@@ -1,7 +1,7 @@
 ---
 id: f1app
 topic: F1app — dark-first Jetpack Compose F1 data app
-status: design-locked / build-ready
+status: design-locked / partial build
 lode-cross-refs:
   - ../summary.md
   - ../terminology.md
@@ -32,7 +32,8 @@ widget. All F1 data comes from free, zero-auth APIs
 (f1api.dev as primary; OpenF1 for top speed; jolpica for all-time most-wins
 at a circuit), fetched over one Ktor `HttpClient`, cached via HttpCache +
 DataStore for offline-first reads. Favorites (2 drivers + 1 team) persist
-locally and drive the Homepage §1 pager and My Team management view. The
+locally and drive the Homepage §3 combined favorites card and My Team
+management view. The
 widget periodically refreshes a cached next-race snapshot and renders a
 render-time countdown + LIVE / COMPLETE / off-season / no-cache states, with
 a custom-scheme deep link into the round detail.
@@ -55,9 +56,9 @@ a custom-scheme deep link into the round detail.
    the network fails so it never blanks mid-season.
 8. As a fan, I want to see "Season over" on the widget during the off-season
    rather than a stale or missing countdown.
-9. As a fan, I want the Homepage to surface, in one scroll: my favourite
-   drivers and team plus the nearest GP (§1), the season progress
-   aggregates (§2), and the nearest GP's circuit stats including top speed
+9. As a fan, I want the Homepage to surface, in one scroll: the next-session
+   countdown (§1), season progress aggregates (§2), and my favourite drivers
+   and constructor plus the nearest GP's circuit stats including top speed
    (§3), so I get the whole weekend picture at a glance.
 10. As a fan, I want the Schedule tab to show upcoming rounds with session
     times and past rounds with full podiums (P1/P2/P3), so I can see what's
@@ -105,9 +106,10 @@ a custom-scheme deep link into the round detail.
   subclass (`app.wiring`). The widget shares the same instance — one manual
   service locator across entry points.
 - **MVVM:** `ViewModel` + sealed `UiState` + `StateFlow`. State derived via
-  `combine` of small `MutableStateFlow` atoms + `stateIn(WhileSubscribed(5_000))`.
+  `combine` of small `MutableStateFlow` atoms + `stateIn(SharingStarted.Lazily)`.
 - **Init-less loading:** first load fires from `Flow.onStart { load() }`, not
-  an `init {}` block; re-fires on `ON_START`.
+  an `init {}` block. The lazy upstream stays alive for the ViewModel lifetime;
+  explicit `refresh()` is the re-fire path.
 - **Result type:** sealed `Outcome<T>` (`Success` / `Failure` / `Loading`) at
   `core/Outcome.kt`.
 - **Domain seam:** UseCase classes; ViewModels take them as function
@@ -194,7 +196,13 @@ This is the hedge that makes a future KMP port a move instead of a rewrite.
   )
   ```
 
-### Use cases (11 — screen-driven, no use case without a caller)
+### Use cases (18 in the full design — screen-driven, no use case without a caller)
+
+The shipped Homepage currently has seven use-case seams: season, next race,
+race-weekend schedule, driver standings, constructor standings, circuit top
+speed, and circuit image. The remaining rows below are the full design
+contract; unimplemented rows remain follow-up work rather than shipped
+behavior.
 
 | Use case | Source(s) | Callers |
 |---|---|---|
@@ -214,10 +222,12 @@ This is the hedge that makes a future KMP port a move instead of a rewrite.
 | `GetRoundPodiumUseCase(year, round)` | reuses `getRoundResults`, slices `[0..2]` | Schedule > Past list |
 | `GetCircuitTopSpeedUseCase(circuitId, year?)` | OpenF1 `/v1/sessions` + `/v1/laps` (`max(st_speed)`) | Homepage §3, Round detail |
 | `GetCircuitMostWinsUseCase(f1apiCircuitId)` | jolpica `/circuits/{id}/results/1.json` | Round detail, Circuit detail |
+| `GetRaceWeekendScheduleUseCase(year, country)` | OpenF1 `/v1/sessions` | Homepage §1 countdown |
+| `GetCircuitImageUseCase(year, country)` | OpenF1 track-layout image | Homepage §1 countdown, Schedule rows |
 
-Homepage ViewModel combines five use cases (the four f1api.dev ones plus
-`GetCircuitTopSpeed`); each section fails independently — no composite use
-case. `GetSeasonUseCase` pre-computes season aggregates
+Homepage ViewModel combines seven use-case seams (including the weekend
+schedule and circuit image); each section fails independently — no composite
+use case. `GetSeasonUseCase` pre-computes season aggregates
 (`completedGp`, `totalKm`, `totalLaps`, `progressPercent`) on the `Season`
 model so ViewModels don't recompute.
 
@@ -265,9 +275,9 @@ Two `DataStore<Preferences>` wrappers in `Wiring`, both using one atomic
 - **`FavoritesCache`** —
   `FAV_DRIVER_1: String`, `FAV_DRIVER_2: String`, `FAV_TEAM: String`. No
   timestamp keys (explicit replace makes them unnecessary). Written from My
-  Team's picker, read by HomepageViewModel (§1) + MyTeamViewModel.
+  Team's picker, read by HomepageViewModel (§3) + MyTeamViewModel.
 
-### Navigation routes (7)
+### Navigation routes (9 in the contract; 6 currently wired)
 
 `@Serializable` `NavKey` route objects in `core/navigation/`:
 
@@ -275,14 +285,17 @@ Two `DataStore<Preferences>` wrappers in `Wiring`, both using one atomic
 - `data object Schedule : NavKey`
 - `data object Leaderboard : NavKey`
 - `data object MyTeam : NavKey` (rightmost)
-- `data class DriverDetail(val driverId: String) : NavKey`
-- `data class TeamDetail(val teamId: String) : NavKey`
-- `data class RoundDetail(val year: Int, val round: Int) : NavKey`
+- `data class DriverDetail(val driverId: String) : NavKey` — reserved in the
+  contract; not wired in the current route file.
+- `data class TeamDetail(val teamId: String) : NavKey` — reserved in the
+  contract; not wired in the current route file.
+- `data class RoundDetail(val year: Int, val round: Int) : NavKey` — wired;
+  current implementation shows basic race/qualifying results and a circuit
+  block, while the richer two-mode/session-result design remains pending.
 - `data class SessionResult(val year: Int, val round: Int, val session: SessionType) : NavKey` —
-  full result list for one session; pushed from a RoundDetail session row
-- `data class CircuitDetail(val circuitId: String) : NavKey` — home for the
-  top-speed + most-wins stats; opened from RoundDetail's circuit block and
-  Homepage §3.
+  reserved in the contract; not wired until the SessionResult follow-up lands.
+- `data class CircuitDetail(val circuitId: String) : NavKey` — wired as the
+  Homepage §3 navigation edge; the destination page remains a placeholder.
 
 Entry points:
 
@@ -327,6 +340,12 @@ Cross-ref: `lode/plans/f1app-build/tickets/03-schedule-tab-and-round-detail.md` 
 
 ### Round detail + Session result
 
+This section is the remaining ticket 03 design contract, not a claim that the
+current build has shipped every row. The current `RoundDetail` implementation
+has basic race/qualifying result blocks and a circuit link; the two-mode
+schedule, `SessionResult` route, sprint support, fastest standouts, and hybrid
+race-result handling remain follow-up work.
+
 `Route.RoundDetail(year, round)` is one screen with two modes driven by the
 Race session start time:
 
@@ -362,14 +381,14 @@ The session list is built from the f1api.dev schedule, which includes
 and Sprint Qualifying results come from Jolpica alpha because f1api.dev does
 not provide them. See ADR `0005-session-results-use-two-apis.md`.
 
-### Favorites (My Team / Homepage §1)
+### Favorites (My Team / Homepage §3)
 
 - Top-level nav is **4 tabs**: Homepage, Schedule, Leaderboard, My Team.
 - My Team tab holds 3 slots: 2 favorite drivers + 1 favorite constructor
   team. The nearest-GP card lives on Homepage §3, not here.
-- Homepage §1 = compact pager of the same 2 favorite drivers + favorite team
-  + nearest-date GP. My Team is the management view over the same
-  `FavoritesCache`.
+- Homepage §3 = one combined three-row card for Driver 1, Driver 2, and
+  Constructor, plus the nearest-GP circuit card. It is not a pager or
+  carousel. My Team is the management view over the same `FavoritesCache`.
 - **First-launch default:** seed `FavoritesCache` with the #1 constructor in
   `GetConstructorsStandings` plus that team's two drivers (top two driver
   rows whose `teamId == favorited team`).
@@ -434,13 +453,13 @@ flowchart LR
 
 ### Enrichments (Tier 1 only in v1)
 
-- **Driver headshots** — on `DriverDetail`, Homepage §1 favorite-driver
+- **Driver headshots** — on `DriverDetail`, Homepage §3 favorite-driver
   cards, My Team favorite-driver cards. Source: OpenF1
   `/v1/drivers?driver_number=<n>&session_key=<latest>` `headshot_url`.
   Cached in-memory (`Map<driverId, String>`); Coil for image load. Fallback
   chain: OpenF1 `headshot_url` → Cloudinary
   `common/f1/{year}/{team}/{driverRef}/` portrait → `team_colour` swatch.
-- **Team / car imagery** — on `TeamDetail` (hero car render), Homepage §1
+- **Team / car imagery** — on `TeamDetail` (hero car render), Homepage §3
   favorite-team card, My Team favorite-team card. Source: formula1.com
   Cloudinary `media.formula1.com/.../common/f1/{year}/{team}/...webp`
   (2026+ only — legacy AEM path dropped for v1). The slug → URL is a
@@ -575,7 +594,7 @@ cut, two deferred until the UI stabilizes.
    DTOs, including the `circuitLength` digit-strip edge case. DTO→model
    mappers in the use cases. `Outcome<T>` sealed-type transitions.
 2. **ViewModels** — init-less `Flow.onStart { load() } +
-   stateIn(WhileSubscribed(5_000))` loading → success/failure transitions;
+   stateIn(SharingStarted.Lazily)` loading → success/failure transitions;
    section-level independence on Homepage; Ktor `MockEngine` stubs on the
    `F1Api.kt` extensions for 200 / 4xx / 5xx / empty-body.
 3. **Widget state reducer** — the `CountdownWidget` render-time state
@@ -636,7 +655,7 @@ they port to a future KMP `:shared`.
 
 ## Further Notes
 
-### Two open questions (fog, deliberately not fake-locked)
+### One open question (fog, deliberately not fake-locked)
 
 These are in-scope decisions that the wayfinder map flagged as **not yet
 specifiable** — sharpening either prematurely into the spec would manufacture
@@ -649,14 +668,13 @@ a decision that has no basis yet. Both affect build sequencing.
    The build implementer should treat this as the first cut-line question
    when picking what to build first; a follow-up wayfinder ticket is the right
    place to lock it once concrete screens exist to slice against.
-2. **Error / empty / loading UX pattern.** Surfaces implicitly by every
-   screen; never grilled as a cross-cutting decision. Either a shared
-   `Outcome`-driven composable family, or per-screen ad-hoc. Decide at the
-   first screen implementing the pattern — picking the wrong shape first
-   forces a later refactor across every screen; picking ad-hoc and seeing the
-   duplication emerge is the cheapest signal. This is the one decision the
-   spec intentionally leaves to the build implementer's judgement rather
-   than locking.
+### Resolved cross-cutting choice
+
+The error / empty / loading UX pattern is resolved: `SectionUiState` is the
+VM-to-UI transport and the shared `OutcomeContent` family renders loading,
+error, content, and optional retry states. Homepage and Schedule use it with
+independent section/row failures; later screens must reuse the same family
+instead of introducing ad-hoc loading/error renderers. See ADR 0002.
 
 ### Design reference
 
@@ -681,11 +699,20 @@ upgrade path; revisit only when the ceiling materializes.
 (headshots, weather) are a separate question, decided above: headshots + team
 imagery in; weather + flags out for v1.
 
-### Build sequence signal
+### Current build status and sequence signal
 
-Theme (ticket 02) and release pipeline (ticket 15) are the only design
-decisions already shipped as code. The rest — architecture, data layer, nav,
-widget, enrichments, testing scope — are design-locked contracts the build
-works toward. Build proceeds down the dependency chain: Architecture → Data
-layer → API client → Navigation → Widget tech → Countdown specifics →
-Research-backed stats → Favorites picker → Enrichments → Testing.
+Foundation + Homepage §2 (ticket 01), Homepage §1 countdown + §3 favorites /
+nearest-GP polish (ticket 02), and the Schedule tab with per-row podium retry
+(the implemented portion of ticket 03) are shipped. Round detail is partial:
+basic race/qualifying result blocks and the circuit link exist, while the
+SessionResult route, sprint results, hybrid race-result source, and richer
+upcoming/past modes remain follow-up work. Circuit detail, Leaderboard, My
+Team picker, enrichments, and the widget remain planned or placeholder scope.
+
+Build proceeds down the dependency chain: Architecture → Data layer → API
+client → Navigation → Homepage slices → Schedule / basic Round detail →
+remaining Round result work → widget → research-backed stats → Favorites
+picker → Enrichments → Testing. Local verification for the shipped slices
+passed JVM unit tests, debug android-test Kotlin compilation, debug assembly,
+and `git diff --check`; instrumentation execution remained unavailable without
+a device or emulator.

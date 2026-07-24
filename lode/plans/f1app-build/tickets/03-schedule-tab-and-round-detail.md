@@ -2,33 +2,43 @@
 id: 03
 title: Schedule tab + Round detail
 type: task
-status: built
+status: partial
 blocked_by: [01]
 owner: ""
 ---
 
 # 03 — Schedule tab + Round detail
 
-**What to build:** the Schedule tab becomes real — upcoming rounds show session times and past rounds show full podiums (P1/P2/P3). Pull-to-refresh re-fetches the schedule. Tapping any round opens a `RoundDetail` page with two modes: upcoming shows the full five-session race-weekend schedule + circuit stats; past shows circuit stats + per-session result rows (Race, Qualifying, Sprint, Sprint Quali, FP1), each with a **Results** button that pushes `Route.SessionResult(year, round, session)`. `SessionResult` renders the full result list for that session. Race results include a podium chip header + Fastest Lap + Fastest Pitstop standout cards, with DNF/DNS status labels and pit-lane handling. The circuit block links to `CircuitDetail` (destination page in slice 06). Reuses `GetSeasonUseCase` from 01, adds `GetRoundResultsUseCase`, `GetRoundQualifyingUseCase`, `GetPracticeResultUseCase`, `GetSprintResultUseCase`, `GetSprintQualifyingResultUseCase`, `GetSessionResultUseCase`, `GetFastestPitstopUseCase`, and `GetRoundPodiumUseCase`.
+**What to build:** the Schedule tab becomes real — upcoming rounds show
+session times and past rounds show full podiums (P1/P2/P3). Pull-to-refresh
+re-fetches the schedule. The planned RoundDetail expansion has two modes:
+upcoming shows the full five-session race-weekend schedule + circuit stats;
+past shows circuit stats + per-session result rows and a
+`Route.SessionResult` destination. The planned SessionResult screen covers
+race, qualifying, practice, sprint, hybrid status/grid handling, and fastest
+standouts. The circuit block links to `CircuitDetail` (destination page in
+slice 06). The implementation is being landed incrementally: Schedule and a
+basic RoundDetail are shipped, while the result-session expansion remains
+open follow-up work.
 
 **Blocked by:** 01 — Foundation (reuses `Wiring`, `F1Api` patterns/Observables, Navigation 3 detail routes, UX family).
 
-**Status:** `[BUILT]` (ticket 03) — Schedule tab + Round detail landed.
+**Status:** `partial` — Schedule tab + basic Round detail landed; the
+SessionResult, sprint, hybrid-result, and richer two-mode work is not shipped.
 
 ## Done when
 
 - [x] `Schedule` tab renders upcoming rounds with session times + past rounds with P1/P2/P3 podium
 - [x] `GetRoundResultsUseCase` over `/{year}/{round}/race` (object-with-results envelope; results `position` kept String; `time` kept String un-parsed)
 - [x] `GetRoundQualifyingUseCase` over `/{year}/{round}/qualy`
-- [x] `GetPracticeResultUseCase` over `/{year}/{round}/fp1|fp2|fp3`
-- [x] `GetSprintResultUseCase` and `GetSprintQualifyingResultUseCase` over Jolpica alpha `/f1/alpha/results/{round_id}/SR/` and `/SQ/`
-- [x] `GetSessionResultUseCase(year, round, sessionType)` branches to the session-specific use cases
-- [x] `GetFastestPitstopUseCase` over OpenF1 `/v1/sessions` + `/v1/pit`
 - [x] `GetRoundPodiumUseCase` reuses `getRoundResults`, slices `[0..2]`; no extra network call
 - [x] `ScheduleViewModel` + `ScheduleScreen` (init-less, pull-to-refresh `NO_CACHE`)
-- [x] `RoundDetail(year, round)` route + `RoundViewModel`/`RoundScreen`: two modes (upcoming schedule / past session rows), circuit stats block, link to `CircuitDetail` wired
-- [x] `SessionResult(year, round, session)` route + `SessionResultViewModel`/`SessionResultScreen`: session-specific result table; Race adds podium chips + Fastest Lap + Fastest Pitstop
+- [x] `RoundDetail(year, round)` route + `RoundViewModel`/`RoundScreen`: basic race and qualifying result blocks, independently-failing loading/error states, and a circuit block linking to `CircuitDetail`
 - [x] Past-list podium failure degrades to a retry row, never blanks the whole schedule (shared UX family)
+- [ ] `RoundDetail` upcoming/past modes with the full weekend schedule, session rows, and circuit stats
+- [ ] `SessionResult(year, round, session)` route + screen with race/qualifying/practice/sprint tables and standout cards
+- [ ] `GetPracticeResultUseCase`, sprint use cases, `GetSessionResultUseCase`, and `GetFastestPitstopUseCase`
+- [ ] Hybrid race-result source and authoritative DNF/DNS/grid/PL handling (revision 3)
 
 Spec cross-ref: `lode/specs/f1app.md` (Use cases table, Schedule contract, envelope diffs, **Schedule surface shape**), `lode/wayfinder/f1app/past-list.md`.
 
