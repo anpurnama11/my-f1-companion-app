@@ -2,9 +2,9 @@
 id: 18
 title: "Lock §3 favorites shape + empty-state behavior"
 type: grilling
-status: open
+status: closed
 blocked_by: [17]
-owner: ""
+owner: "pi"
 ---
 
 ## Question
@@ -39,13 +39,29 @@ The §3 favorites section currently uses a 2-card `HorizontalPager` (`DriverCard
 
 The accent is a 6dp surface strip on the leading edge of the card (mirrors the §3 top-speed `Circuits.forId(...)` pattern). On DriverEntry: the strip is the *team* color (the driver's constructor). On TeamEntry: the strip is the constructor's own color. `Color.Unspecified` returns no strip (honest unknown state, e.g. Cadillac before livery is confirmed).
 
-## Resolution needed
+## Answer
 
-The user (this ticket is a grilling ticket — HITL). Three picks:
+§3 uses **D: one combined card** containing three rows in fixed slot order:
+Driver 1, Driver 2, Constructor. Each row has its own leading color bar. Driver
+rows use that driver's constructor color; the Constructor row uses the selected
+constructor's color. Colors come from `TeamColors.forId`; an unknown color omits
+the bar rather than inventing a fallback.
 
-1. **Shape:** A / B / C / D
-2. **Empty state:** I / II / III / IV
-3. **Open question:** If shape = D (single combined card), the accent has no card-edge to live on. Where does the accent go — a thin top bar on the card? Inside the `Row` as a 4dp leading dot? Or skip the accent entirely on the combined card?
+When no favorites are selected, §3 uses **I: one “Pick favorites” CTA card**.
+The CTA opens the My Team picker. The section remains visible so first-time users
+can discover favorites; it does not render three noisy empty slots.
+
+```mermaid
+flowchart TD
+  F{Any favorites selected?}
+  F -- No --> E[Single Pick favorites CTA card]
+  F -- Yes --> C[Combined favorites card]
+  C --> D1[Driver 1 row + constructor-color bar]
+  C --> D2[Driver 2 row + constructor-color bar]
+  C --> T[Constructor row + constructor-color bar]
+```
+
+The prototype used to compare A–D was deleted after the user selected D.
 
 ## Out of scope
 
@@ -59,6 +75,6 @@ The user (this ticket is a grilling ticket — HITL). Three picks:
 - Ticket 16: `lode/wayfinder/f1app/tickets/16-team-accent-source.md` — `TeamColors.forId` is the accent source.
 - Ticket 17: `lode/wayfinder/f1app/tickets/17-q1-q4-homepage-layout.md` — the §3 horizontal budget depends on the overall layout.
 - Ticket 20: `lode/wayfinder/f1app/tickets/20-q3-constructor-caption.md` — the caption inside whichever shape is chosen.
-- `lode/wayfinder/f1app/homepage.md` — current §3 description (out of date after this ticket resolves).
-- `lode/wayfinder/f1app/tickets/02-homepage-section-1-and-section-3.md` (in `lode/plans/f1app-build/`) — the current §3 implementation, 28-line duplication.
-- `lode/wayfinder/f1app/tickets/22-remaining-minor-observations.md` — item 8 (the 28-line duplication fix) is implemented in whichever shape this ticket picks.
+- `lode/wayfinder/f1app/homepage.md` — current homepage section contract.
+- `lode/wayfinder/f1app/tickets/02-homepage-section-1-and-section-3.md` (in `lode/plans/f1app-build/`) — the prior implementation shape that ticket 22 replaced.
+- `lode/wayfinder/f1app/tickets/22-remaining-minor-observations.md` — item 8 implements this locked shape.

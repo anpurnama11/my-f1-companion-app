@@ -40,8 +40,8 @@ for "is it time?" and opens the app for details only when needed.
 Built: next-session countdown (Homepage §1, Glance widget); Schedule
 (Upcoming + Past with per-row podium retry); Round detail (upcoming + past
 modes, 5-session weekend, Results push); Session results (Race / Quali /
-Sprint / SQuali / FP); Homepage §2 season aggregates; favorites pager
-(Homepage §1); deep link `f1app://round/{year}/{round}` from widget.
+Sprint / SQuali / FP); Homepage §2 season aggregates; combined favorites card
+(Homepage §3); deep link `f1app://round/{year}/{round}` from widget.
 
 Queued for v1: Leaderboard (04), My Team (05), Circuit Detail (06), additive
 enrichments (08 — headshots/weather/race-control/team-imagery, scope being

@@ -95,6 +95,9 @@ design decision in the codebase is unrecorded.
   the countdown on top and the 5-row weekend schedule below (FP1 / FP2 / Quali / Sprint /
   Race, local times, reuses `SessionChip` + `formatStart`); not a separate section, not
   a pager card. §2 season aggregates unchanged. §3 favorites shape decided in ticket 18.
+- [§3 favorites shape + empty-state behavior](tickets/18-section-3-favorites-shape.md) —
+  one combined card with Driver 1, Driver 2, and Constructor rows; each row has a
+  constructor-color leading bar. No favorites renders one “Pick favorites” CTA card.
 - [Q2 podium shape lock](tickets/19-q2-podium-shape-locked.md) — `red = current/active
   (LIVE only)`. Past-row `P1` chip stays text-only with no fill, no background, no
   special color. P1 dominance is implicit (left-to-right scan order). The shape decision
@@ -104,27 +107,16 @@ design decision in the codebase is unrecorded.
   on the §1 Team card. F1-orthodox, matches `ConstructorStanding` and Jolpica `Constructor`.
   "My team" rejected (misleading when no favorites picked). "Team" rejected (loses F1
   meaning). Glossary entry added to `lode/terminology.md` with rejected synonyms.
+- [Default predictive back behavior for v1](tickets/23-default-predictive-back.md) — use
+  Android and Navigation 3 defaults; no custom `PredictiveBackHandler` or screen-specific
+  predictive-back animation in v1.
+- [Remaining minor observations batch](tickets/22-remaining-minor-observations.md) — completed
+  the v1 polish pass: combined favorites card, honest loading/error states, live/completion
+  indicators, tappable semantics, and the completed/upcoming schedule fixture.
 
 ## Not yet specified
 
-- **Critique follow-through (v1 polish).** Open tickets: §3 favorites shape +
-  empty-state (ticket 18, blocked by 17), remaining minor observations batch
-  (ticket 22). Closed in this phase: team-accent source (ticket 16 →
-  `TeamColors.forId` for v1, Jolpica alpha migration noted), Q1/Q4 homepage
-  layout (ticket 17 → one §1 hero card), Q2 podium shape lock (ticket 19 →
-  ADR 0007, text-only `InlinePodium` final), Q3 `Constructor` caption
-  (ticket 20 → kept, glossary entry), edge-to-edge insets (ticket 21 →
-  ADR 0008, `navigationBarsPadding` only, top bleeds).
-- **Predictive back gesture handler (`PredictiveBackHandler`).** Design
-  question deferred to a separate session: do we want predictive back
-  animations in v1, which screens get them, and what animation shape?
-  The `edge-to-edge` skill flags this as required for API 35+, but the
-  default back behavior is acceptable for v1. Manifest flag
-  (`android:enableOnBackInvokedCallback="true"`) and contrast-enforced
-  flag (`window.isNavigationBarContrastEnforced = false`) shipped
-  2027-01-15 alongside ticket 21's resolution. See ticket 21 "Out of
-  scope" section.
-
+- No remaining fog for the current F1app destination.
 ## Out of scope
 
 - **Feeders (F2 / F3 / F1 Academy)** — no free API. User ruled out: "if it's not covered

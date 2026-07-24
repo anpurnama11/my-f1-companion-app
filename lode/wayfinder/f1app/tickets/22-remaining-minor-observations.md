@@ -2,9 +2,9 @@
 id: 22
 title: "Remaining minor observations batch"
 type: task
-status: open
+status: closed
 blocked_by: [17, 18]
-owner: ""
+owner: dev
 ---
 
 ## Question
@@ -25,13 +25,21 @@ Each is a small, scoped fix. Can be split into execution tickets when work begin
 5. **`"RACE COMPLETE"` chip on §1 uses `surfaceContainerHighest` background** — barely distinguishable from the card's `surfaceContainer`. Use `outline` background or a higher-contrast surface.
 6. **`CountdownCard` wraps a `Row` in a `Box` for no reason** — collapse to a single `Row`. May be redundant after ticket 17 extends the §1 card.
 7. **Page-indicator dots on §1 are visual-only** — not tappable to jump. Add `Modifier.clickable` per dot.
-8. **`HomepageScreen.kt:240-307` `DriverCard` and `TeamCard` are 28 lines of line-for-line duplication** — collapse into one `FavoriteEntry` composable (depends on ticket 18 shape decision).
+8. **Replace the §1 favorites pager with ticket 18's locked §3 shape** — one combined card with Driver 1, Driver 2, and Constructor rows, each rendered by one shared `FavoriteEntry` composable with a per-row constructor-color bar. Render one “Pick favorites” CTA card when empty. This both implements ticket 18 and removes the duplicated `DriverCard` / `TeamCard` layouts.
 
 ### Logic / data
 9. **`failureState` in §1 empty-card branch only surfaces the first error** — not the most relevant one. If `favorites` is `Error` because the user has never picked, the §1 card is mis-attributed.
 10. **`ScheduleViewModel.retryPodium(round)` early-returns when `year == 0` during initial `Loading`** — row stays in `Loading` until season resolves, no user signal. A snackbar ("Schedule still loading") would be honest.
 11. **`winnerId`-based Upcoming/Past split is a single point of failure** — DTO mapping `null` would misclassify a completed race as Upcoming. Add an integration test asserting the filter on a known-past f1api.dev fixture.
 12. **`ScheduleScreen.kt:243` `race.name.ifEmpty { race.name }` is dead code** — both branches identical. Likely meant `race.raceId`. Fix the dead branch.
+
+## Resolution
+
+The remaining polish batch is implemented. `HomepageScreen` now renders one combined §3 three-row favorites card with per-row `TeamColors` accents, an empty-state CTA wired to `Route.MyTeam`, a pulsing LIVE marker, stronger RACE COMPLETE contrast, a 20dp top-speed spinner, and single-element circuit semantics. The old pager, dots, duplicate driver/team cards, and redundant countdown `Box` are gone. Favorite lookup failures identify the affected data, while persisted-but-unavailable selections show `Unavailable` rather than an add prompt.
+
+`ScheduleScreen` now exposes circuit/round action semantics, uses the circuit name when a race name is blank, shows 24dp/2.5dp podium loading, and reports initial retry attempts through a snackbar. `ScheduleViewModel.retryPodium` rejects requests while the season or row is already loading. `GetSeasonUseCaseTest` covers mixed completed/upcoming fixture mapping. `TeamColors` includes the API's `redbull` id and returns `Color.Unspecified` for unknown teams.
+
+Verification: `./gradlew :app:testDebugUnitTest`, `./gradlew :app:compileDebugAndroidTestKotlin`, and `./gradlew :app:assembleDebug` passed. Instrumentation execution remains unavailable without a connected device.
 
 ## Out of scope
 

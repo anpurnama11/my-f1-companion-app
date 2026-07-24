@@ -7,24 +7,23 @@ no composite `GetHomepageDataUseCase`).
 
 ```mermaid
 flowchart LR
-  A[HomepageViewModel] --> S1["§1 Favorite pager"]
+  A[HomepageViewModel] --> S1["§1 Next-race countdown"]
   A --> S2["§2 Season progress"]
-  A --> S3["§3 Nearest GP info"]
+  A --> S3["§3 Favorites + nearest GP info"]
   S1 -.-> UC1[GetDriversStandings + GetConstructorsStandings + GetNextRace + GetRaceWeekendSchedule + GetCircuitImage]
   S2 -.-> UC2[GetSeason]
   S3 -.-> UC3[GetNextRace + GetCircuitTopSpeed]
 ```
 
-## Section 1 — Favorite pager (sliding)
+## Section 1 — Next-race countdown
 
-A swipeable pager of up to four cards: **two favorite drivers, one favorite
-team, and one countdown card** for the next race weekend. The pager shows
-whatever subset is available; missing favorites just means fewer cards.
+A single hero card presents the next race weekend: the circuit image,
+next-session countdown, session status, local time, and GP name. Favorites
+are rendered separately in §3.
 
-- Data: `GetDriversStandingsUseCase` + `GetConstructorsStandingsUseCase`
-  (pick the favorited driver/team rows) + `GetNextRaceUseCase` (circuit
-  name + accent) + `GetRaceWeekendScheduleUseCase` (the OpenF1 weekend
-  schedule — FP1/FP2/FP3/Quali/Sprint/Race with absolute start times) +
+- Data: `GetNextRaceUseCase` (circuit name + accent) +
+  `GetRaceWeekendScheduleUseCase` (the OpenF1 weekend schedule —
+  FP1/FP2/FP3/Quali/Sprint/Race with absolute start times) +
   `GetCircuitImageUseCase` (decorative track-layout image from OpenF1
   `/v1/meetings`).
 - Implies a **favorites store** — the user picks 2 drivers + 1 team to pin.
@@ -58,6 +57,27 @@ whatever subset is available; missing favorites just means fewer cards.
   in-app card — the widget renders to the OS home screen with no
   client-side chronometer; the in-app card is a Compose live tick.
   Both pull from the same `GetNextRaceUseCase` / OpenF1 sources.
+
+## Section 3 favorites — locked polish destination
+
+The favorites surface moves out of the §1 pager into one combined §3 card. Its
+fixed row order is Driver 1, Driver 2, Constructor. Each row has a leading
+`TeamColors.forId` bar: driver rows use the driver's constructor color and the
+Constructor row uses the selected constructor's color. Unknown colors omit the
+bar. When no favorites are selected, §3 renders one “Pick favorites” CTA card
+that opens the My Team picker.
+
+```mermaid
+flowchart LR
+  C[Combined favorites card] --> D1[Driver 1]
+  C --> D2[Driver 2]
+  C --> T[Constructor]
+  E[No favorites] --> CTA[Pick favorites CTA]
+```
+
+This is the locked destination from [§3 favorites shape + empty-state
+behavior](tickets/18-section-3-favorites-shape.md). The combined-card replacement is implemented by [Remaining minor observations
+batch](tickets/22-remaining-minor-observations.md), item 8.
 
 ### §1 hero — bleed-to-top (ADR 0008)
 
