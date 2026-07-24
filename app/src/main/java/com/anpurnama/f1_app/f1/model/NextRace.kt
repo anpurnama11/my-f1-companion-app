@@ -1,6 +1,6 @@
 package com.anpurnama.f1_app.f1.model
 
-// Next race. Drives Homepage §1 (favorites pager GP card) and §3 (nearest-GP
+// Next race. Drives Homepage §1 (countdown card) and §3 (nearest-GP
 // info). The `country` + `qualyDate` fields are the OpenF1 join keys for
 // `GetCircuitTopSpeedUseCase`; §3 already has the data on hand.
 //

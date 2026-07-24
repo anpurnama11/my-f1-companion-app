@@ -62,7 +62,7 @@ suspend fun HttpClient.getDriversChampionship(forceRefresh: Boolean = false): Dr
 
 /**
  * Constructors' championship standings, position-ordered. Used by Homepage
- * §1 (favorites team card) and the Leaderboard tab, and the first-launch
+ * §3 (favorites team card) and the Leaderboard tab, and the first-launch
  * default-seed (the top constructor's two drivers).
  */
 suspend fun HttpClient.getConstructorsChampionship(forceRefresh: Boolean = false): ConstructorsChampionshipResponseDto {

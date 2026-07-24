@@ -10,7 +10,7 @@ import io.ktor.client.plugins.ServerResponseException
 
 /**
  * Constructors' championship standings (`/current/constructors-championship`).
- * Position-ordered. Drives Homepage §1 (favorites team card) and the
+ * Position-ordered. Drives Homepage §3 (favorites team card) and the
  * Leaderboard tab, and the first-launch default seed in
  * `HomepageViewModel` (#1 constructor + its two drivers).
  */

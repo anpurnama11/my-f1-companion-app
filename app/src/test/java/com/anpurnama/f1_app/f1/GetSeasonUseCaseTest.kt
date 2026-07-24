@@ -77,6 +77,27 @@ class GetSeasonUseCaseTest {
     }
 
     @Test
+    fun `invoke preserves completed and upcoming race split in one season fixture`() = runTest {
+        val body = """
+            { "season": 2026,
+              "races": [
+                { "round": 1, "raceName": "Bahrain GP",
+                  "circuit": { "circuitId": "bahrain", "circuitName": "Bahrain" },
+                  "winner": { "driverId": "max_verstappen" } },
+                { "round": 2, "raceName": "Saudi Arabian GP",
+                  "circuit": { "circuitId": "jeddah", "circuitName": "Jeddah" } }
+              ]
+            }
+        """.trimIndent()
+
+        val out = useCase { jsonOk(body) }.invoke()
+        assertTrue("expected Success, was $out", out is Outcome.Success)
+        val races = (out as Outcome.Success).data.races
+        assertEquals(1, races.count { it.winnerId != null })
+        assertEquals(1, races.count { it.winnerId == null })
+    }
+
+    @Test
     fun `invoke returns Failure on 4xx`() = runTest {
         val out = useCase { respondError(HttpStatusCode.NotFound) }.invoke()
         assertTrue("expected Failure, was $out", out is Outcome.Failure)

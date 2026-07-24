@@ -134,14 +134,18 @@ class ScheduleViewModel(
     /**
      * Per-row retry. Re-fires a single past round's `/race` call with
      * `forceRefresh = true` (the cached value is the stale one that
-     * just failed; retry expects a fresh hit).
+     * just failed; retry expects a fresh hit). A retry is rejected while
+     * the season or requested row is already loading.
      */
-    fun retryPodium(round: Int) {
+    fun retryPodium(round: Int): Boolean {
         val year = yearState.value
-        if (year == 0) return  // no past rounds known yet
+        if (year == 0 || podiumsState.value[round] is SectionUiState.Loading) {
+            return false // schedule or this row is already loading
+        }
         viewModelScope.launch {
             loadPodium(year = year, round = round, forceRefresh = true)
         }
+        return true
     }
 
     private suspend fun loadSeason(forceRefresh: Boolean) {

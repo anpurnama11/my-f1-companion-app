@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * Three-slot favorites store: 2 driver IDs + 1 team ID. Backs Homepage §1
- * (favorites pager) and (later) the My Team tab's management surface.
+ * Three-slot favorites store: 2 driver IDs + 1 team ID. Backs Homepage §3
+ * and the My Team tab's management surface.
  *
  * Storage: `DataStore<Preferences>` with three typed keys, one atomic
  * `edit` per write. Mirrors the `NextRaceCache` shape from the design.

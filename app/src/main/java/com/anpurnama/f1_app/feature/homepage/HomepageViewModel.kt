@@ -38,11 +38,11 @@ import kotlinx.coroutines.launch
 /**
  * Homepage ViewModel — combines 5 use cases + reads the favorites cache.
  *
- *  - §1 favorite pager — `Favorites` cache + the constructors' standing
- *    (to resolve the picked team) + the drivers' standing (to resolve the
- *    two picked drivers) + the next race (for the GP card).
+ *  - §1 next-race countdown — `GetNextRaceUseCase`, weekend schedule, and
+ *    circuit image data.
  *  - §2 season aggregates — `GetSeasonUseCase`.
- *  - §3 nearest GP info — `GetNextRaceUseCase` + `GetCircuitTopSpeedUseCase`.
+ *  - §3 favorites + nearest GP info — favorites cache, standings,
+ *    `GetNextRaceUseCase`, and `GetCircuitTopSpeedUseCase`.
  *
  * **Section independence:** every section has its own [SectionUiState] and
  * each use case runs in isolation. A 4xx/5xx on the drivers endpoint does NOT

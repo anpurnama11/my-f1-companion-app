@@ -10,7 +10,7 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
 
 /**
- * Next race (`/current/next`). Drives Homepage §1 (favorites pager GP card)
+ * Next race (`/current/next`). Drives Homepage §1 (countdown card)
  * and §3 (nearest-GP info). Also feeds the Countdown worker (when that
  * lands in ticket 07).
  *

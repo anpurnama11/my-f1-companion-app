@@ -1,7 +1,11 @@
 package com.anpurnama.f1_app.feature.homepage
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -10,20 +14,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,17 +39,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -75,9 +84,9 @@ private val RACE_DURATION = 3.hours
 /**
  * Homepage — three sections, each section fails independently.
  *
- *  - §1 Favorite pager (HorizontalPager of driver cards + team card + GP card)
+ *  - §1 Next-race countdown card
  *  - §2 Season progress aggregates (carried over from ticket 01)
- *  - §3 Nearest GP card with top speed
+ *  - §3 Favorites card plus nearest GP card with top speed
  *
  * The screen reads the VM's `UiState.Sections` and renders each section
  * via the shared `OutcomeContent` family — Loading/Failure/Success, each
@@ -87,6 +96,7 @@ private val RACE_DURATION = 3.hours
 @Composable
 fun HomepageScreen(
     onCircuitClick: (String) -> Unit = {},
+    onPickFavorites: () -> Unit = {},
     viewModel: HomepageViewModel = rememberHomepageViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -116,16 +126,17 @@ fun HomepageScreen(
                 .padding(top = Spacing.normal),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            Section1FavoritesPager(
-                favorites = sections.favorites,
-                drivers = sections.drivers,
-                constructors = sections.constructors,
+            Section1Countdown(
                 nextRace = sections.nextRace,
                 weekendSchedule = sections.weekendSchedule,
                 circuitImage = sections.circuitImage,
             )
             Section2Season(sections.season)
             Section3NearestGp(
+                favorites = sections.favorites,
+                drivers = sections.drivers,
+                constructors = sections.constructors,
+                onPickFavorites = onPickFavorites,
                 nextRace = sections.nextRace,
                 topSpeed = sections.topSpeed,
                 onClickCircuit = { circuitId ->
@@ -136,198 +147,179 @@ fun HomepageScreen(
     }
 }
 
-// ─── §1 Favorite pager ────────────────────────────────────────────────────
+// ─── §1 Countdown ─────────────────────────────────────────────────────────
 
 @Composable
-private fun Section1FavoritesPager(
-    favorites: SectionUiState<Favorites>,
-    drivers: SectionUiState<List<DriverStanding>>,
-    constructors: SectionUiState<List<ConstructorStanding>>,
+private fun Section1Countdown(
     nextRace: SectionUiState<NextRace?>,
     weekendSchedule: SectionUiState<WeekendSchedule?>,
     circuitImage: SectionUiState<String?>,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        // Pager renders the resolved cards if everything loaded, or the
-        // loading state if any upstream is still resolving.
-        val cards = buildList {
-            val favs = (favorites as? SectionUiState.Content)?.data
-            val drv = (drivers as? SectionUiState.Content)?.data.orEmpty()
-            val con = (constructors as? SectionUiState.Content)?.data.orEmpty()
-            val ws = (weekendSchedule as? SectionUiState.Content)?.data
-            val next = (nextRace as? SectionUiState.Content)?.data
-            if (favs != null) {
-                favs.driver1Id?.let { id -> drv.firstOrNull { it.driverId == id } }?.let { add(PagerCard.Driver(it)) }
-                favs.driver2Id?.let { id -> drv.firstOrNull { it.driverId == id } }?.let { add(PagerCard.Driver(it)) }
-                favs.teamId?.let { id -> con.firstOrNull { it.teamId == id } }?.let { add(PagerCard.Team(it)) }
-            }
-            // Countdown card needs the next race (for circuit name + accent)
-            // and the weekend schedule (for the next session + time). Both
-            // resolved = countdown. Only one resolved = show the available
-            // half (race name without countdown, or "Loading\u2026" otherwise).
-            val imageUrl = (circuitImage as? SectionUiState.Content)?.data
-            if (next != null) add(PagerCard.Countdown(next, ws, imageUrl))
+    OutcomeContent(state = nextRace) { race ->
+        if (race != null) {
+            CountdownCard(
+                race = race,
+                schedule = (weekendSchedule as? SectionUiState.Content)?.data,
+                circuitImageUrl = (circuitImage as? SectionUiState.Content)?.data,
+            )
         }
-        if (cards.isEmpty()) {
-            // Initial load (or all upstreams failed) — render the first
-            // failure surfaced, or Loading if everything is still in flight.
-            val failureState = when {
-                favorites is SectionUiState.Error -> favorites
-                drivers is SectionUiState.Error -> drivers
-                constructors is SectionUiState.Error -> constructors
-                nextRace is SectionUiState.Error -> nextRace
-                weekendSchedule is SectionUiState.Error -> weekendSchedule
-                circuitImage is SectionUiState.Error -> circuitImage
-                else -> SectionUiState.Loading
+    }
+}
+
+@Composable
+private fun FavoriteLoadError(label: String, message: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(Spacing.normal),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+internal fun FavoritesSection(
+    favorites: Favorites,
+    drivers: List<DriverStanding>,
+    constructors: List<ConstructorStanding>,
+    onPickFavorites: () -> Unit,
+) {
+    if (favorites.isEmpty()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.normal),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    text = "No favorites selected",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Pick drivers and a constructor to personalize your homepage.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(onClick = onPickFavorites) {
+                    Text("Pick favorites")
+                }
             }
+        }
+        return
+    }
+
+    val driver1Id = favorites.driver1Id
+    val driver2Id = favorites.driver2Id
+    val constructorId = favorites.teamId
+    val driver1 = driver1Id?.let { id -> drivers.firstOrNull { it.driverId == id } }
+    val driver2 = driver2Id?.let { id -> drivers.firstOrNull { it.driverId == id } }
+    val constructor = constructorId?.let { id -> constructors.firstOrNull { it.teamId == id } }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            FavoriteEntry(
+                slot = "Driver 1",
+                name = driver1?.driverName?.ifBlank { driver1.driverId }
+                    ?: if (driver1Id == null) "Add a driver" else "Unavailable",
+                detail = driver1?.let { "${it.driverShortName ?: it.driverId} · #${it.driverNumber ?: "—"}" }
+                    ?: driver1Id?.let { "Selected driver is not in current standings" },
+                teamId = driver1?.teamId,
+                accentTag = "favorite-accent-driver-1",
+            )
+            FavoriteEntry(
+                slot = "Driver 2",
+                name = driver2?.driverName?.ifBlank { driver2.driverId }
+                    ?: if (driver2Id == null) "Add a driver" else "Unavailable",
+                detail = driver2?.let { "${it.driverShortName ?: it.driverId} · #${it.driverNumber ?: "—"}" }
+                    ?: driver2Id?.let { "Selected driver is not in current standings" },
+                teamId = driver2?.teamId,
+                accentTag = "favorite-accent-driver-2",
+            )
+            FavoriteEntry(
+                slot = "Constructor",
+                name = constructor?.teamName?.ifBlank { constructor.teamId }
+                    ?: if (constructorId == null) "Add a constructor" else "Unavailable",
+                detail = constructor?.country
+                    ?: constructorId?.let { "Selected constructor is not in current standings" },
+                teamId = constructor?.teamId,
+                accentTag = "favorite-accent-constructor",
+            )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteEntry(
+    slot: String,
+    name: String,
+    detail: String?,
+    teamId: String?,
+    accentTag: String,
+) {
+    val accent = teamId?.let(com.anpurnama.f1_app.ui.theme.TeamColors::forId)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .padding(end = Spacing.normal),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (accent != null && accent != Color.Unspecified) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                OutcomeContent(state = failureState) {
-                    /* nothing — the section just stays empty if no picks */
-                }
-            }
-        } else {
-            val pagerState = rememberPagerState(pageCount = { cards.size })
-            HorizontalPager(
-                state = pagerState,
-                pageSpacing = Spacing.md,
-                contentPadding = PaddingValues(horizontal = 0.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp),
-            ) { page ->
-                when (val card = cards[page]) {
-                    is PagerCard.Driver -> DriverCard(card.standing)
-                    is PagerCard.Team -> TeamCard(card.standing)
-                    is PagerCard.Countdown -> CountdownCard(card.race, card.schedule, card.circuitImageUrl)
-                }
-            }
-            // Page-indicator dots (small row of circles).
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = Spacing.xs),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                repeat(cards.size) { index ->
-                    val selected = pagerState.currentPage == index
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 3.dp)
-                            .size(if (selected) 8.dp else 6.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.outline
-                            ),
-                    )
-                }
-            }
+                    .testTag(accentTag)
+                    .width(6.dp)
+                    .height(64.dp)
+                    .background(accent),
+            )
         }
-    }
-}
-
-private sealed interface PagerCard {
-    data class Driver(val standing: DriverStanding) : PagerCard
-    data class Team(val standing: ConstructorStanding) : PagerCard
-    // Pager card for §1's countdown. The `NextRace` carries the circuit
-    // (id + name for the accent strip) and the schedule carries the next
-    // upcoming session + its start instant. Either may be missing.
-    // `circuitImageUrl` is the decorative OpenF1 track-layout image.
-    data class Countdown(
-        val race: NextRace,
-        val schedule: WeekendSchedule?,
-        val circuitImageUrl: String?,
-    ) : PagerCard
-}
-
-@Composable
-private fun DriverCard(standing: DriverStanding) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-    ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(Spacing.normal),
-            verticalArrangement = Arrangement.SpaceBetween,
+                .weight(1f)
+                .padding(horizontal = Spacing.normal, vertical = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = "Driver",
+                text = slot,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Column {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (detail != null) {
                 Text(
-                    text = standing.driverName.ifEmpty { standing.driverId },
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (standing.driverShortName != null) {
-                    Text(
-                        text = "${standing.driverShortName} · #${standing.driverNumber ?: "—"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
-            Text(
-                text = "P${standing.position} · ${standing.points} pts",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TeamCard(standing: ConstructorStanding) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(Spacing.normal),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "Constructor",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Column {
-                Text(
-                    text = standing.teamName.ifEmpty { standing.teamId },
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (standing.country != null) {
-                    Text(
-                        text = standing.country,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Text(
-                text = "P${standing.position} · ${standing.points} pts",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -372,8 +364,7 @@ private fun CountdownCard(
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Row(
+        Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(Spacing.normal),
@@ -400,7 +391,7 @@ private fun CountdownCard(
                         } else if (live != null) {
                             SessionChip(text = "LIVE", emphasis = true)
                         } else if (raceComplete) {
-                            SessionChip(text = "RACE COMPLETE")
+                            SessionChip(text = "RACE COMPLETE", strong = true)
                         }
                     }
                     // Big countdown (or fallback labels).
@@ -451,22 +442,55 @@ private fun CountdownCard(
                     )
                 }
             }
-        }
     }
 }
 
 @Composable
-private fun SessionChip(text: String, emphasis: Boolean = false) {
-    val container = if (emphasis) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.surfaceContainerHighest
-    val content = if (emphasis) MaterialTheme.colorScheme.onPrimary
-        else MaterialTheme.colorScheme.onSurface
-    Box(
+private fun SessionChip(
+    text: String,
+    emphasis: Boolean = false,
+    strong: Boolean = false,
+) {
+    val container = when {
+        emphasis -> MaterialTheme.colorScheme.primary
+        strong -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.outline
+    }
+    val content = when {
+        emphasis -> MaterialTheme.colorScheme.onPrimary
+        strong -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    val pulseAlpha = if (emphasis) {
+        rememberInfiniteTransition(label = "live-indicator").animateFloat(
+            initialValue = 1f,
+            targetValue = 0.3f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(750),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "live-indicator-alpha",
+        ).value
+    } else {
+        1f
+    }
+    Row(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .background(container)
             .padding(horizontal = Spacing.sm, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (emphasis) {
+            Box(
+                modifier = Modifier
+                    .size(4.dp)
+                    .alpha(pulseAlpha)
+                    .clip(CircleShape)
+                    .background(content),
+            )
+        }
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
@@ -638,7 +662,10 @@ private fun CircularProgressGauge(
 
 @Composable
 private fun SeasonStatRow(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
@@ -657,11 +684,46 @@ private fun SeasonStatRow(label: String, value: String) {
 
 @Composable
 private fun Section3NearestGp(
+    favorites: SectionUiState<Favorites>,
+    drivers: SectionUiState<List<DriverStanding>>,
+    constructors: SectionUiState<List<ConstructorStanding>>,
+    onPickFavorites: () -> Unit,
     nextRace: SectionUiState<NextRace?>,
     topSpeed: SectionUiState<TopSpeed?>,
     onClickCircuit: (circuitId: String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        when {
+            favorites is SectionUiState.Error -> FavoriteLoadError(
+                label = "Favorites unavailable",
+                message = favorites.message,
+            )
+            favorites is SectionUiState.Content &&
+                drivers is SectionUiState.Content &&
+                constructors is SectionUiState.Content -> FavoritesSection(
+                favorites = favorites.data,
+                drivers = drivers.data,
+                constructors = constructors.data,
+                onPickFavorites = onPickFavorites,
+            )
+            drivers is SectionUiState.Error -> FavoriteLoadError(
+                label = "Favorite drivers unavailable",
+                message = drivers.message,
+            )
+            constructors is SectionUiState.Error -> FavoriteLoadError(
+                label = "Favorite constructor unavailable",
+                message = constructors.message,
+            )
+            else -> Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+
         OutcomeContent(state = nextRace) { race ->
             if (race == null) {
                 // Off-season.
@@ -688,7 +750,11 @@ private fun CircuitCard(
     onClick: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Open ${race.circuit.name} circuit details"
+            },
         onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -763,10 +829,9 @@ private fun CircuitCard(
                             )
                         }
                         is SectionUiState.Loading -> {
-                            Text(
-                                text = "…",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
                             )
                         }
                     }

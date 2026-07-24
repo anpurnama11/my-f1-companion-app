@@ -17,6 +17,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -24,16 +26,21 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.ui.OutcomeContent
@@ -79,12 +86,15 @@ fun ScheduleScreen(
     // Per-row pods / images each have their own state; refreshing
     // them is the row-level retry button, not the swipe.
     val isRefreshing = sections.season is SectionUiState.Loading
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = { viewModel.refresh() },
-    ) {
-        Column(
+    Box(modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refresh() },
+        ) {
+            Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
@@ -122,11 +132,24 @@ fun ScheduleScreen(
                         year = sections.year,
                         podiums = sections.podiums,
                         onRoundClick = onRoundClick,
-                        onRetryPodium = { viewModel.retryPodium(it) },
+                        onRetryPodium = {
+                            if (!viewModel.retryPodium(it)) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Schedule is still loading")
+                                }
+                            }
+                        },
                     )
                 }
             }
+            }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = Spacing.normal),
+        )
     }
 }
 
@@ -229,7 +252,10 @@ private fun ScheduleRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Open Round ${race.round}, ${race.circuit.name}"
+            },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
@@ -254,7 +280,7 @@ private fun ScheduleRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = race.name.ifEmpty { race.name },
+                        text = race.name.ifBlank { race.circuit.name },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -300,8 +326,8 @@ private fun PodiumCell(
             contentAlignment = Alignment.CenterStart,
         ) {
             CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                strokeWidth = 2.dp,
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.5.dp,
             )
         }
         is SectionUiState.Error -> Row(

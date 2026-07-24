@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -228,6 +229,13 @@ class ScheduleViewModelTest {
         assertTrue(p1 is SectionUiState.Content)
         assertTrue("podium[2] should be Error, was $p2", p2 is SectionUiState.Error)
         assertEquals("boom-round-2", (p2 as SectionUiState.Error).message)
+    }
+
+    @Test
+    fun `retryPodium reports that schedule is still loading before year resolves`() {
+        val vm = fakeVm()
+
+        assertFalse(vm.retryPodium(round = 1))
     }
 
     @Test
