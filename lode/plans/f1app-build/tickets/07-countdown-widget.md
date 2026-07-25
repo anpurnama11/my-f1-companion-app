@@ -2,7 +2,8 @@
 id: 07
 title: Countdown widget (Glance + worker + deep link)
 type: task
-status: ready-for-agent
+status: shipped
+shipped_on: 2026-07-25
 blocked_by: [02, 03]
 owner: ""
 ---

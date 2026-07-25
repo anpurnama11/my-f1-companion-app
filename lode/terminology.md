@@ -63,10 +63,12 @@ Short term → meaning lines. Domain + project language.
   each section falls back to "—" via the shared UX family when its source is
   unavailable. Opened from the RoundDetail circuit block. Top speed is not a v1
   feature (cut by ticket 10 / ADR 0009).
-- **Deep link (custom scheme)** — `f1app://round/{year}/{round}` is the only deep link
+- **Deep link (custom scheme)** — `[BUILT ticket 07]` `f1app://round/{year}/{round}` is the only deep link
   in scope. Countdown widget builds a `PendingIntent` over `Intent.ACTION_VIEW` with
   that data (args from `NextRaceCache`); `MainActivity` parses the URI into a `RoundDetail`
-  nav key and pushes it on Homepage as backstack root. Single-app custom scheme.
+  nav key and pushes it on Homepage as backstack root. Single-app custom scheme;
+  `launchMode="singleTop"` ensures a foreground widget tap reuses the existing
+  activity and fires `onNewIntent`.
 - **f1api.dev** — primary free F1 API (schedule, standings, results, circuit metadata,
   pre-joined driver+team). Zero auth.
 - **OpenF1** — retired runtime API dependency. Ticket 10 deliberately removes
@@ -146,9 +148,9 @@ Short term → meaning lines. Domain + project language.
   question #2 — every later screen reuses this shape, no per-screen ad-hoc
   loading/error rendering. The retry button is suppressed when `onRetry == null`
   (read-only surfaces).
-- **NextRaceCache** — `DataStore<Preferences>` cache for next-race data, read by the
+- **NextRaceCache** — `[BUILT ticket 07]` `DataStore<Preferences>` cache for next-race data, read by the
   Countdown widget and written by CountdownWorker. Detail: [widget/countdown.md](widget/countdown.md).
-- **CountdownWorker** — periodic WorkManager worker that polls next race and updates
+- **CountdownWorker** — `[BUILT ticket 07]` periodic WorkManager worker that polls next race and updates
   NextRaceCache. Detail: [widget/countdown.md](widget/countdown.md).
 - **Season aggregates** — computed client-side in `GetSeasonUseCase` from
   `/current` (full schedule): completedGp (count `winner != null`), totalKm

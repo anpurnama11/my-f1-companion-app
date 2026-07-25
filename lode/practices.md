@@ -13,8 +13,8 @@ APKs assembling clean. Sections marked `[BUILT]` describe code in the repo; ever
 else is the agreed contract the build works toward, written present-tense as the spec
 to implement against. Flip a section to `[BUILT]` as it lands.
 
-**Still pending:** the widget (`CountdownWidget` + `CountdownWorker` + `NextRaceCache`),
-and most-wins-at-circuit. Leaderboard plus
+**Still pending:** the widget (`CountdownWidget` + `CountdownWorker` + `NextRaceCache`) is now
+shipped (ticket 07). Leaderboard plus
 Driver/Team detail is now `[BUILT]`: standings are reused by the tab and joined
 to current driver/team metadata for detail pages. Round detail and the Schedule
 tab are `[BUILT]`: `RoundScreen` derives upcoming/past mode from the race slot,

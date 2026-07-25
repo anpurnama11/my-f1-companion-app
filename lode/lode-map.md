@@ -37,6 +37,7 @@ lode/
     0008-screen-inset-bottom-only-top-bleeds.md  # Screen inset treatment: navigationBarsPadding only; top bleeds (ticket 21)
     0009-remove-openf1-runtime-dependency.md  # OpenF1 removed; f1api/Jolpica/local F1DB artwork; top speed absent from v1 (ticket 10)
     0010-my-team-content-into-homepage-§3.md  # Variant A wins; no separate My Team tab; §3 is the management surface (ticket 24, build 11)
+    0011-countdown-widget-cache-narrow-to-racestart.md  # Widget cache stores only raceStartMillis; pre-race window is a fixed 3d buffer, not cached FP1 (ticket 07)
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)
@@ -45,7 +46,7 @@ lode/
       04-leaderboard-and-driver-team-detail.md  # shipped — leaderboard + driver/team detail
       05-my-team-tab-and-favorites-picker.md    # shipped — My Team slots + bottom-sheet picker
       06-circuit-detail.md                      # shipped — Circuit detail page (most-wins + metadata, ticket 06, 2026-07-25)
-      07-countdown-widget.md                    # ready — blocked by 02,03
+      07-countdown-widget.md                    # shipped — Countdown widget (Glance + worker + deep link, ticket 07, 2026-07-25)
       08-enrichments-headshots-and-team-imagery.md # ready — pending 04/05; Homepage §3 rows exist
       09-testing-cut.md                         # partial — shipped-slice unit/lifecycle coverage; widget reducer/full instrumentation remain
       10-remove-openf1-runtime-dependency.md   # shipped — f1api/Jolpica/local F1DB artwork source cut
@@ -53,7 +54,7 @@ lode/
   release/
     build-and-signing.md           # release buildType, signing, R8 (AGP 9 DSL), versioning, output (ticket 15)
   widget/
-    countdown.md                   # CountdownWidget, CountdownWorker, NextRaceCache
+    countdown.md                   # CountdownWidget, CountdownWorker, NextRaceCache [BUILT ticket 07]
   tooling/
     pi-usage.md                    # pi session token/cost aggregation and provider→model report
   wayfinder/

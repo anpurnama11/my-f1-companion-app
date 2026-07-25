@@ -1,10 +1,11 @@
 # Testing scope
 
-> **STATUS: STRATEGY DECIDED, no tests built yet.** Nothing to test — only the
-> theme (ticket 02) and the `MainActivity` scaffold exist in code. This is the
-> agreed test ladder + library/placement rules to apply *as production code
-> lands*. No surface is tested before its production code exists (rung gating
-> below).
+> **STATUS: Rungs 1–4 partially built; widget reducer + worker gate are now tested.**
+> Rungs 1–3 (pure mappings, ViewModel transitions, Ktor `MockEngine`) have been
+> shipping as the screens/VMs land. Rung 4 (widget state reducer) shipped with
+> ticket 07 — the reducer is a pure function, no Glance/LocalContext in the test
+> body, and a separate test pins the worker's adaptive-gate logic. Rung 5
+> (Compose UI smoke + theme) and rung 6 (macrobenchmark) are still deferred.
 
 What gets tested, how, where it lives. Decided in ticket 14. Tests are JVM
 unit + Compose instrumented; no `:testing` module, no E2E against live APIs.
@@ -82,14 +83,17 @@ flowchart TD
 - **Module placement is the Android default**, not a portability mechanism. The
   invariant on test bodies is the mechanism; placement just moves with the code.
 
-## Widget
+## Widget `[BUILT ticket 07]`
 
 The `CountdownWidget` render-time state — countdown / LIVE NOW / RACE COMPLETE /
 off-season (`START_MILLIS == 0L`) / no-cache (no cache + sync fail) — is computed
-render-time from `now` vs cached race window. Test the **reducer as a pure
-function** (input: cache + `now`; output: state enum + label), not Glance
-`@Composable` rendering. Pull the computation behind a function the widget calls,
-assert its branch logic. No Glance/`LocalContext` in the test.
+render-time from `now` vs cached race window via `reduceCountdownState(nowMillis,
+snapshot)`. The reducer is tested as a pure function in
+`app/src/test/.../widget/countdown/CountdownStateTest.kt` (12 tests, table-driven
+over the spec's 6 states plus data-roundtrip assertions), and the worker's
+adaptive gate is tested in `CountdownWorkerGateTest.kt` (10 tests, including the
+60-min cache-age boundary and the 3d-pre / 3h-post race window). No Glance,
+`LocalContext`, or `WorkManager` harness in either test body — they're JVM-only.
 
 ## Out of scope
 

@@ -20,6 +20,17 @@ while My Team manages two favorite drivers and one favorite constructor through
 a standings-backed bottom-sheet picker. Driver IDs are unique across the two
 slots, enforced atomically in `FavoritesCache`; the shared cache updates
 Homepage §3 reactively.
+
+The **Countdown widget** (shipped in ticket 07) is a Jetpack Glance
+`GlanceAppWidget` reading `NextRaceCache` and rendering a dark-only Surface
+with a circuit-accent strip + countdown / LIVE NOW / RACE COMPLETE / Season
+over / No race data states. A periodic `CountdownWorker` (15-min floor,
+network-constrained, exponential backoff) refreshes the cache; the worker
+uses an adaptive gate (every tick inside a 3d-pre-race / 3h-post-race window,
+60-min cache-age gate otherwise). Tapping the widget fires a
+`f1app://round/{year}/{round}` deep link; `MainActivity` parses it and
+pushes `Route.RoundDetail` onto the Homepage backstack.
+
 Data from f1api.dev primary, Jolpica standard for race status/grid and
 pit-stop enrichment, and Jolpica alpha for sprint sessions. Circuit artwork
 is bundled from a pinned F1DB revision; no runtime artwork service is used.
