@@ -20,6 +20,8 @@ lode/
     summary.md                       # standings tab + driver/team detail joins (ticket 04)
   my-team/
     summary.md                       # 3-slot favorites management + atomic uniqueness (ticket 05)
+  news/
+    summary.md                       # parked — RSS news tab design (post-v1; replaces My Team per ticket 25)
   specs/
     f1app.md                         # full F1app design contract + current build status
   testing/
@@ -33,6 +35,8 @@ lode/
     0006-race-results-hybrid-source.md       # Race results: f1api.dev metadata/fastest-lap + Jolpica standard status/grid
     0007-podium-shape-locked.md            # Past-row podium: text-only InlinePodium, no red P1 background; red = current/active (LIVE only) (ticket 19)
     0008-screen-inset-bottom-only-top-bleeds.md  # Screen inset treatment: navigationBarsPadding only; top bleeds (ticket 21)
+    0009-remove-openf1-runtime-dependency.md  # OpenF1 removed; f1api/Jolpica/local F1DB artwork; top speed absent from v1 (ticket 10)
+    0010-my-team-content-into-homepage-§3.md  # Variant A wins; no separate My Team tab; §3 is the management surface (ticket 24, build 11)
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)
@@ -45,6 +49,7 @@ lode/
       08-enrichments-headshots-and-team-imagery.md # ready — pending 04/05; Homepage §3 rows exist
       09-testing-cut.md                         # partial — shipped-slice unit/lifecycle coverage; widget reducer/full instrumentation remain
       10-remove-openf1-runtime-dependency.md   # shipped — f1api/Jolpica/local F1DB artwork source cut
+    11-favorites-on-homepage.md              # ready — fold My Team content into Homepage §3 (wayfinder 24, ADR 0010)
   release/
     build-and-signing.md           # release buildType, signing, R8 (AGP 9 DSL), versioning, output (ticket 15)
   widget/
@@ -56,6 +61,7 @@ lode/
       map.md                         # destination spec + scope + fog patches (v1 spec + v1 polish)
       homepage.md                    # Homepage three-section composition + data sources
       past-list.md                   # Schedule>Past full-podium fetch strategy (ticket 10) + locked visual treatment
+      my-team-on-homepage.md         # Finding: 3 variants for folding My Team into Homepage §3 (no separate tab)
       tickets/
         01-architecture-and-modules.md   # closed (single :app, Wiring DI, MVVM init-less, Nav3, Ktor/CIO)
         02-design-system-theme.md        # closed (dark-only M3 theme; also the only ticket shipped as code)
@@ -80,6 +86,8 @@ lode/
         21-edge-to-edge-insets-bug.md               # closed (task; navigationBarsPadding on Homepage + Schedule root Columns, top bleeds per ADR 0008)
         22-remaining-minor-observations.md          # closed (task batch; combined favorites card, a11y + visual polish + schedule logic)
         23-default-predictive-back.md                # closed (default Android/Navigation 3 behavior; no custom handler or animation)
+        24-favorites-on-homepage.md                  # closed (variant A wins; no separate My Team tab; see ADR 0010 + build 11)
+        25-news-rss.md                                 # parked — RSS news tab replaces My Team (post-v1); see lode/news/summary.md
       top-speed.md                     # top-speed/fastest-lap stat source + cost (ticket 08)
       top-speed-api-wrangling.md       # API wrangling detail for the top-speed stat (ticket 08)
       circuit-most-wins.md             # most-wins-at-circuit stat source + cost (ticket 09)

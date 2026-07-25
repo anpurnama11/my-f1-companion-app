@@ -15,7 +15,7 @@ The circuit block links to `CircuitDetail` (shipped in ticket 06 as
 two independently-failing sections: f1api.dev metadata + jolpica
 most-wins aggregation). Four bottom tabs
 (Homepage, Schedule, Leaderboard, My Team); Leaderboard has Drivers and
-Constructors sub-tabs and drills into Driver and Constructor detail pages,
+Constructors sub-tabs and drills into Driver and Constructor detail pages, while My Team manages two favorite drivers and one favorite constructor through a standings-backed bottom-sheet picker. **v1 destination is 3 tabs** — My Team is being folded into Homepage §3 per wayfinder ticket 24 / plans ticket 11, and the news tab takes the freed slot when RSS news un-parks (wayfinder ticket 25).
 while My Team manages two favorite drivers and one favorite constructor through
 a standings-backed bottom-sheet picker. Driver IDs are unique across the two
 slots, enforced atomically in `FavoritesCache`; the shared cache updates

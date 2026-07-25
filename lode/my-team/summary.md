@@ -1,5 +1,15 @@
 # My Team favorites management
 
+> **Superseded 2026-07-25.** The My Team tab is removed in v1 polish.
+> Favorites management moves to Homepage §3 per
+> [ADR 0010](../decisions/0010-my-team-content-into-homepage-§3.md) +
+> [wayfinder ticket 24](../wayfinder/f1app/tickets/24-favorites-on-homepage.md) +
+> [build ticket 11](../plans/f1app-build/tickets/11-favorites-on-homepage.md).
+> This file is kept as the record of what the in-tab My Team management
+> looked like before it was folded into §3. The `FavoritesCache` storage
+> layer (`FavoritesCache.kt`) is unchanged; only the surface that exposes
+> it is removed.
+
 The `Route.MyTeam` tab is the management surface for the same three-slot
 `FavoritesCache` read by Homepage §3. It renders Driver 1, Driver 2, and
 Constructor cards from the cache, resolves their display data from current

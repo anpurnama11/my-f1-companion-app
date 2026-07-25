@@ -25,8 +25,8 @@ the same picture.
 
 ## Solution
 
-A single-module Jetpack Compose Android app (`com.anpurnama.f1_app`) with four
-top-level tabs — Homepage, Schedule, Leaderboard, My Team — plus Driver / Team
+A single-module Jetpack Compose Android app (`com.anpurnama.f1_app`) with three
+top-level tabs — Homepage, Schedule, Leaderboard — plus Driver / Team
 / Round / Circuit detail pages, and one Jetpack Glance home-screen Countdown
 widget. All F1 data comes from free, zero-auth APIs
 (f1api.dev as primary; OpenF1 for top speed; jolpica for all-time most-wins
@@ -66,15 +66,15 @@ a custom-scheme deep link into the round detail.
 11. As a fan, I want the Leaderboard tab to show current driver and
     constructor standings with wins and points, with rows that drill into
     driver or team detail.
-12. As a fan, I want My Team to hold my two favourite drivers and one
-    favourite constructor, with an easy replace interaction, so the
-    Homepage reflects who I care about.
+12. As a fan, I want my two favourite drivers and one favourite
+    constructor to be pinnable from Homepage §3, with an easy replace
+    interaction, so the Homepage reflects who I care about.
 13. As a fan, I want the favorite-driving picks to be decoupled from my
     favorite constructor (drivers need not be from that team), so I can
     follow whoever I actually root for.
 14. As a fan, I want first launch to seed sensible defaults (the current
-    championship-leading constructor plus its two drivers) so neither the
-    Homepage nor My Team is empty before I pick anything.
+    championship-leading constructor plus its two drivers) so §3 on the
+    Homepage is not empty before I pick anything.
 15. As a fan, I want a Round detail page showing the race-weekend schedule
     (upcoming) or per-session result rows (past), plus a circuit block that
     links to Circuit detail, and a per-session result page, so I can dig into
@@ -284,7 +284,10 @@ Two `DataStore<Preferences>` wrappers in `Wiring`, both using one atomic
 - `data object Homepage : NavKey` — start destination
 - `data object Schedule : NavKey`
 - `data object Leaderboard : NavKey`
-- `data object MyTeam : NavKey` (rightmost)
+- (No 4th `MyTeam` `data object` — the My Team tab is being removed per
+  wayfinder ticket 24 / plans ticket 11. The 3 tabs above are the v1
+  destination. When the news feature un-parks per wayfinder ticket 25,
+  `Route.News` takes the freed slot.)
 - `data class DriverDetail(val driverId: String) : NavKey` — wired from
   Leaderboard driver rows and DriverDetail team links.
 - `data class TeamDetail(val teamId: String) : NavKey` — wired from
@@ -378,14 +381,19 @@ The session list is built from the f1api.dev schedule, which includes
 and Sprint Qualifying results come from Jolpica alpha because f1api.dev does
 not provide them. See ADR `0005-session-results-use-two-apis.md`.
 
-### Favorites (My Team / Homepage §3)
+### Favorites (Homepage §3)
 
-- Top-level nav is **4 tabs**: Homepage, Schedule, Leaderboard, My Team.
-- My Team tab holds 3 slots: 2 favorite drivers + 1 favorite constructor
-  team. The nearest-GP card lives on Homepage §3, not here.
-- Homepage §3 = one combined three-row card for Driver 1, Driver 2, and
+- Top-level nav is **3 tabs**: Homepage, Schedule, Leaderboard. The
+  previous 4th tab (My Team) is being folded into Homepage §3 per
+  wayfinder ticket 24 / plans ticket 11; the 3-tab shape is the v1
+  destination.
+- Homepage §3 is the favorites management surface (variant A per ticket
+  24): one combined three-row card for Driver 1, Driver 2, and
   Constructor, plus the nearest-GP circuit card. It is not a pager or
-  carousel. My Team is the management view over the same `FavoritesCache`.
+  carousel. Each row is tappable and opens the picker (a
+  `ModalBottomSheet` listing current standings with the "Already
+  selected" disabled state) for that slot. The "Change" label on each
+  row is the affordance; no mode toggle to teach.
 - **First-launch default:** seed `FavoritesCache` with the #1 constructor in
   `GetConstructorsStandings` plus that team's two drivers (top two driver
   rows whose `teamId == favorited team`).
@@ -542,7 +550,6 @@ com.anpurnama.f1_app/
     homepage/{HomepageScreen,HomepageViewModel,HomepageViewModelFactory}.kt
     schedule/{ScheduleScreen,ScheduleViewModel,...}.kt
     leaderboard/{LeaderboardScreen,LeaderboardViewModel,...}.kt
-    myteam/{MyTeamScreen,MyTeamViewModel,...}.kt
     driver/...
     team/...
     round/{RoundScreen,RoundViewModel,...}.kt
@@ -622,7 +629,8 @@ they port to a future KMP `:shared`.
 - **News + collaborator content screens** (BoxBoxClub, F1StatsGuru,
   FormulaAddict, FormulaAerodynamics, FormulaDataAnalysis, FormulaNeon,
   FormulaPlanet, TrackLimits) — served via Firebase Remote Config, no free
-  API.
+  API. **RSS news** (free, public feeds) is parked to v2 per wayfinder
+  ticket 25; the news tab replaces the My Team tab when un-parked.
 - **Firebase Remote Config** as a data source — only the dropped screens /
   feeders used it.
 - **7 secondary widget types** (Schedule, Drivers Standings, Team Standings,
