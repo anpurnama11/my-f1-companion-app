@@ -15,6 +15,7 @@ lode/
     network.md                       # Ktor HttpClient factory + F1Api extensions
   design-system/
     theme.md                         # dark-only M3 theme + Circuits/Tyres/Shapes/Spacing (ticket 02)
+    icons.md                         # launcher adaptive icon + 4 tab bar icons (mipmap/drawable rules)
   leaderboard/
     summary.md                       # standings tab + driver/team detail joins (ticket 04)
   my-team/
