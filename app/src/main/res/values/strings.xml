@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">F1-app</string>
+    <string name="widget_label">F1 Countdown</string>
 </resources>

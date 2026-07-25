@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.anpurnama.f1_app.core.network.HttpClientFactory
 import com.anpurnama.f1_app.feature.favorites.FavoritesCache
+import com.anpurnama.f1_app.widget.countdown.data.NextRaceCache
 import com.anpurnama.f1_app.f1.GetCircuitMostWinsUseCase
 import com.anpurnama.f1_app.f1.GetCircuitUseCase
 import com.anpurnama.f1_app.f1.GetConstructorsStandingsUseCase
@@ -66,6 +67,19 @@ class Wiring(context: Context) {
     val favoritesCache: FavoritesCache = FavoritesCache(
         PreferenceDataStoreFactory.create {
             File(File(appContext.filesDir, "datastore"), "favorites.preferences_pb").apply {
+                parentFile?.mkdirs()
+            }
+        }
+    )
+
+    /**
+     * Typed-key DataStore for the Countdown widget. Same `Wiring`
+     * instance is held by the application, the worker, and the
+     * Glance widget — one DataStore, one source of truth.
+     */
+    val nextRaceCache: NextRaceCache = NextRaceCache(
+        PreferenceDataStoreFactory.create {
+            File(File(appContext.filesDir, "datastore"), "next_race.preferences_pb").apply {
                 parentFile?.mkdirs()
             }
         }

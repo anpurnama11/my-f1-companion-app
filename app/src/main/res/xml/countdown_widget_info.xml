@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Countdown widget provider info.
+
+  Sizing per the wayfinder 07 lock:
+    - minWidth 115dp / minHeight 256dp — minimum size the user can drop.
+    - maxResizeWidth 130dp / maxResizeHeight 624dp — upper resize bound.
+    - minResizeWidth 56dp / minResizeHeight 120dp — lower resize bound.
+    - resizeMode horizontal|vertical — freely resizable on both axes.
+    - no `configure` attribute — no config activity, plain drop-and-go.
+    - updatePeriodMillis 0 — Glance re-render is driven by the
+      CountdownWorker's `updateAll` call after a cache write, not by
+      the system poller. Setting this to a non-zero value is
+      effectively a no-op for a Glance widget.
+    - widgetCategory home_screen — appears in the launcher's
+      home-screen widget picker.
+    - initialLayout — required by the system even though Glance
+      ignores its content (the `provideGlance` composable is the
+      real source of truth). Reusing a trivial empty layout avoids
+      any flash-of-default-content on first install.
+    - previewLayout — omitted intentionally. The launcher's widget
+      picker falls back to a generated preview from the widget's
+      own composable. Adding a separate XML layout would mean
+      keeping the design in two places; revisit if a launcher
+      actually refuses to render the default.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="115dp"
+    android:minHeight="256dp"
+    android:maxResizeWidth="130dp"
+    android:maxResizeHeight="624dp"
+    android:minResizeWidth="56dp"
+    android:minResizeHeight="120dp"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    android:initialLayout="@layout/countdown_widget_initial" />

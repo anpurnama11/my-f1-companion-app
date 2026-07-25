@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Trivial initial layout for the Countdown widget. The system
+  inflates this once at install time as a placeholder; the real
+  content is provided by `CountdownWidget.provideGlance()` which
+  overrides the inflated view before the user sees it. Glance
+  replaces the contents on the first bind.
+
+  Kept as a single dark-colored box (matching the design's Surface
+  #0D0D0D) so there's no flash of white background if the system
+  ever does briefly show it.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0D0D0D" />

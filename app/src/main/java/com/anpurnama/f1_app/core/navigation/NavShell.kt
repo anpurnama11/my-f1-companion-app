@@ -12,6 +12,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,12 +46,45 @@ import com.anpurnama.f1_app.feature.team.TeamScreen
  * back on Homepage's root exits the app.
  */
 @Composable
-fun NavShell() {
+fun NavShell(
+    /**
+     * Deep-link route pending consumption. Set by [MainActivity]
+     * from `intent.data` (initial onCreate) or `onNewIntent`
+     * (foreground widget tap). When non-null, a
+     * [LaunchedEffect] pushes it onto the Homepage backstack and
+     * invokes [onDeepLinkConsumed] to clear the pending state.
+     */
+    pendingDeepLink: Route? = null,
+    /**
+     * Callback that clears the parent's pending-deep-link state
+     * once the route has been pushed. Wired by [MainActivity] to
+     * set its own `pendingDeepLinkRoute` back to null.
+     */
+    onDeepLinkConsumed: () -> Unit = {},
+) {
     val navigationState = rememberNavigationState(
         startRoute = Route.Homepage,
         topLevelRoutes = Route.homepageTabs,
     )
     val navigator = remember(navigationState) { Navigator(navigationState) }
+
+    // Deep-link consumption. The spec is "push RoundDetail onto
+    // Homepage as backstack root ([Homepage, RoundDetail]); back
+    // lands on Homepage". So we always switch to Homepage first
+    // (preserves the user's other-tab state, e.g. an open Schedule
+    // detail), then push the route onto Homepage's backstack.
+    // The effect is keyed on `pendingDeepLink` so each new
+    // intent triggers a fresh push.
+    LaunchedEffect(pendingDeepLink) {
+        val route = pendingDeepLink ?: return@LaunchedEffect
+        if (route is Route.RoundDetail) {
+            navigator.navigate(Route.Homepage)
+            navigator.navigate(route)
+        } else {
+            navigator.navigate(route)
+        }
+        onDeepLinkConsumed()
+    }
 
     val entryProvider = entryProvider {
         entry<Route.Homepage> {
