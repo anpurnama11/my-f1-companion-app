@@ -377,6 +377,87 @@ data class PracticeResponseDto(
     }
 }
 
+// f1api.dev /circuits/{circuitId} envelope. Distinct from /current* which
+// inlines a single `circuit` object: this endpoint returns a one-element
+// `circuit: [...]` array, and the per-circuit fields carry a different
+// shape:
+//   - `circuitLength: Int` in **meters** (e.g. 5412 for Bahrain = 5.412 km)
+//     — NOT the `"<N>km"` string form used in /current*.
+//   - `lapRecord` is the all-time fastest race lap as a wall-clock string
+//     (`"1:21:046"`); `fastestLapDriverId`/`fastestLapTeamId`/
+//     `fastestLapYear` carry attribution. The driver/team ids match
+//     f1api.dev's namespace (e.g. `barrichelo` on Monza's 2004 record).
+//   - `firstParticipationYear` is the year the circuit first hosted a GP.
+//   - `numberOfCorners` (Int) replaces `/current*`'s `corners` field.
+@Serializable
+data class CircuitDetailResponseDto(
+    val total: Int = 0,
+    val circuit: List<CircuitDetailDto> = emptyList(),
+) {
+    @Serializable
+    data class CircuitDetailDto(
+        val circuitId: String = "",
+        val circuitName: String? = null,
+        val country: String? = null,
+        val city: String? = null,
+        val circuitLength: Int = 0,
+        val lapRecord: String? = null,
+        val firstParticipationYear: Int? = null,
+        val numberOfCorners: Int? = null,
+        val fastestLapDriverId: String? = null,
+        val fastestLapTeamId: String? = null,
+        val fastestLapYear: Int? = null,
+        val url: String? = null,
+    )
+}
+
+// jolpica Ergast-compatible /circuits/{id}/results/1.json envelope. The `1`
+// in the path filters to P1 per race; we walk the array client-side and
+// groupBy driver/constructor to find the most-winning driver and team.
+@Serializable
+data class CircuitWinnersResponseDto(
+    @SerialName("MRData") val mrData: MrDataDto = MrDataDto(),
+) {
+    @Serializable
+    data class MrDataDto(
+        val total: String? = null,
+        @SerialName("RaceTable") val raceTable: RaceTableDto = RaceTableDto(),
+    )
+
+    @Serializable
+    data class RaceTableDto(
+        val circuitId: String? = null,
+        @SerialName("Races") val races: List<RaceDto> = emptyList(),
+    )
+
+    @Serializable
+    data class RaceDto(
+        val season: String? = null,
+        val round: String? = null,
+        @SerialName("Results") val results: List<ResultDto> = emptyList(),
+    )
+
+    @Serializable
+    data class ResultDto(
+        val position: String? = null,
+        @SerialName("Driver") val driver: DriverDto = DriverDto(),
+        @SerialName("Constructor") val constructor: ConstructorDto = ConstructorDto(),
+    )
+
+    @Serializable
+    data class DriverDto(
+        val driverId: String? = null,
+        val givenName: String? = null,
+        val familyName: String? = null,
+    )
+
+    @Serializable
+    data class ConstructorDto(
+        val constructorId: String? = null,
+        val name: String? = null,
+    )
+}
+
 // Jolpica standard Ergast-compatible race result envelope.
 @Serializable
 data class JolpicaRaceResultsResponseDto(

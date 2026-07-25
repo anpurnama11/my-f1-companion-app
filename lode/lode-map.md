@@ -39,7 +39,7 @@ lode/
       03-schedule-tab-and-round-detail.md       # shipped — Schedule + two-mode Round detail + SessionResult/hybrid results
       04-leaderboard-and-driver-team-detail.md  # shipped — leaderboard + driver/team detail
       05-my-team-tab-and-favorites-picker.md    # shipped — My Team slots + bottom-sheet picker
-      06-circuit-detail.md                      # ready — blocked by 02,03
+      06-circuit-detail.md                      # shipped — Circuit detail page (most-wins + metadata, ticket 06, 2026-07-25)
       07-countdown-widget.md                    # ready — blocked by 02,03
       08-enrichments-headshots-and-team-imagery.md # ready — pending 04/05; Homepage §3 rows exist
       09-testing-cut.md                         # partial — shipped-slice unit/lifecycle coverage; widget reducer/full instrumentation remain
@@ -48,6 +48,8 @@ lode/
     build-and-signing.md           # release buildType, signing, R8 (AGP 9 DSL), versioning, output (ticket 15)
   widget/
     countdown.md                   # CountdownWidget, CountdownWorker, NextRaceCache
+  tooling/
+    pi-usage.md                    # pi session token/cost aggregation and provider→model report
   wayfinder/
     f1app/
       map.md                         # destination spec + scope + fog patches (v1 spec + v1 polish)

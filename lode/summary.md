@@ -11,7 +11,9 @@ a P1/P2/P3 podium cell with per-row retry).
 Round detail page (`Route.RoundDetail`) switches between upcoming mode
 (race-weekend schedule + circuit stats) and past mode (per-session result rows);
 tapping **Results** pushes `Route.SessionResult` for a full session result list.
-The circuit block links to `CircuitDetail`. Four bottom tabs
+The circuit block links to `CircuitDetail` (shipped in ticket 06 as
+two independently-failing sections: f1api.dev metadata + jolpica
+most-wins aggregation). Four bottom tabs
 (Homepage, Schedule, Leaderboard, My Team); Leaderboard has Drivers and
 Constructors sub-tabs and drills into Driver and Constructor detail pages,
 while My Team manages two favorite drivers and one favorite constructor through

@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.anpurnama.f1_app.feature.homepage.HomepageScreen
+import com.anpurnama.f1_app.feature.circuit.CircuitScreen
 import com.anpurnama.f1_app.feature.driver.DriverScreen
 import com.anpurnama.f1_app.feature.leaderboard.LeaderboardScreen
 import com.anpurnama.f1_app.feature.myteam.MyTeamScreen
@@ -64,7 +65,7 @@ fun NavShell() {
             )
         }
         entry<Route.MyTeam> { MyTeamScreen() }
-        entry<Route.CircuitDetail> { PlaceholderScreen("Circuit") }
+        entry<Route.CircuitDetail> { key -> CircuitScreen(circuitId = key.circuitId) }
         entry<Route.RoundDetail> { key ->
             RoundScreen(
                 year = key.year,

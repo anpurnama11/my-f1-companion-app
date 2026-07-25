@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.anpurnama.f1_app.core.network.HttpClientFactory
 import com.anpurnama.f1_app.feature.favorites.FavoritesCache
+import com.anpurnama.f1_app.f1.GetCircuitMostWinsUseCase
+import com.anpurnama.f1_app.f1.GetCircuitUseCase
 import com.anpurnama.f1_app.f1.GetConstructorsStandingsUseCase
 import com.anpurnama.f1_app.f1.GetDriverDetailUseCase
 import com.anpurnama.f1_app.f1.GetDriversStandingsUseCase
@@ -58,6 +60,8 @@ class Wiring(context: Context) {
         getSprintQualifying = getSprintQualifyingResult,
     )
     val getFastestPitstop: GetFastestPitstopUseCase = GetFastestPitstopUseCase(httpClient)
+    val getCircuit: GetCircuitUseCase = GetCircuitUseCase(httpClient)
+    val getCircuitMostWins: GetCircuitMostWinsUseCase = GetCircuitMostWinsUseCase(httpClient)
 
     val favoritesCache: FavoritesCache = FavoritesCache(
         PreferenceDataStoreFactory.create {

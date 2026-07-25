@@ -40,7 +40,7 @@ with parameters that the deserializer reads from `data` on the intent / deeplink
 | `Route.DriverDetail(driverId)` | `data class` | `DriverScreen` | [BUILT] ticket 04 |
 | `Route.TeamDetail(teamId)` | `data class` | `TeamScreen` | [BUILT] ticket 04 |
 | `Route.RoundDetail(year, round)` | `data class` | — | ticket 03 |
-| `Route.CircuitDetail(circuitId)` | `data class` | — | ticket 06 |
+| `Route.CircuitDetail(circuitId)` | `data class` | `CircuitScreen` | [BUILT] ticket 06 |
 
 ## Nav 3 1.1.4 surface used
 

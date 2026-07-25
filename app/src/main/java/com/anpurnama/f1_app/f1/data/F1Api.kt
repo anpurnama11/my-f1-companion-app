@@ -190,3 +190,61 @@ suspend fun HttpClient.getRoundQualifying(
     }
     return response.body()
 }
+
+/**
+ * Per-circuit metadata from f1api.dev. Distinct from the `Circuit` block
+ * inlined on `/current*` responses: this endpoint returns a
+ * one-element `circuit: [...]` array and carries the all-time lap record
+ * with attribution (`lapRecord` + `fastestLapDriverId/TeamId/Year`) plus
+ * `firstParticipationYear`. `circuitLength` is an Int in **meters** (not
+ * the `"<N>km"` string form). Drives the Circuit detail page.
+ */
+suspend fun HttpClient.getCircuit(
+    f1apiCircuitId: String,
+    forceRefresh: Boolean = false,
+): CircuitDetailResponseDto {
+    val response = get("$F1API_BASE/circuits/$f1apiCircuitId") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+/**
+ * Per-circuit P1 results from jolpica. The endpoint path
+ * `/circuits/{id}/results/1.json` filters to P1 per race; the
+ * aggregation (top driver / top team) is client-side. Server cache is
+ * `max-age=3600` (1h) — Ktor HttpCache covers re-opens.
+ *
+ * **ID translation:** f1api.dev and jolpica use different `circuitId`
+ * values for 5 of 24 inlined circuits (see
+ * `lode/wayfinder/f1app/circuit-most-wins-api-wrangling.md`). The
+ * private map below translates f1api.dev's id to jolpica's at call
+ * time; ids not in the map are passed through unchanged (the 19/24
+ * match is direct). f1api.dev remains the public `circuitId`
+ * everywhere else in the app — the jolpica form never escapes this
+ * extension.
+ */
+suspend fun HttpClient.getCircuitWinners(
+    f1apiCircuitId: String,
+    forceRefresh: Boolean = false,
+): CircuitWinnersResponseDto {
+    val jolpicaCircuitId = F1API_TO_JOLPICA_CIRCUIT[f1apiCircuitId] ?: f1apiCircuitId
+    val response = get("$JOLPICA_BASE/circuits/$jolpicaCircuitId/results/1.json") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+/**
+ * 5-entry f1api.dev → jolpica `circuitId` translation. Stable, not
+ * data-driven; lives as a private detail of the jolpica adapter. See
+ * `lode/wayfinder/f1app/circuit-most-wins-api-wrangling.md` for the
+ * full 19/24 namespace match table and the per-circuit race counts.
+ */
+private val F1API_TO_JOLPICA_CIRCUIT: Map<String, String> = mapOf(
+    "austin" to "americas",
+    "gilles_villeneuve" to "villeneuve",
+    "hermanos_rodriguez" to "rodriguez",
+    "lusail" to "losail",
+    "montmelo" to "catalunya",
+)

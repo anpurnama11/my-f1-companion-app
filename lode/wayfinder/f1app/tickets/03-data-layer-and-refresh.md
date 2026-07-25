@@ -3,6 +3,16 @@ id: 03
 title: Data layer & widget refresh strategy
 type: grilling
 status: closed
+
+> **Historical note (2026-07-25):** This ticket was closed before the
+> OpenF1 removal in shipped ticket 10 and the `CircuitDetail` page
+> landing in shipped ticket 06. The `getCircuit(id)` extension and
+> the "circuitId in `/circuits/{id}` responses" notes below remain
+> accurate to the shipped surface; the open question about
+> "TopSpeed extension" is moot (Top speed is absent from v1 per
+> ticket 10 / ADR 0009). See
+> [`lode/plans/f1app-build/tickets/06-circuit-detail.md`](../../../plans/f1app-build/tickets/06-circuit-detail.md)
+> for the shipped implementation.
 closed_by: single-source Ktor + HttpCache + one periodic WorkManager job; DataStore + HttpCache, no repo class
 blocked_by: [01, 04]
 owner: ""

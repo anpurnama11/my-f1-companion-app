@@ -53,10 +53,16 @@ Short term → meaning lines. Domain + project language.
 
 - **Tour/race/round** — an F1 race weekend. "Round" = a numbered race in a season
   (`RoundDetail(year, round)` route). "Next race" = `/current/next` endpoint from f1api.dev.
-- **CircuitDetail** — NavKey route `CircuitDetail(circuitId: String)`, opened from
-  RoundDetail's circuit block + Homepage §3's nearest-GP card. The screen home for
-  most-wins-at-circuit (Jolpica) and other circuit metadata. Top speed is not a v1
-  feature.
+- **CircuitDetail** — `[BUILT ticket 06]` `Route.CircuitDetail(circuitId: String)`,
+  the circuit detail screen (`feature/circuit/CircuitScreen.kt`). Two independently
+  failing sections per ADR 0002: **metadata** (f1api.dev `/circuits/{circuitId}`:
+  length, corners, first-GP year, all-time lap record with attribution) and
+  **most wins** (jolpica `/circuits/{id}/results/1.json` aggregated to top driver
+  + top team, with the 5-entry `F1API_TO_JOLPICA_CIRCUIT` translation map applied
+  at the network seam). The screen renders lap record + most-wins leader per row;
+  each section falls back to "—" via the shared UX family when its source is
+  unavailable. Opened from the RoundDetail circuit block. Top speed is not a v1
+  feature (cut by ticket 10 / ADR 0009).
 - **Deep link (custom scheme)** — `f1app://round/{year}/{round}` is the only deep link
   in scope. Countdown widget builds a `PendingIntent` over `Intent.ACTION_VIEW` with
   that data (args from `NextRaceCache`); `MainActivity` parses the URI into a `RoundDetail`
@@ -181,11 +187,6 @@ Short term → meaning lines. Domain + project language.
   round (e.g., pre-2024 US GP), the card is hidden. Other sessions show their
   session-specific result table (Quali/SprintQuali = Q1/Q2/Q3; Sprint = same as
   Race; FP = time-ordered fastest lap).
-- **CircuitDetail** — `[PLACEHOLDER ticket 06]` `Route.CircuitDetail(circuitId)`,
-  the circuit detail screen. Shows most successful driver and constructor at
-  this circuit with win counts, the year of the first Grand Prix held there,
-  and the race lap record time plus its driver. Reached from RoundDetail's
-  circuit card tap.
 - **RaceSchedule** — `[BUILT ticket 03]` `f1/model/Season.kt`; the
   per-session date+time block carried on `Race` from f1api.dev `/current`
   (`RaceScheduleDto`). Fields: `fp1`/`fp2`/`fp3`/`sprintQualy`/`sprintRace`/

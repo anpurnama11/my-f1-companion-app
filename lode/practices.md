@@ -21,7 +21,8 @@ tab are `[BUILT]`: `RoundScreen` derives upcoming/past mode from the race slot,
 uses the year-specific season schedule, and pushes `SessionResult`; session
 results normalize f1api.dev, Jolpica standard/alpha, and optional Jolpica
 pit-stop data through `Wiring`. Circuit artwork is a pinned F1DB build-time
-asset catalog; `CircuitDetail` remains the slice-06 placeholder.
+asset catalog; `CircuitDetail` is shipped (ticket 06) as the destination for
+the RoundDetail circuit block.
 
 My Team is `[BUILT]`: `feature/myteam/` renders the three `FavoritesCache`
 slots and uses a `ModalBottomSheet` over current standings for explicit

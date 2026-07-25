@@ -7,6 +7,15 @@ blocked_by: [01]
 owner: ""
 ---
 
+> **Historical note (2026-07-25):** The "Homepage §3 circuit card → `CircuitDetail`"
+> edge listed below was removed by shipped ticket 10 alongside the OpenF1
+> dependency. `CircuitDetail` ships in ticket 06 (closed 2026-07-25) and is
+> reached only from the RoundDetail circuit block. See
+> [`lode/terminology.md`](../../../terminology.md) for the shipped
+> `CircuitDetail` definition and `lode/plans/f1app-build/tickets/06-circuit-detail.md`
+> for the implementation ticket. The "§3 circuit card" route below is preserved
+> as written so this historical record is not silently rewritten.
+
 ## Decision
 
 Navigation 3 (locked by ticket 01). Seven nav routes, one custom-scheme deep
