@@ -20,9 +20,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.anpurnama.f1_app.F1App
@@ -122,15 +126,79 @@ private fun CircuitStatsCard(
     onClick: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Text("Circuit stats", style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold)
+        // Section divider — kept small so it doesn't compete with the
+        // card's title (the clickable area). The card itself carries the
+        // navigation affordance.
+        Text(
+            text = "Circuit stats",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // Content description = the circuit's identifying text (name +
+        // place). The onClick label carries the *action* hint separately,
+        // so TalkBack announces "Bahrain International Circuit. Sakhir,
+        // Bahrain. Button. Double tap to open circuit details" — the two
+        // phrases never duplicate. Merge-descendants stops TalkBack from
+        // also reading each text in the row.
+        val placeText = listOfNotNull(circuit.city, circuit.country)
+            .joinToString(", ")
+            .ifBlank { null }
+        val accessibleName = placeText?.let { "${circuit.name}, $it" } ?: circuit.name
         Card(
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    onClick = onClick,
+                    onClickLabel = "Open circuit details",
+                )
+                .semantics(mergeDescendants = true) {
+                    contentDescription = accessibleName
+                },
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
         ) {
-            Column(Modifier.padding(Spacing.normal), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Text(circuit.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(
+                modifier = Modifier.padding(Spacing.normal),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = circuit.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        if (placeText != null) {
+                            Text(
+                                text = placeText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    // Trailing chevron — the M3 standard affordance for a
+                    // navigable card. Unicode (not material-icons-extended)
+                    // to match the rest of the app's text-glyph iconography
+                    // (see NavShell's bottom-bar glyphs + core/navigation.md).
+                    Text(
+                        text = "›",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
                     Stat("Length", formatLength(circuit.circuitLengthRaw))
                     Stat("Laps", race?.laps?.toString() ?: "—")
                     Stat("Turns", circuit.corners?.toString() ?: "—")
