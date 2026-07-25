@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon — default (square-mask friendly).
+  - Foreground: the F1 stopwatch WebP (`drawable/ic_launcher_foreground.webp`).
+  - Background: solid Surface #0d0d0d so the launcher mask shape sits on the
+    app's dark theme without a visible "card" edge.
+  - Monochrome: stopwatch silhouette vector for Android 13+ themed icons.
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
-    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>

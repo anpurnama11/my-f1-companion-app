@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  NavigationBar icon — My Team tab.
+  Racing helmet, front view. Drawn in two halves with a horizontal visor
+  slit in the negative space between them so the visor stays readable
+  after the icon is tinted by the NavigationBarItem.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Top half: rounded helmet shell, ends at the visor line. -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12,2.25c-4.14,0 -7.5,3.36 -7.5,7.5v1.5h15v-1.5c0,-4.14 -3.36,-7.5 -7.5,-7.5z" />
+    <!-- Bottom half: chin bar + lower face, with a gap for the visor. -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M4.5,12.75v2.25a2.25,2.25 0 0 0 2.25,2.25h0.75v3a1.5,1.5 0 0 0 1.5,1.5h6a1.5,1.5 0 0 0 1.5,-1.5v-3h0.75a2.25,2.25 0 0 0 2.25,-2.25v-2.25z" />
+    <!-- Visor accent: a small F1-style mark in the upper face area. -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M10.5,7.5h3l-0.75,1.5h-1.5z" />
+</vector>

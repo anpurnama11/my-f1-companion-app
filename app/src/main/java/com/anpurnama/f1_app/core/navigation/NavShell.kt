@@ -1,19 +1,24 @@
 package com.anpurnama.f1_app.core.navigation
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import com.anpurnama.f1_app.R
 import com.anpurnama.f1_app.feature.homepage.HomepageScreen
 import com.anpurnama.f1_app.feature.circuit.CircuitScreen
 import com.anpurnama.f1_app.feature.driver.DriverScreen
@@ -111,12 +116,19 @@ private fun F1BottomBar(navigationState: NavigationState) {
                 selected = navigationState.currentRoute == dest.route,
                 onClick = { navigationState.selectTab(dest.route) },
                 icon = {
-                    Text(
-                        text = dest.glyph,
-                        style = MaterialTheme.typography.titleMedium,
+                    Icon(
+                        painter = painterResource(dest.iconRes),
+                        contentDescription = dest.label,
                     )
                 },
                 label = { Text(dest.label) },
+                colors = NavigationBarItemDefaults.colors(
+                    // Selected tab picks up the F1 primary orange so the
+                    // current tab reads as "live" against the dark surface.
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                ),
             )
         }
     }
@@ -125,12 +137,12 @@ private fun F1BottomBar(navigationState: NavigationState) {
 private enum class TopLevelDestination(
     val route: Route,
     val label: String,
-    val glyph: String,
+    @DrawableRes val iconRes: Int,
 ) {
-    Homepage(Route.Homepage, "Home", "H"),
-    Schedule(Route.Schedule, "Schedule", "S"),
-    Leaderboard(Route.Leaderboard, "Leaderboard", "L"),
-    MyTeam(Route.MyTeam, "My Team", "M"),
+    Homepage(Route.Homepage, "Home", R.drawable.ic_home_outline),
+    Schedule(Route.Schedule, "Schedule", R.drawable.ic_schedule_outline),
+    Leaderboard(Route.Leaderboard, "Leaderboard", R.drawable.ic_leaderboard_outline),
+    MyTeam(Route.MyTeam, "My Team", R.drawable.ic_myteam_outline),
 }
 
 @Composable
