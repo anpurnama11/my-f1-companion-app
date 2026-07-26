@@ -33,7 +33,9 @@ pushes `Route.RoundDetail` onto the Homepage backstack.
 
 Data from f1api.dev primary, Jolpica standard for race status/grid and
 pit-stop enrichment, and Jolpica alpha for sprint sessions. Circuit artwork
-is bundled from a pinned F1DB revision; no runtime artwork service is used.
+is bundled from a pinned F1DB revision; 2026+ driver headshots and team/car
+renders load from formula1.com Cloudinary paths derived locally from f1api.dev
+name/team fields.
 Manual `Wiring` DI, MVVM
 init-less, sealed `Outcome<T>`/`SectionUiState<T>` with shared `OutcomeContent`
 renderer (ADR 0002). Single `:app` module; KMP `:shared` extraction deferred.

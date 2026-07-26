@@ -60,10 +60,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.res.painterResource
+import coil3.compose.AsyncImage
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.ui.OutcomeContent
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.feature.favorites.Favorites
+import com.anpurnama.f1_app.f1.data.Seasons.currentSeasonYear
+import com.anpurnama.f1_app.f1.data.driverImageUrl
+import com.anpurnama.f1_app.f1.data.teamImageUrl
 import com.anpurnama.f1_app.f1.model.ConstructorStanding
 import com.anpurnama.f1_app.f1.model.DriverStanding
 import com.anpurnama.f1_app.f1.model.NextRace
@@ -239,6 +243,8 @@ internal fun FavoritesSection(
                     ?: driver1Id?.let { "Selected driver is not in current standings" },
                 teamId = driver1?.teamId,
                 accentTag = "favorite-accent-driver-1",
+                driverName = driver1?.name,
+                driverSurname = driver1?.surname,
             )
             FavoriteEntry(
                 slot = "Driver 2",
@@ -248,6 +254,8 @@ internal fun FavoritesSection(
                     ?: driver2Id?.let { "Selected driver is not in current standings" },
                 teamId = driver2?.teamId,
                 accentTag = "favorite-accent-driver-2",
+                driverName = driver2?.name,
+                driverSurname = driver2?.surname,
             )
             FavoriteEntry(
                 slot = "Constructor",
@@ -269,8 +277,20 @@ private fun FavoriteEntry(
     detail: String?,
     teamId: String?,
     accentTag: String,
+    driverName: String? = null,
+    driverSurname: String? = null,
 ) {
     val accent = teamId?.let(com.anpurnama.f1_app.ui.theme.TeamColors::forId)
+    val year = currentSeasonYear()
+    val imageUrl = if (teamId == null) {
+        null
+    } else if (driverName != null && driverSurname != null) {
+        // Driver row: headshot.
+        driverImageUrl(driverName, driverSurname, teamId, year)
+    } else {
+        // Team row: car render.
+        teamImageUrl(teamId, year)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -279,13 +299,28 @@ private fun FavoriteEntry(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (accent != null && accent != Color.Unspecified) {
+            // The accent tag covers the visual identity surface: it's
+            // the AsyncImage when the CDN has an asset, the swatch
+            // when the URL is null (e.g. year < 2026), and absent
+            // entirely when the teamId is unknown. The
+            // `unknownTeam_omitsAccentBar` androidTest pins the
+            // unknown-team absence case.
             Box(
                 modifier = Modifier
                     .testTag(accentTag)
-                    .width(6.dp)
-                    .height(64.dp)
+                    .size(64.dp)
                     .background(accent),
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                if (imageUrl != null) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+            }
         }
         Column(
             modifier = Modifier

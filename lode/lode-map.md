@@ -47,7 +47,7 @@ lode/
       05-my-team-tab-and-favorites-picker.md    # shipped — My Team slots + bottom-sheet picker
       06-circuit-detail.md                      # shipped — Circuit detail page (most-wins + metadata, ticket 06, 2026-07-25)
       07-countdown-widget.md                    # shipped — Countdown widget (Glance + worker + deep link, ticket 07, 2026-07-25)
-      08-enrichments-headshots-and-team-imagery.md # ready — pending 04/05; Homepage §3 rows exist
+      08-imagery.md                            # shipped — driver headshots + team / car imagery (Cloudinary formula1.com, 2026+); driverRef derived from name+last surname token (no map)
       09-testing-cut.md                         # partial — shipped-slice unit/lifecycle coverage; widget reducer/full instrumentation remain
       10-remove-openf1-runtime-dependency.md   # shipped — f1api/Jolpica/local F1DB artwork source cut
     11-favorites-on-homepage.md              # ready — fold My Team content into Homepage §3 (wayfinder 24, ADR 0010)
@@ -76,7 +76,7 @@ lode/
         10-research-past-list-podium.md  # closed (research; full-podium via per-row /race) — see past-list.md
         11-research-openf1-join-all-time-top-speed.md  # closed (research; date-match join + latest-peak semantics)
         12-design-favorites-picker-ux-storage.md      # closed (re-opened then closed 2027-01-11; favorites picker UX + storage human-locked)
-        13-additive-ui-enrichments.md               # OPEN (grilling — which ship, on which surfaces; 4 candidates: headshots, weather, race-control, team imagery)
+        13-additive-ui-enrichments.md               # closed (planning — code lives in build 08; headshots parked for human A/B/C pick)
         14-testing-scope.md                          # closed (strategy: pure mappings + VM transitions + MockEngine; Compose UI + macrobenchmark deferred to 15)
         15-release-signing-r8.md                    # closed (release build: PKCS12 keystore in ~/.android, signingConfigs from git-ignored keystore.properties, optimization.enable=true + android.r8.gradual.support; versionCode 1/versionName "1.0.0"; sideload APK; macrobenchmark rung folded in)
         16-team-accent-source.md                    # closed (research; TeamColors.forId hardcoded map for v1, Jolpica alpha migration noted) — see team-accent.md
@@ -97,6 +97,7 @@ lode/
       f1db-data.md                     # F1DB coverage for Driver of the Day and fastest laps
       team-imagery.md                  # formula1.com CDN: two systems, slug maps, car/team renders (ticket 13 enrichment #4)
       team-accent.md                   # TeamColors.forId hardcoded map: which API has it, why hardcoded v1, Jolpica alpha migration (ticket 16)
+      cloudinary-headshot-paths.md     # driverRef = {name3}{last-surname-token3}01 — pure function, no map, no OpenF1; rules out option C, reframes option B as D (ticket 08 parked)
   tmp/                               # git-ignored session scraps
 ```
 

@@ -16,7 +16,10 @@ data class NextRace(
 // top-2 by the position field. `driverName` is the long form
 // ("Lewis Hamilton"); `driverShortName` is the F1 broadcast short
 // ("HAM"). `points` and `wins` ride along for any future use; not surfaced
-// on §1.
+// on §1. `name` + `surname` are the split f1api.dev fields, kept so
+// the Cloudinary headshot slug (ticket 08) can be derived without a
+// second API call; may be null if the API ever emits a row with
+// only `shortName` set.
 data class DriverStanding(
     val driverId: String,
     val teamId: String,
@@ -27,6 +30,8 @@ data class DriverStanding(
     val driverShortName: String?,
     val driverNumber: Int?,
     val teamName: String? = null,
+    val name: String? = null,
+    val surname: String? = null,
 )
 
 // Constructors' championship row. Used by the first-launch default seed to

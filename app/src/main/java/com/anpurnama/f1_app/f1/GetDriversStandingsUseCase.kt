@@ -43,5 +43,7 @@ internal fun DriversChampionshipResponseDto.toDriverStandings(): List<DriverStan
             driverShortName = entry.driver.shortName,
             driverNumber = entry.driver.number,
             teamName = entry.team.teamName,
+            name = entry.driver.name,
+            surname = entry.driver.surname,
         )
     }

@@ -20,10 +20,11 @@ DriverScreen(driverId = key.driverId)
 // ViewModel seam: suspend (String, Boolean) -> Outcome<DriverDetail>
 ```
 
-Both detail surfaces use `TeamColors.forId(teamId)` as the temporary swatch:
-the driver hero says “Headshot unavailable” and the team hero says “Car image
-unavailable”. Imagery is intentionally deferred to
-[`08-enrichments-headshots-and-team-imagery.md`](../plans/f1app-build/tickets/08-enrichments-headshots-and-team-imagery.md).
+Both detail surfaces render Cloudinary formula1.com imagery for the current
+season: `DriverScreen` builds a `driverImageUrl()` headshot from the driver's
+name + last surname token, and `TeamScreen` builds a `teamImageUrl()` car
+render from `teamId`. If the URL cannot be derived, the hero falls back to the
+existing `TeamColors.forId(teamId)` swatch treatment.
 
 ```mermaid
 flowchart LR

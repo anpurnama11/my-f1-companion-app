@@ -31,21 +31,22 @@ beats feature parity with the official app for a casual fan who only needs
 ## Operating Context
 
 Used on a phone (`minSdk 24`, `targetSdk 37`) plus the phone's home screen via
-the Glance widget. Race weekends (Fri–Sun, plus Saturday for sprint weekends)
+the Glance widget. Three bottom tabs: Homepage, Schedule, Leaderboard.
+Race weekends (Fri–Sun, plus Saturday for sprint weekends)
 are the peak usage window; off-season is dead air. The user checks the widget
 for "is it time?" and opens the app for details only when needed.
 
 ## Capabilities and Constraints
 
-Built: next-session countdown (Homepage §1, Glance widget); Schedule
-(Upcoming + Past with per-row podium retry); Round detail (upcoming + past
-modes, 5-session weekend, Results push); Session results (Race / Quali /
+Built: next-session countdown (Homepage §1); Glance countdown widget;
+Schedule (Upcoming + Past with per-row podium retry); Round detail (upcoming +
+past modes, 5-session weekend, Results push); Session results (Race / Quali /
 Sprint / SQuali / FP); Homepage §2 season aggregates; combined favorites card
-(Homepage §3); deep link `f1app://round/{year}/{round}` from widget.
+(Homepage §3); Circuit Detail (ticket 06); 2026+ Cloudinary driver headshots
+and team/car imagery (ticket 08); deep link `f1app://round/{year}/{round}` from widget.
 
-Queued for v1: Circuit Detail (06), additive enrichments (08 —
-headshots/weather/race-control/team-imagery, scope being grilled per ticket
-13). Leaderboard and My Team are built.
+Queued for v1: favorites management folded into Homepage §3 (ticket 11,
+ready). Leaderboard is built.
 
 Confirmed technical constraints (not product): single `:app` module; manual
 Wiring DI; MVVM init-less; sealed `Outcome<T>` → `SectionUiState<T>`;
@@ -75,7 +76,8 @@ M3 defaults.
 ## Evidence on Hand
 
 F1 data is fetched live from f1api.dev and jolpica. Circuit artwork is bundled
-from a pinned F1DB revision; no runtime image service is used. No synthetic
+from a pinned F1DB revision; driver/team imagery loads from the pinned
+formula1.com Cloudinary tree for 2026+ seasons. No synthetic
 fixtures; no fabricated driver/team stats; no invented testimonials or
 benchmarks. Design source for the theme: `~/Downloads/boxbox-club-DESIGN.md`
 (lives outside the repo), transcribed into `lode/design-system/theme.md`.
@@ -97,7 +99,7 @@ data, no telemetry, no accounts.
    stats, or fabricated benchmarks. F1app's edge is one well-built thing, not
    feature parity with the official F1 app.
 5. **Ship the queued tickets before adding new surface area** — v1 closes
-   04 / 05 / 06 / 08. No new surfaces until those are done.
+   11. No new surfaces until that is done.
 
 ## Accessibility & Inclusion
 

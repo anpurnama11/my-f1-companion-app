@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -36,9 +37,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.ui.OutcomeContent
 import com.anpurnama.f1_app.core.ui.SectionUiState
+import com.anpurnama.f1_app.f1.data.Seasons
+import com.anpurnama.f1_app.f1.data.driverImageUrl
+import com.anpurnama.f1_app.f1.data.teamImageUrl
 import com.anpurnama.f1_app.f1.model.ConstructorStanding
 import com.anpurnama.f1_app.f1.model.DriverStanding
 import com.anpurnama.f1_app.feature.favorites.Favorites
@@ -103,6 +108,8 @@ internal fun MyTeamContent(
                     detail = driverDetail(favorites.driver1Id, drivers),
                     teamId = driverTeamId(favorites.driver1Id, drivers),
                     onClick = { pickerSlot = PickerSlot.Driver1 },
+                    driverName = driverStanding(favorites.driver1Id, drivers)?.name,
+                    driverSurname = driverStanding(favorites.driver1Id, drivers)?.surname,
                 )
                 FavoriteSlotCard(
                     label = "Driver 2",
@@ -111,6 +118,8 @@ internal fun MyTeamContent(
                     detail = driverDetail(favorites.driver2Id, drivers),
                     teamId = driverTeamId(favorites.driver2Id, drivers),
                     onClick = { pickerSlot = PickerSlot.Driver2 },
+                    driverName = driverStanding(favorites.driver2Id, drivers)?.name,
+                    driverSurname = driverStanding(favorites.driver2Id, drivers)?.surname,
                 )
                 FavoriteSlotCard(
                     label = "Constructor",
@@ -165,6 +174,8 @@ private fun FavoriteSlotCard(
     detail: String?,
     teamId: String?,
     onClick: () -> Unit,
+    driverName: String? = null,
+    driverSurname: String? = null,
 ) {
     Card(
         modifier = Modifier
@@ -191,13 +202,30 @@ private fun FavoriteSlotCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val accent = teamId?.let(TeamColors::forId)
+            val year = Seasons.currentSeasonYear()
+            val imageUrl = if (teamId == null) {
+                null
+            } else if (driverName != null && driverSurname != null) {
+                driverImageUrl(driverName, driverSurname, teamId, year)
+            } else {
+                teamImageUrl(teamId, year)
+            }
             if (accent != null && accent != Color.Unspecified) {
                 Box(
                     modifier = Modifier
-                        .width(6.dp)
-                        .heightIn(min = 48.dp)
+                        .size(64.dp)
                         .background(accent),
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (imageUrl != null) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
+                }
             }
             Column(
                 modifier = Modifier.weight(1f),
@@ -375,6 +403,9 @@ private fun driverDetail(id: String?, drivers: List<DriverStanding>): String? =
 
 private fun driverTeamId(id: String?, drivers: List<DriverStanding>): String? =
     drivers.firstOrNull { it.driverId == id }?.teamId
+
+private fun driverStanding(id: String?, drivers: List<DriverStanding>): DriverStanding? =
+    drivers.firstOrNull { it.driverId == id }
 
 private fun constructorName(id: String?, constructors: List<ConstructorStanding>): String = when {
     id == null -> "Add a constructor"

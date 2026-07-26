@@ -23,14 +23,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.ui.OutcomeContent
 import com.anpurnama.f1_app.core.ui.SectionUiState
+import com.anpurnama.f1_app.f1.data.Seasons.currentSeasonYear
+import com.anpurnama.f1_app.f1.data.driverImageUrl
 import com.anpurnama.f1_app.f1.model.DriverDetail
 import com.anpurnama.f1_app.ui.theme.Spacing
 import com.anpurnama.f1_app.ui.theme.TeamColors
@@ -66,6 +70,13 @@ fun DriverScreen(
 private fun DriverContent(detail: DriverDetail, onTeamClick: (String) -> Unit) {
     val accent = TeamColors.forId(detail.teamId).takeIf { it != Color.Unspecified }
         ?: MaterialTheme.colorScheme.surfaceContainerHigh
+    val (namePart, surnamePart) = splitName(detail.name)
+    val imageUrl = driverImageUrl(
+        name = namePart,
+        surname = surnamePart,
+        teamId = detail.teamId,
+        year = currentSeasonYear(),
+    )
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(
@@ -75,7 +86,20 @@ private fun DriverContent(detail: DriverDetail, onTeamClick: (String) -> Unit) {
                     .background(accent),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Headshot unavailable", color = MaterialTheme.colorScheme.onSurface)
+                if (imageUrl != null) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = "${detail.name} headshot",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                } else {
+                    Text(
+                        text = detail.shortName ?: detail.name,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
             Column(
                 modifier = Modifier
@@ -100,6 +124,23 @@ private fun DriverContent(detail: DriverDetail, onTeamClick: (String) -> Unit) {
     }
     Text("Standings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
     StandingSnapshot(detail)
+}
+
+/**
+ * Split a `DriverDetail.name` ("Andrea Kimi Antonelli", "Lewis Hamilton",
+ * "Sergio Pérez") into the (name, surname) pair the Cloudinary slug
+ * math needs. First token is the name, the rest is the surname (the
+ * `name` DTO field on f1api.dev is the first name; the `surname` DTO
+ * field is everything else — this matches the mapper in
+ * `GetDriverDetailUseCase`).
+ */
+private fun splitName(full: String): Pair<String, String> {
+    val parts = full.trim().split(" ", limit = 2)
+    return when (parts.size) {
+        0 -> "" to ""
+        1 -> parts[0] to ""
+        else -> parts[0] to parts[1]
+    }
 }
 
 @Composable

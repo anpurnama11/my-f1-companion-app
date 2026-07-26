@@ -22,14 +22,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.ui.OutcomeContent
 import com.anpurnama.f1_app.core.ui.SectionUiState
+import com.anpurnama.f1_app.f1.data.Seasons.currentSeasonYear
+import com.anpurnama.f1_app.f1.data.teamImageUrl
 import com.anpurnama.f1_app.f1.model.TeamDetail
 import com.anpurnama.f1_app.ui.theme.Spacing
 import com.anpurnama.f1_app.ui.theme.TeamColors
@@ -64,6 +68,7 @@ fun TeamScreen(
 private fun TeamContent(detail: TeamDetail) {
     val accent = TeamColors.forId(detail.teamId).takeIf { it != Color.Unspecified }
         ?: MaterialTheme.colorScheme.surfaceContainerHigh
+    val imageUrl = teamImageUrl(detail.teamId, currentSeasonYear())
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -71,7 +76,16 @@ private fun TeamContent(detail: TeamDetail) {
             .background(accent),
         contentAlignment = Alignment.Center,
     ) {
-        Text("Car image unavailable", color = MaterialTheme.colorScheme.onSurface)
+        if (imageUrl != null) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "${detail.wordmark} car render",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+            )
+        } else {
+            Text("Car image unavailable", color = MaterialTheme.colorScheme.onSurface)
+        }
     }
     Text(detail.wordmark, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     detail.country?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
