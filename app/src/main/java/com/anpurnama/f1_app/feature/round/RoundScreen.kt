@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.datetime.Clock
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.f1.model.Circuit
@@ -37,6 +38,7 @@ import com.anpurnama.f1_app.f1.model.Race
 import com.anpurnama.f1_app.f1.model.RoundMode
 import com.anpurnama.f1_app.f1.model.ScheduledSession
 import com.anpurnama.f1_app.f1.model.SessionType
+import com.anpurnama.f1_app.f1.model.sessionResultMayBeAvailable
 import com.anpurnama.f1_app.f1.model.toDeviceLocalLabel
 import com.anpurnama.f1_app.ui.theme.Spacing
 
@@ -231,7 +233,16 @@ private fun UpcomingWeekend(
         if (sessions.isEmpty()) {
             Text("Weekend schedule unavailable", color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            sessions.forEach { WeekendSessionRow(it, showAction = false, year, round, onSessionResultClick) }
+            val now = Clock.System.now()
+            sessions.forEach {
+                WeekendSessionRow(
+                    it,
+                    showAction = sessionResultMayBeAvailable(it.type, it.slot, now),
+                    year = year,
+                    round = round,
+                    onSessionResultClick = onSessionResultClick,
+                )
+            }
         }
     }
 }

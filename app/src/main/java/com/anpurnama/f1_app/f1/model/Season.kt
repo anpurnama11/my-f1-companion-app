@@ -103,3 +103,45 @@ fun roundMode(race: Race, now: Instant = Clock.System.now()): RoundMode {
         else -> RoundMode.Past
     }
 }
+
+/**
+ * Per-session-type delay (in hours) after a session's scheduled UTC start
+ * before its **Results** button is offered in `UpcomingWeekend`. See ADR 0015.
+ *
+ * Race is intentionally absent: the race row is gated by [roundMode] (the
+ * page flips to `Past` at race start), not this helper.
+ */
+private val sessionResultBufferHours: Map<SessionType, Int> = mapOf(
+    SessionType.FP1 to 6,
+    SessionType.FP2 to 6,
+    SessionType.FP3 to 6,
+    SessionType.SprintQuali to 6,
+    SessionType.Sprint to 6,
+    SessionType.Quali to 12,
+)
+
+/**
+ * Heuristic controlling whether the **Results** button is shown for a
+ * session row while the round is still in `Upcoming` mode (ADR 0015).
+ *
+ * Returns `true` only when the session's scheduled UTC start has passed by
+ * at least the per-session-type buffer (6h for practices/sprint, 12h for
+ * qualifying). The race row returns `false` — [roundMode] owns the race.
+ *
+ * Null-safe: a missing or unparseable slot ([SessionSlot.toInstantOrNull]
+ * null) returns `false` (no button), since `roundMode` only proves the
+ * race slot is present, not that FP/quali slots are populated.
+ *
+ * This is a heuristic, not an authoritative check. Tap reuses the existing
+ * `Route.SessionResult` fetch, which owns empty/error states when the API
+ * has not posted results yet.
+ */
+fun sessionResultMayBeAvailable(
+    session: SessionType,
+    slot: SessionSlot,
+    now: Instant = Clock.System.now(),
+): Boolean {
+    val bufferHours = sessionResultBufferHours[session] ?: return false
+    val start = slot.toInstantOrNull() ?: return false
+    return now.epochSeconds >= start.epochSeconds + bufferHours * 3600L
+}
