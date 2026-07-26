@@ -2,12 +2,14 @@
 
 ## Destination
 
-F1app v1 spec + v1 polish, every decision a build session needs is locked. Tickets
-01–15 are the v1 spec (closed); tickets 16+ are the v1 polish pass — the
-post-critique decisions, team-accent source, §3 favorites shape, and minor-observation
-graduation. The map is done when (a) every critique P0/P1 has a locked decision,
-(b) every minor-observation item has a graduated execution ticket, and (c) no
-design decision in the codebase is unrecorded.
+F1app v1 spec + v1 polish + GAP-F detail-page redesign. Tickets 01–15 are the v1
+spec (closed); tickets 16–24 are the v1 polish pass (closed); ticket 25 is parked
+(News RSS — v2). Tickets 26–29 are the GAP-F detail-page redesign — all four
+closed (research 26, planning for F1DB catalog 27, planning for Wikipedia REST 28,
+planning for the UI rewrite 29). The map is done when (a) every critique P0/P1 has
+a locked decision, (b) every minor-observation item has a graduated execution
+ticket, (c) the GAP-F detail-page work is fully ticketed in both wayfinder and
+plans, and (d) no design decision in the codebase is unrecorded.
 
 > **Build vs decide.** Wayfinder plans; building is downstream of the map. A `closed`
 > ticket here means the *planning decision* is locked — it says nothing about whether the
@@ -113,10 +115,35 @@ design decision in the codebase is unrecorded.
 - [Remaining minor observations batch](tickets/22-remaining-minor-observations.md) — completed
   the v1 polish pass: combined favorites card, honest loading/error states, live/completion
   indicators, tappable semantics, and the completed/upcoming schedule fixture.
+- [GAP-F research — DriverDetail/TeamDetail redesign data sources](tickets/26-research-gap-f-detail-redesign.md) —
+  F1DB build-time for stats + team facts (chassis/PU/base country); Wikipedia REST for
+  "About" (CC BY-SA); bar chart + base city + team principal dropped; all-time = race-only
+  (sprint rounds filtered). Detail: [driver-team-detail.md](driver-team-detail.md) +
+  [api-wrangling](driver-team-detail-api-wrangling.md).
+- [F1DB driver + constructor + team-facts import](tickets/27-f1db-driver-constructor-import.md) —
+  planned as [build ticket 12](../plans/f1app-build/tickets/12-f1db-driver-constructor-catalog-import.md):
+  sister Python script (not extension) + separate F1DB pin (`tools/f1db/catalog-revision.txt` at
+  v2026.10.1) + three `object` catalogs at `app/src/main/java/com/anpurnama/f1_app/f1/data/`.
+  Race-only counts via `races-race-results.json` (NOT the `total*` fields on
+  `f1db-drivers.json`, which include sprint). DNF = `reasonRetired != null AND
+  positionNumber == null` — the strict rule is required to hit the "Antonelli 2026: 1 DNF"
+  acceptance (R9 Spin is classified at position 14, NOT a DNF). Acceptance gate: script
+  prints and asserts the Antonelli 2026 + Mercedes 2026 lines before writing any file.
+- [DriverDetail / TeamDetail UI rewrite](tickets/29-driver-team-detail-ui-rewrite.md) —
+  four sub-decisions locked: Compare card (DriverDetail only) = vs teammate per
+  [ADR 0013](../decisions/0013-compare-card-vs-teammate.md); tab interaction =
+  `SecondaryTabRow` + `HorizontalPager` (Leaderboard precedent); "About" section
+  = bottom-placed inline; loading/error = `OutcomeContent` pattern. Implementation
+  contract: [build ticket 14](../plans/f1app-build/tickets/14-driver-team-detail-ui-rewrite.md).
+  Data layer (F1DB catalog from build 12 + Wikipedia REST from build 13) is already shipped.
 
 ## Not yet specified
 
-- No remaining fog for the current F1app destination.
+<!-- see "Fog of war": in-scope fog you can't ticket yet; graduates as the frontier advances -->
+
+None. The GAP-F detail-page work is fully ticketed (26 + 27 + 28 + 29 all closed;
+build 12 + 13 shipped; build 14 ready). The map is done pending build 14.
+
 ## Out of scope
 
 - **Feeders (F2 / F3 / F1 Academy)** — no free API. User ruled out: "if it's not covered

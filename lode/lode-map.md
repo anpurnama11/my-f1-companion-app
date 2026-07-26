@@ -38,6 +38,8 @@ lode/
     0009-remove-openf1-runtime-dependency.md  # OpenF1 removed; f1api/Jolpica/local F1DB artwork; top speed absent from v1 (ticket 10)
     0010-my-team-content-into-homepage-§3.md  # Variant A wins; no separate My Team tab; §3 is the management surface (ticket 24, build 11)
     0011-countdown-widget-cache-narrow-to-racestart.md  # Widget cache stores only raceStartMillis; pre-race window is a fixed 3d buffer, not cached FP1 (ticket 07)
+    0012-gap-f-detail-page-data-sources.md       # GAP-F data sources: F1DB build-time + Wikipedia REST (ticket 26)
+    0013-compare-card-vs-teammate.md         # Compare card on DriverDetail = vs teammate; rejected: vs another driver = dropped Driver Comparison feature (ticket 29)
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)
@@ -51,6 +53,9 @@ lode/
       09-testing-cut.md                         # partial — shipped-slice unit/lifecycle coverage; widget reducer/full instrumentation remain
       10-remove-openf1-runtime-dependency.md   # shipped — f1api/Jolpica/local F1DB artwork source cut
     11-favorites-on-homepage.md              # ready — fold My Team content into Homepage §3 (wayfinder 24, ADR 0010)
+    12-f1db-driver-constructor-catalog-import.md  # ready — F1DB driver/constructor/team-facts catalog import (wayfinder 27, ADR 0012; sister script; three `object` catalogs under f1/data)
+    13-wikipedia-rest-extension.md           # ready — Wikipedia REST `getWikipediaSummary` extension + DTO + User-Agent + HttpCache (wayfinder 28, ADR 0012)
+    14-driver-team-detail-ui-rewrite.md     # ready — DriverDetail/TeamDetail UI rewrite (two tabs, Compare card vs teammate, About section); consumes F1DB catalog (12) + Wikipedia REST (13) in one use case update (wayfinder 29, ADR 0012 + ADR 0013)
   release/
     build-and-signing.md           # release buildType, signing, R8 (AGP 9 DSL), versioning, output (ticket 15)
   widget/
@@ -89,12 +94,18 @@ lode/
         23-default-predictive-back.md                # closed (default Android/Navigation 3 behavior; no custom handler or animation)
         24-favorites-on-homepage.md                  # closed (variant A wins; no separate My Team tab; see ADR 0010 + build 11)
         25-news-rss.md                                 # parked — RSS news tab replaces My Team (post-v1); see lode/news/summary.md
+        26-research-gap-f-detail-redesign.md     # closed — GAP-F research; F1DB + Wikipedia + dropped fields
+        27-f1db-driver-constructor-import.md     # closed — F1DB driver/constructor/team-facts import → build 12 (ticket 26)
+        28-wikipedia-rest-extension.md            # closed — Wikipedia REST extension; `getWikipediaSummary()` + User-Agent + HttpCache (build 13)
+        29-driver-team-detail-ui-rewrite.md       # closed — UI rewrite for the redesign (ticket 26, blocked on 27, 28); 4 sub-decisions locked; produced build 14 + ADR 0013
       top-speed.md                     # top-speed/fastest-lap stat source + cost (ticket 08)
       top-speed-api-wrangling.md       # API wrangling detail for the top-speed stat (ticket 08)
       circuit-most-wins.md             # most-wins-at-circuit stat source + cost (ticket 09)
       circuit-most-wins-api-wrangling.md  # API wrangling detail for the most-wins-at-circuit stat (ticket 09)
       openf1-removal.md                # accepted runtime source replacement plan (ADR 0009)
       f1db-data.md                     # F1DB coverage for Driver of the Day and fastest laps
+      driver-team-detail.md            # GAP-F research — DriverDetail/TeamDetail redesign data sources (F1DB + Wikipedia + hardcoded facts)
+      driver-team-detail-api-wrangling.md  # GAP-F API wrangling — per-source probes, payload shapes, live counts
       team-imagery.md                  # formula1.com CDN: two systems, slug maps, car/team renders (ticket 13 enrichment #4)
       team-accent.md                   # TeamColors.forId hardcoded map: which API has it, why hardcoded v1, Jolpica alpha migration (ticket 16)
       cloudinary-headshot-paths.md     # driverRef = {name3}{last-surname-token3}01 — pure function, no map, no OpenF1; rules out option C, reframes option B as D (ticket 08 parked)
