@@ -24,16 +24,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Rung 2 at the use-case level: drive [GetRoundResultsUseCase] through
- * a MockEngine-backed [HttpClient]. Same harness as the other use case
- * tests.
+ * Rung 2 at the use-case level: drive [GetRoundResultsUseCase] through a
+ * MockEngine-backed [HttpClient]. The use case now hits Jolpica standard
+ * `/ergast/f1/{year}/{round}/results.json` as the single source for race
+ * results (the old f1api.dev `/{year}/{round}/race` hybrid merge is retired).
  *
  * Verifies:
- *  - 200 + valid envelope → Success(RoundResults) with the ordered
- *    results, the inlined circuit from the one-element array, and
- *    `position` kept as a String.
+ *  - 200 + valid Ergast envelope → Success(RoundResults) with the ordered
+ *    results, the circuit from the inlined `Circuit` block, and `position`
+ *    kept as a String (numeric finishers / "NC" for retirees).
  *  - 4xx/5xx → Failure with the expected status-coded message.
- *  - URL hits `/{year}/{round}/race` (not `/current`, etc.).
+ *  - URL hits `/ergast/f1/{year}/{round}/results.json` (not f1api.dev).
  *  - `forceRefresh = true` adds `Cache-Control: no-cache`.
  */
 class GetRoundResultsUseCaseTest {
@@ -56,29 +57,36 @@ class GetRoundResultsUseCaseTest {
         headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
     )
 
+    // Truncated 2-row Ergast envelope — enough to prove the full-richness
+    // mapping (status, grid, Time, FastestLap, Constructor, Circuit.Location,
+    // Driver givenName/familyName/code/permanentNumber) wires through.
     private val SAMPLE_BODY = """
-        { "season": 2024,
-          "races": {
-            "round": "1", "date": "2024-03-02", "time": "15:00:00Z",
-            "raceId": "bahrein2024",
-            "raceName": "Gulf Air Bahrain Grand Prix 2024",
-            "circuit": [{
-              "circuitId": "bahrain", "circuitName": "Bahrain International Circuit",
-              "country": "Bahrain", "city": "Sakhir",
-              "circuitLength": "5412km", "corners": 15
-            }],
-            "results": [
-              { "position": "1", "points": 26, "grid": "1", "time": "1:31:44",
-                "driver": { "driverId": "maxverstappen", "number": 33, "shortName": "VER",
-                            "name": "Max", "surname": "Verstappen" },
-                "team": { "teamId": "redbull", "teamName": "Red Bull Racing" } },
-              { "position": "2", "points": 18, "grid": "5", "time": "+22.457",
-                "driver": { "driverId": "perez", "number": 11, "shortName": "PER",
-                            "name": "Sergio", "surname": "Pérez" },
-                "team": { "teamId": "redbull", "teamName": "Red Bull Racing" } }
-            ]
-          }
-        }
+        { "MRData": { "RaceTable": {
+            "season": "2024", "round": "1",
+            "Races": [{
+              "season": "2024", "round": "1",
+              "raceName": "Gulf Air Bahrain Grand Prix 2024",
+              "date": "2024-03-02", "time": "15:00:00Z",
+              "Circuit": {
+                "circuitId": "bahrain", "circuitName": "Bahrain International Circuit",
+                "Location": { "locality": "Sakhir", "country": "Bahrain" }
+              },
+              "Results": [
+                { "number": "1", "position": "1", "positionText": "1", "points": "25",
+                  "grid": "1", "laps": "57", "status": "Finished",
+                  "Driver": { "driverId": "max_verstappen", "permanentNumber": "1", "code": "VER",
+                              "givenName": "Max", "familyName": "Verstappen" },
+                  "Constructor": { "constructorId": "red_bull", "name": "Red Bull Racing" },
+                  "Time": { "millis": "5500000", "time": "1:31:44.000" },
+                  "FastestLap": { "rank": "1", "lap": "57", "Time": { "time": "1:32.000" } } },
+                { "number": "44", "position": "19", "positionText": "R", "points": "0",
+                  "grid": "11", "laps": "15", "status": "Retired",
+                  "Driver": { "driverId": "hamilton", "permanentNumber": "44", "code": "HAM",
+                              "givenName": "Lewis", "familyName": "Hamilton" },
+                  "Constructor": { "constructorId": "ferrari", "name": "Ferrari" } }
+              ]
+            }] }
+        } }
     """.trimIndent()
 
     @Test
@@ -92,20 +100,39 @@ class GetRoundResultsUseCaseTest {
         assertEquals("2024-03-02", results.date)
         assertEquals("15:00:00Z", results.time)
         assertEquals("bahrain", results.circuit.id)
+        assertEquals("Sakhir", results.circuit.city)
         assertEquals(2, results.results.size)
-        assertEquals("1", results.results[0].position)
-        assertEquals("Max Verstappen", results.results[0].driverName)
+
+        val winner = results.results[0]
+        assertEquals("1", winner.position)
+        assertEquals(25, winner.points)
+        assertEquals("Max Verstappen", winner.driverName)
+        assertEquals("VER", winner.driverShortName)
+        assertEquals(1, winner.driverNumber)
+        assertEquals("red_bull", winner.teamId)
+        assertEquals("Finished", winner.status)
+        assertEquals("1:31:44.000", winner.time)
+        assertEquals("1:32.000", winner.fastLap)
+
+        val retiree = results.results[1]
+        assertEquals("NC", retiree.position)
+        assertEquals("Retired", retiree.status)
+        assertEquals("", retiree.time ?: "")
+        assertEquals("", retiree.fastLap ?: "")
     }
 
     @Test
-    fun `invoke hits the expected URL`() = runTest {
+    fun `invoke hits the Jolpica results endpoint`() = runTest {
         val requestedPaths = mutableListOf<String>()
         val out = useCase { req ->
             requestedPaths += req.url.fullPath
             jsonOk(SAMPLE_BODY)
         }.invoke(year = 2024, round = 5)
         assertTrue(out is Outcome.Success)
-        assertTrue("f1api race request missing: $requestedPaths", "/api/2024/5/race" in requestedPaths)
+        assertTrue(
+            "Jolpica results request missing: $requestedPaths",
+            "/ergast/f1/2024/5/results.json" in requestedPaths,
+        )
     }
 
     @Test

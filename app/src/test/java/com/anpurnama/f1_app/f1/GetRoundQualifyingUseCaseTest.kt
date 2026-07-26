@@ -21,19 +21,26 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Rung 2 at the use-case level for [GetRoundQualifyingUseCase].
+ * Rung 2 at the use-case level: drive [GetRoundQualifyingUseCase] through a
+ * MockEngine-backed [HttpClient]. The use case now hits Jolpica standard
+ * `/ergast/f1/{year}/{round}/qualifying.json` as the single source for
+ * qualifying results (the old f1api.dev `/{year}/{round}/qualy` fetch is retired).
  *
  * Verifies:
- *  - 200 + valid envelope → Success(RoundQualifying) with the
- *    ordered results and the single `circuit` object (NOT a list).
+ *  - 200 + valid Ergast envelope → Success(RoundQualifying) with the ordered
+ *    results, full Driver richness (givenName/familyName/code/permanentNumber),
+ *    the per-row Constructor, and the circuit from the inlined `Circuit`/
+ *    `Location` block.
  *  - 4xx/5xx → Failure with the expected status-coded message.
- *  - URL hits `/{year}/{round}/qualy`.
+ *  - URL hits `/ergast/f1/{year}/{round}/qualifying.json` (not f1api.dev).
  *  - `forceRefresh = true` adds `Cache-Control: no-cache`.
- *  - q1-only knockout is parsed (q2/q3 null in source → null in model).
+ *  - Q1-only knockout is parsed (Q2/Q3 null in source → null in model).
  */
 class GetRoundQualifyingUseCaseTest {
 
@@ -55,31 +62,34 @@ class GetRoundQualifyingUseCaseTest {
         headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
     )
 
+    // Truncated 2-row Ergast qualifying envelope — enough to prove the full-
+    // richness mapping (Constructor on every row, Driver givenName/familyName/
+    // code/permanentNumber, Circuit/Location, Q1-only knockout) wires through.
     private val SAMPLE_BODY = """
-        { "season": 2024,
-          "races": {
-            "round": "1", "qualyDate": "2024-03-01", "qualyTime": "16:00:00Z",
-            "raceId": "bahrein2024",
-            "raceName": "Gulf Air Bahrain Grand Prix 2024",
-            "circuit": {
-              "circuitId": "bahrain", "circuitName": "Bahrain International Circuit",
-              "country": "Bahrain", "city": "Sakhir",
-              "circuitLength": "5412km", "corners": 15
-            },
-            "qualyResults": [
-              { "classificationId": 1, "driverId": "maxverstappen", "teamId": "redbull",
-                "q1": "1:30.031", "q2": "1:29.374", "q3": "1:29.179", "gridPosition": 1,
-                "driver": { "driverId": "maxverstappen", "number": 33, "shortName": "VER",
-                            "name": "Max", "surname": "Verstappen" },
-                "team": { "teamId": "redbull", "teamName": "Red Bull Racing" } },
-              { "classificationId": 17, "driverId": "sargeant", "teamId": "williams",
-                "q1": "1:30.770", "q2": null, "q3": null, "gridPosition": 18,
-                "driver": { "driverId": "sargeant", "number": 2, "shortName": "SAR",
-                            "name": "Logan", "surname": "Sargeant" },
-                "team": { "teamId": "williams", "teamName": "Williams Racing" } }
-            ]
-          }
-        }
+        { "MRData": { "RaceTable": {
+            "season": "2024", "round": "1",
+            "Races": [{
+              "season": "2024", "round": "1",
+              "raceName": "Gulf Air Bahrain Grand Prix 2024",
+              "date": "2024-03-02", "time": "15:00:00Z",
+              "Circuit": {
+                "circuitId": "bahrain", "circuitName": "Bahrain International Circuit",
+                "Location": { "locality": "Sakhir", "country": "Bahrain" }
+              },
+              "QualifyingResults": [
+                { "number": "1", "position": "1",
+                  "Driver": { "driverId": "max_verstappen", "permanentNumber": "1", "code": "VER",
+                              "givenName": "Max", "familyName": "Verstappen" },
+                  "Constructor": { "constructorId": "red_bull", "name": "Red Bull Racing" },
+                  "Q1": "1:30.031", "Q2": "1:29.374", "Q3": "1:29.179" },
+                { "number": "2", "position": "20",
+                  "Driver": { "driverId": "sargeant", "permanentNumber": "2", "code": "SAR",
+                              "givenName": "Logan", "familyName": "Sargeant" },
+                  "Constructor": { "constructorId": "williams", "name": "Williams Racing" },
+                  "Q1": "1:30.770", "Q2": null, "Q3": null }
+              ]
+            }] }
+        } }
     """.trimIndent()
 
     @Test
@@ -90,25 +100,44 @@ class GetRoundQualifyingUseCaseTest {
         assertEquals(2024, qualy.year)
         assertEquals(1, qualy.round)
         assertEquals("Gulf Air Bahrain Grand Prix 2024", qualy.raceName)
-        assertEquals("2024-03-01", qualy.qualyDate)
-        assertEquals("16:00:00Z", qualy.qualyTime)
+        // Ergast qualifying has no separate quali date/time — the race's
+        // date/time round through (unused by the UI).
+        assertEquals("2024-03-02", qualy.qualyDate)
+        assertEquals("15:00:00Z", qualy.qualyTime)
         assertEquals("bahrain", qualy.circuit.id)
+        assertEquals("Sakhir", qualy.circuit.city)
         assertEquals(2, qualy.results.size)
-        assertEquals(1, qualy.results[0].gridPosition)
-        assertEquals("1:29.179", qualy.results[0].q3)
-        assertNull(qualy.results[1].q2)
-        assertNull(qualy.results[1].q3)
+
+        val pole = qualy.results[0]
+        assertEquals(1, pole.gridPosition)
+        assertEquals("1:30.031", pole.q1)
+        assertEquals("1:29.374", pole.q2)
+        assertEquals("1:29.179", pole.q3)
+        assertEquals("max_verstappen", pole.driverId)
+        assertEquals("Max Verstappen", pole.driverName)
+        assertEquals("VER", pole.driverShortName)
+        assertEquals(1, pole.driverNumber)
+        assertEquals("red_bull", pole.teamId)
+        assertEquals("Red Bull Racing", pole.teamName)
+
+        val q1Knockout = qualy.results[1]
+        assertEquals(20, q1Knockout.gridPosition)
+        assertEquals("1:30.770", q1Knockout.q1)
+        assertNull(q1Knockout.q2)
+        assertNull(q1Knockout.q3)
     }
 
     @Test
-    fun `invoke hits the expected URL`() = runTest {
-        var requestedPath: String? = null
+    fun `invoke hits the Jolpica qualifying endpoint and never the f1api qualy route`() = runTest {
+        val requestedPaths = mutableListOf<String>()
         val out = useCase { req ->
-            requestedPath = req.url.fullPath
+            requestedPaths += req.url.fullPath
             jsonOk(SAMPLE_BODY)
         }.invoke(year = 2024, round = 5)
         assertTrue(out is Outcome.Success)
-        assertEquals("/api/2024/5/qualy", requestedPath)
+        // Single fetch, single Jolpica standard qualifying path — NOT the
+        // retired f1api.dev `/{year}/{round}/qualy` route.
+        assertEquals(listOf("/ergast/f1/2024/5/qualifying.json"), requestedPaths)
     }
 
     @Test

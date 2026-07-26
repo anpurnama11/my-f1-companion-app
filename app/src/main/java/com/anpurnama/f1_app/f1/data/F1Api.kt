@@ -76,6 +76,25 @@ suspend fun HttpClient.getConstructorsChampionship(forceRefresh: Boolean = false
     return response.body()
 }
 
+/**
+ * Driver metadata for a given season — the same shape as [getCurrentDrivers]
+ * (the f1api.dev catalog uses Ergast canonical ids like `max_verstappen`/
+ * `red_bull` for both current and historical seasons). Used as the car-number
+ * → Ergast id bridge for the alpha result translator (FP/SQ/SR results carry
+ * Jolpica alpha's opaque ids, translated back to canonical at the data seam).
+ * Season-matched so past rounds don't suffer car-number reuse across years.
+ * HttpCache shares the cost with the favorites/driver-detail flows.
+ */
+suspend fun HttpClient.getDrivers(
+    year: Int,
+    forceRefresh: Boolean = false,
+): CurrentDriversResponseDto {
+    val response = get("$F1API_BASE/$year/drivers") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
 /** Current driver metadata used by the Driver detail page. */
 suspend fun HttpClient.getCurrentDrivers(forceRefresh: Boolean = false): CurrentDriversResponseDto {
     val response = get("$F1API_BASE/current/drivers") {
@@ -92,30 +111,25 @@ suspend fun HttpClient.getCurrentTeams(forceRefresh: Boolean = false): CurrentTe
     return response.body()
 }
 
-/**
- * Per-round race results. Drives Round detail (full grid) and the
- * Schedule > Past list podium (sliced via `GetRoundPodiumUseCase`).
- * The `races` envelope here is the unusual object-with-results shape,
- * distinct from `/current`'s array envelope.
- */
-suspend fun HttpClient.getRoundResults(
-    year: Int,
-    round: Int,
-    forceRefresh: Boolean = false,
-): RoundResultsResponseDto {
-    val response = get("$F1API_BASE/$year/$round/race") {
-        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
-    }
-    return response.body()
-}
-
-/** Jolpica's authoritative status/grid companion for f1api.dev race data. */
+/** Single source for race results — Jolpica standard `/results.json` (full Ergast richness). */
 suspend fun HttpClient.getJolpicaRaceResults(
     year: Int,
     round: Int,
     forceRefresh: Boolean = false,
 ): JolpicaRaceResultsResponseDto {
     val response = get("$JOLPICA_BASE/$year/$round/results.json") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+/** Single source for qualifying results — Jolpica standard `/qualifying.json` (full Ergast richness, Q1/Q2/Q3 segment times). */
+suspend fun HttpClient.getJolpicaQualifying(
+    year: Int,
+    round: Int,
+    forceRefresh: Boolean = false,
+): JolpicaQualifyingResponseDto {
+    val response = get("$JOLPICA_BASE/$year/$round/qualifying.json") {
         if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body()
@@ -128,20 +142,6 @@ suspend fun HttpClient.getJolpicaPitStops(
     forceRefresh: Boolean = false,
 ): JolpicaPitStopsResponseDto {
     val response = get("$JOLPICA_BASE/$year/$round/pitstops.json") {
-        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
-    }
-    return response.body()
-}
-
-/** One of f1api.dev's three practice result endpoints. */
-suspend fun HttpClient.getPracticeResults(
-    year: Int,
-    round: Int,
-    session: String,
-    forceRefresh: Boolean = false,
-): PracticeResponseDto {
-    require(session in setOf("fp1", "fp2", "fp3"))
-    val response = get("$F1API_BASE/$year/$round/$session") {
         if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body()
@@ -167,25 +167,12 @@ suspend fun HttpClient.getJolpicaAlphaResults(
     filter: String,
     forceRefresh: Boolean = false,
 ): JolpicaAlphaResultsResponseDto {
-    require(filter in setOf("SR", "SQ"))
+    // Sprint (SR), Sprint Qualifying (SQ), and the three Free Practice sessions
+    // (FP1/FP2/FP3) are the alpha filter set. An unsupported filter throws
+    // "Invalid session filter", which the shared `loadAlpha` caller maps to the
+    // not-scheduled Outcome ("Session is unavailable") rather than a hard error.
+    require(filter in setOf("SR", "SQ", "FP1", "FP2", "FP3")) { "Invalid session filter" }
     val response = get("$JOLPICA_ALPHA_BASE/results/$roundId/$filter/") {
-        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
-    }
-    return response.body()
-}
-
-/**
- * Per-round qualifying results. Same envelope shape as the race
- * endpoint but with `qualyResults` (ordered by `gridPosition`) and a
- * single `circuit` object (not a one-element array). Drives Round
- * detail's Qualifying tab.
- */
-suspend fun HttpClient.getRoundQualifying(
-    year: Int,
-    round: Int,
-    forceRefresh: Boolean = false,
-): RoundQualifyingResponseDto {
-    val response = get("$F1API_BASE/$year/$round/qualy") {
         if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body()

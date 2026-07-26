@@ -1,23 +1,29 @@
 package com.anpurnama.f1_app.f1.model
 
 /**
- * Per-round race result, returned by f1api.dev `/{year}/{round}/race`.
+ * Per-round race result, returned by Jolpica standard
+ * `/ergast/f1/{year}/{round}/results.json` (the f1api.dev hybrid merge is
+ * retired — see lode/decisions/0006-race-results-hybrid-source.md, superseded).
  * Drives the Round detail full grid AND the Schedule > Past list
  * podium (sliced `[0..2]`).
  *
- * `position` is kept as a String per the ticket 03 spec: handles
- * `"1"`/`"2"`/`"3"`/`"NC"` without any parsing. Consumers slice the
- * ordered `results` array rather than sorting on `position` —
- * position order is position order. The "NC" string is for
- * DNF/DNS rows; they have a non-zero `grid` and a messy `time`
- * like `"DNF (1)"`.
+ * `position` is kept as a String: Ergast `positionText` is numeric for
+ * finishers and lapped rows (`"1"`/`"2"`/`"11"`) and a code for
+ * non-classified rows (`"R"` retired, `"D"`/`"E"`/`"W"`…); the latter
+ * normalize to `"NC"` at the DTO→domain seam so the screen keeps its
+ * f1api-era `"P NC"` + hidden-arrow behavior. Consumers slice the
+ * ordered `results` array rather than sorting on `position` — position
+ * order is position order.
  *
- * `time` is kept un-parsed: `"1:31:44"` for the winner, `"+22.457"`
- * for the gap, `"+1 lap"` for lapped, `"DNF (1)"` for retirees.
+ * `time` is kept un-parsed: `"1:31:44.000"` for the winner, `"+22.457"`
+ * for the gap, `"+1 lap"` for lapped; `null` for retirees/DNS — the
+ * `RoundResult.displayStatusOrTime()` extension maps the `status` field
+ * (`"Retired"`/`"Did not start"`/…) to `"DNF"`/`"DNS"`.
  *
- * `grid` is also a String (`"1"` for pole, `"20"` for back of grid).
- * Stored as String to keep the schema noise consistent with
- * `position` and avoid a parse that would crash on `"Pit"` rows.
+ * `grid` is also a String (`"1"` for pole, `"20"` for back of grid,
+ * `"0"` for pit-lane/DNS starts). Stored as String to keep the schema
+ * noise consistent with `position` and avoid a parse that would crash
+ * on `"0"` rows.
  */
 data class RoundResult(
     val position: String,

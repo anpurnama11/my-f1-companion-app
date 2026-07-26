@@ -12,7 +12,7 @@ import com.anpurnama.f1_app.f1.model.RoundResult
  * HttpCache is the only reason the Past list and the Round detail
  * drilldown don't double-fetch the same round: when a row's podium
  * has been fetched, opening that row in the drilldown is a cache hit
- * on the same `/{year}/{round}/race` endpoint.
+ * on the same Jolpica `/ergast/f1/{year}/{round}/results.json` endpoint.
  *
  * **Partial podium on short grids:** when the source has fewer than
  * 3 finishers (e.g. an early-season 2-car test or a heavily-redacted

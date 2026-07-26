@@ -35,8 +35,8 @@ import org.junit.Test
  *    exactly 3 when the source has 3+ rows, may be shorter for very
  *    short grids — a partial podium is still a podium, never a
  *    failure).
- *  - Failure path: same as the underlying /race call. The use case
- *    does not paper over a 4xx/5xx with a "fewer than 3" success.
+ *  - Failure path: same as the underlying Jolpica `/results.json` call.
+ *    The use case does not paper over a 4xx/5xx with a "fewer than 3" success.
  */
 class GetRoundPodiumUseCaseTest {
 
@@ -61,36 +61,44 @@ class GetRoundPodiumUseCaseTest {
     )
 
     private val FULL_GRID_BODY = """
-        { "season": 2024,
-          "races": {
-            "round": "1", "date": "2024-03-02", "time": "15:00:00Z",
-            "raceId": "bahrein2024",
-            "raceName": "Gulf Air Bahrain Grand Prix 2024",
-            "circuit": [{
-              "circuitId": "bahrain", "circuitName": "Bahrain International Circuit",
-              "country": "Bahrain", "city": "Sakhir",
-              "circuitLength": "5412km", "corners": 15
-            }],
-            "results": [
-              { "position": "1", "points": 26, "grid": "1", "time": "1:31:44",
-                "driver": { "driverId": "maxverstappen", "number": 33, "shortName": "VER",
-                            "name": "Max", "surname": "Verstappen" },
-                "team": { "teamId": "redbull", "teamName": "Red Bull Racing" } },
-              { "position": "2", "points": 18, "grid": "5", "time": "+22.457",
-                "driver": { "driverId": "perez", "number": 11, "shortName": "PER",
-                            "name": "Sergio", "surname": "Pérez" },
-                "team": { "teamId": "redbull", "teamName": "Red Bull Racing" } },
-              { "position": "3", "points": 15, "grid": "4", "time": "+25.110",
-                "driver": { "driverId": "sainz", "number": 55, "shortName": "SAI",
-                            "name": "Carlos", "surname": "Sainz" },
-                "team": { "teamId": "ferrari", "teamName": "Scuderia Ferrari" } },
-              { "position": "4", "points": 12, "grid": "2", "time": "+39.669",
-                "driver": { "driverId": "leclerc", "number": 16, "shortName": "LEC",
-                            "name": "Charles", "surname": "Leclerc" },
-                "team": { "teamId": "ferrari", "teamName": "Scuderia Ferrari" } }
-            ]
-          }
-        }
+        { "MRData": { "RaceTable": {
+            "season": "2024", "round": "1",
+            "Races": [{
+              "season": "2024", "round": "1",
+              "raceName": "Gulf Air Bahrain Grand Prix 2024",
+              "date": "2024-03-02", "time": "15:00:00Z",
+              "Circuit": {
+                "circuitId": "bahrain", "circuitName": "Bahrain International Circuit",
+                "Location": { "locality": "Sakhir", "country": "Bahrain" }
+              },
+              "Results": [
+                { "number": "1", "position": "1", "positionText": "1", "points": "26",
+                  "grid": "1", "laps": "57", "status": "Finished",
+                  "Driver": { "driverId": "max_verstappen", "permanentNumber": "1", "code": "VER",
+                              "givenName": "Max", "familyName": "Verstappen" },
+                  "Constructor": { "constructorId": "red_bull", "name": "Red Bull Racing" },
+                  "Time": { "time": "1:31:44.000" } },
+                { "number": "11", "position": "2", "positionText": "2", "points": "18",
+                  "grid": "5", "laps": "57", "status": "Finished",
+                  "Driver": { "driverId": "perez", "permanentNumber": "11", "code": "PER",
+                              "givenName": "Sergio", "familyName": "Pérez" },
+                  "Constructor": { "constructorId": "red_bull", "name": "Red Bull Racing" },
+                  "Time": { "time": "+22.457" } },
+                { "number": "55", "position": "3", "positionText": "3", "points": "15",
+                  "grid": "4", "laps": "57", "status": "Finished",
+                  "Driver": { "driverId": "sainz", "permanentNumber": "55", "code": "SAI",
+                              "givenName": "Carlos", "familyName": "Sainz" },
+                  "Constructor": { "constructorId": "ferrari", "name": "Ferrari" },
+                  "Time": { "time": "+25.110" } },
+                { "number": "16", "position": "4", "positionText": "4", "points": "12",
+                  "grid": "2", "laps": "57", "status": "Finished",
+                  "Driver": { "driverId": "leclerc", "permanentNumber": "16", "code": "LEC",
+                              "givenName": "Charles", "familyName": "Leclerc" },
+                  "Constructor": { "constructorId": "ferrari", "name": "Ferrari" },
+                  "Time": { "time": "+39.669" } }
+              ]
+            }] }
+        } }
     """.trimIndent()
 
     @Test
@@ -100,7 +108,7 @@ class GetRoundPodiumUseCaseTest {
         val podium = (out as Outcome.Success).data
         assertEquals(3, podium.topThree.size)
         assertEquals("1", podium.topThree[0].position)
-        assertEquals("maxverstappen", podium.topThree[0].driverId)
+        assertEquals("max_verstappen", podium.topThree[0].driverId)
         assertEquals("Max Verstappen", podium.topThree[0].driverName)
         assertEquals("2", podium.topThree[1].position)
         assertEquals("perez", podium.topThree[1].driverId)
@@ -113,23 +121,28 @@ class GetRoundPodiumUseCaseTest {
     @Test
     fun `invoke returns fewer than 3 when the grid is short (partial podium)`() = runTest {
         val shortBody = """
-            { "season": 2024,
-              "races": {
-                "round": "1", "date": "2024-03-02", "time": "15:00:00Z",
-                "raceId": "x", "raceName": "Bahrain GP",
-                "circuit": [{ "circuitId": "bahrain" }],
-                "results": [
-                  { "position": "1", "points": 25, "grid": "1", "time": "1:31:44",
-                    "driver": { "driverId": "a" }, "team": { "teamId": "t" } }
-                ]
-              }
-            }
+            { "MRData": { "RaceTable": {
+                "season": "2024", "round": "1",
+                "Races": [{
+                  "season": "2024", "round": "1",
+                  "raceName": "Bahrain GP",
+                  "Circuit": { "circuitId": "bahrain" },
+                  "Results": [
+                    { "number": "27", "position": "1", "positionText": "1", "points": "25",
+                      "grid": "1", "laps": "57", "status": "Finished",
+                      "Driver": { "driverId": "hulkenberg", "code": "HUL",
+                                  "givenName": "Nico", "familyName": "Hülkenberg" },
+                      "Constructor": { "constructorId": "haas", "name": "Haas F1 Team" },
+                      "Time": { "time": "1:31:44.000" } }
+                  ]
+                }] }
+            } }
         """.trimIndent()
         val out = useCase { jsonOk(shortBody) }.invoke(year = 2024, round = 1)
         assertTrue(out is Outcome.Success)
         val podium = (out as Outcome.Success).data
         assertEquals(1, podium.topThree.size)
-        assertEquals("a", podium.topThree[0].driverId)
+        assertEquals("hulkenberg", podium.topThree[0].driverId)
     }
 
     @Test

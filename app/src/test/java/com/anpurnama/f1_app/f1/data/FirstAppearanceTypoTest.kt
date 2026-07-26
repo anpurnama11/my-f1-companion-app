@@ -8,18 +8,20 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Adversarial verification: the DTOs use the misspelled key
- * `firstAppareance` (no `r` after `App`) as the `@SerialName`, in
- * three places:
+ * Adversarial verification: the schedule `CircuitDto` uses the misspelled key
+ * `firstAppareance` (no `r` after `App`) as the `@SerialName`:
  *
- *   - `CircuitDto.firstGrandPrix`           (Dtos.kt:52)
- *   - `RoundResultsResponseDto.TeamDto`     (Dtos.kt:247)
- *   - `RoundQualifyingResponseDto.TeamDto`  (Dtos.kt:311)
+ *   - `CircuitDto.firstGrandPrix`           (Dtos.kt)
  *
  * The actual wire field is `firstAppearance` (with `r`). The HTTP
  * client is configured with `ignoreUnknownKeys = true`
  * (HttpClientFactory.kt:54), so the correct field is silently
  * dropped and the typo field is parsed.
+ *
+ * The former per-round result DTOs (`RoundResultsResponseDto.TeamDto`,
+ * `RoundQualifyingResponseDto.TeamDto`) also carried the typo; they were
+ * deleted in step 5 of the f1api.dev→Jolpica migration (race/quali results
+ * now come from Jolpica standard, which has no `firstAppareance` field).
  *
  * This test pins the silent-drop behavior: the correct wire field
  * (`firstAppearance`) is ignored; only the typo field

@@ -195,188 +195,6 @@ data class CurrentTeamDto(
     val driversChampionships: Int? = null,
 )
 
-// f1api.dev /{year}/{round}/race envelope — `races` is an *object* here
-// (different from /current's `races: [...]` array), holding a
-// one-element `circuit: [...]` array (also different from /current's
-// inlined `circuit` object). `results` is ordered by finishing position.
-// `position` is a String (`"1"`/`"2"`/`"NC"`); `time` is a dirty String
-// (`"1:31:44"`/`"+22.457"`/`"+1 lap"`/`"DNF (1)"`) — both kept
-// un-parsed per the ticket 03 spec.
-@Serializable
-data class RoundResultsResponseDto(
-    val season: Int = 0,
-    val races: RacesDto = RacesDto(),
-) {
-    @Serializable
-    data class RacesDto(
-        val round: String? = null,
-        val date: String? = null,
-        val time: String? = null,
-        val raceId: String = "",
-        val raceName: String? = null,
-        val url: String? = null,
-        val circuit: List<CircuitDto> = emptyList(),
-        val results: List<ResultDto> = emptyList(),
-    ) {
-        @Serializable
-        data class CircuitDto(
-            val circuitId: String = "",
-            val circuitName: String? = null,
-            val country: String? = null,
-            val city: String? = null,
-            val circuitLength: String = "",
-            val corners: Int? = null,
-        )
-
-        @Serializable
-        data class ResultDto(
-            val position: String? = null,
-            val points: Int = 0,
-            val grid: String? = null,
-            val time: String? = null,
-            val fastLap: String? = null,
-            val retired: String? = null,
-            val driver: DriverDto = DriverDto(),
-            val team: TeamDto = TeamDto(),
-        ) {
-            @Serializable
-            data class DriverDto(
-                val driverId: String = "",
-                val number: Int? = null,
-                val shortName: String? = null,
-                val name: String? = null,
-                val surname: String? = null,
-                val nationality: String? = null,
-                val birthday: String? = null,
-            )
-
-            @Serializable
-            data class TeamDto(
-                val teamId: String = "",
-                val teamName: String? = null,
-                val nationality: String? = null,
-                val firstAppareance: Int? = null,
-            )
-        }
-    }
-}
-
-// f1api.dev /{year}/{round}/qualy envelope — `races` is an *object* with
-// a SINGLE `circuit` object (not a one-element array like /race uses).
-// `qualyResults` is ordered by `gridPosition` (1-based Int). q1/q2/q3
-// are dirty Strings or null when the driver didn't reach that segment.
-@Serializable
-data class RoundQualifyingResponseDto(
-    val season: Int = 0,
-    val races: RacesDto = RacesDto(),
-) {
-    @Serializable
-    data class RacesDto(
-        val round: String? = null,
-        val qualyDate: String? = null,
-        val qualyTime: String? = null,
-        val raceId: String = "",
-        val raceName: String? = null,
-        val url: String? = null,
-        val circuit: CircuitDto = CircuitDto(),
-        val qualyResults: List<QualyResultDto> = emptyList(),
-    ) {
-        @Serializable
-        data class CircuitDto(
-            val circuitId: String = "",
-            val circuitName: String? = null,
-            val country: String? = null,
-            val city: String? = null,
-            val circuitLength: String = "",
-            val corners: Int? = null,
-        )
-
-        @Serializable
-        data class QualyResultDto(
-            val classificationId: Int? = null,
-            val driverId: String = "",
-            val teamId: String = "",
-            val q1: String? = null,
-            val q2: String? = null,
-            val q3: String? = null,
-            val gridPosition: Int = 0,
-            val driver: DriverDto = DriverDto(),
-            val team: TeamDto = TeamDto(),
-        ) {
-            @Serializable
-            data class DriverDto(
-                val driverId: String = "",
-                val number: Int? = null,
-                val shortName: String? = null,
-                val name: String? = null,
-                val surname: String? = null,
-                val nationality: String? = null,
-                val birthday: String? = null,
-            )
-
-            @Serializable
-            data class TeamDto(
-                val teamId: String = "",
-                val teamName: String? = null,
-                val nationality: String? = null,
-                val firstAppareance: Int? = null,
-            )
-        }
-    }
-}
-
-// f1api.dev /{year}/{round}/fp1|fp2|fp3. The endpoint changes only the
-// result-array property, so one tolerant DTO handles all three responses.
-@Serializable
-data class PracticeResponseDto(
-    val season: Int = 0,
-    val races: PracticeRaceDto = PracticeRaceDto(),
-) {
-    @Serializable
-    data class PracticeRaceDto(
-        val round: String? = null,
-        val raceName: String? = null,
-        val circuit: PracticeCircuitDto = PracticeCircuitDto(),
-        val fp1Results: List<PracticeResultDto> = emptyList(),
-        val fp2Results: List<PracticeResultDto> = emptyList(),
-        val fp3Results: List<PracticeResultDto> = emptyList(),
-    )
-
-    @Serializable
-    data class PracticeCircuitDto(
-        val circuitId: String = "",
-        val circuitName: String? = null,
-        val circuitLength: String = "",
-        val corners: Int? = null,
-        val city: String? = null,
-        val country: String? = null,
-    )
-
-    @Serializable
-    data class PracticeResultDto(
-        val driverId: String = "",
-        val teamId: String = "",
-        val time: String? = null,
-        val driver: DriverDto = DriverDto(),
-        val team: TeamDto = TeamDto(),
-    ) {
-        @Serializable
-        data class DriverDto(
-            val driverId: String = "",
-            val number: Int? = null,
-            val shortName: String? = null,
-            val name: String? = null,
-            val surname: String? = null,
-        )
-
-        @Serializable
-        data class TeamDto(
-            val teamId: String = "",
-            val teamName: String? = null,
-        )
-    }
-}
-
 // f1api.dev /circuits/{circuitId} envelope. Distinct from /current* which
 // inlines a single `circuit` object: this endpoint returns a one-element
 // `circuit: [...]` array, and the per-circuit fields carry a different
@@ -458,7 +276,14 @@ data class CircuitWinnersResponseDto(
     )
 }
 
-// Jolpica standard Ergast-compatible race result envelope.
+// Jolpica standard Ergast-compatible race result envelope — the single
+// source for race results (see lode/decisions/0006-race-results-hybrid-source.md,
+// superseded). Full Ergast richness: per-race Circuit/Location and full Driver
+// givenName/familyName/code; per-result points, laps, status, grid, Time
+// (millis+time), FastestLap (rank, lap, Time), and the Driver's permanentNumber.
+// `driverId`/`constructorId` are the canonical Ergast ids (e.g. "max_verstappen",
+// "red_bull") — the same namespace Jolpica pit-stops already use, so the
+// race-result ↔ pit-stop join aligns at this boundary.
 @Serializable
 data class JolpicaRaceResultsResponseDto(
     @SerialName("MRData") val mrData: MrDataDto = MrDataDto(),
@@ -479,22 +304,152 @@ data class JolpicaRaceResultsResponseDto(
     data class RaceDto(
         val season: String? = null,
         val round: String? = null,
+        val raceName: String? = null,
+        val date: String? = null,
+        val time: String? = null,
+        @SerialName("Circuit") val circuit: CircuitDto = CircuitDto(),
         @SerialName("Results") val results: List<ResultDto> = emptyList(),
+    )
+
+    @Serializable
+    data class CircuitDto(
+        val circuitId: String = "",
+        val circuitName: String? = null,
+        @SerialName("Location") val location: LocationDto = LocationDto(),
+    )
+
+    @Serializable
+    data class LocationDto(
+        val locality: String? = null,
+        val country: String? = null,
     )
 
     @Serializable
     data class ResultDto(
         val number: String? = null,
         val position: String? = null,
+        val positionText: String? = null,
+        val points: String? = null,
         val grid: String? = null,
+        val laps: String? = null,
         val status: String? = null,
         @SerialName("Driver") val driver: DriverDto = DriverDto(),
+        @SerialName("Constructor") val constructor: ConstructorDto = ConstructorDto(),
+        @SerialName("Time") val time: TimeDto? = null,
+        @SerialName("FastestLap") val fastestLap: FastestLapDto? = null,
     )
 
     @Serializable
     data class DriverDto(
         val driverId: String? = null,
         val permanentNumber: String? = null,
+        val code: String? = null,
+        val givenName: String? = null,
+        val familyName: String? = null,
+    )
+
+    @Serializable
+    data class ConstructorDto(
+        val constructorId: String? = null,
+        val name: String? = null,
+    )
+
+    @Serializable
+    data class TimeDto(
+        val millis: String? = null,
+        val time: String? = null,
+    )
+
+    @Serializable
+    data class FastestLapDto(
+        val rank: String? = null,
+        val lap: String? = null,
+        @SerialName("Time") val time: TimeDto? = null,
+    )
+}
+
+// Jolpica standard Ergast-compatible qualifying envelope — the single
+// source for per-round qualifying results (the f1api.dev `/{year}/{round}/qualy`
+// fetch is retired; see lode/decisions/0005-session-results-use-two-apis.md,
+// to be amended step 7). Full Ergast richness: per-race Circuit/Location and
+// full Driver givenName/familyName/code/permanentNumber, plus the per-row
+// Constructor (constructorId/name — confirmed present on every row, including
+// Q1 knockouts). Qualifying results DO NOT carry `points`/`grid`/`laps`/
+// `status`/`Time`/`FastestLap`/`positionText` — only `number`, `position`, and
+// the `Q1`/`Q2`/`Q3` segment lap-time Strings (null when the driver didn't reach
+// that segment). `driverId`/`constructorId` are the canonical Ergast ids (e.g.
+// "max_verstappen", "red_bull") — the same namespace Jolpica pit-stops already
+// use, consistent with the race-result mapping in [JolpicaRaceResultsResponseDto].
+@Serializable
+data class JolpicaQualifyingResponseDto(
+    @SerialName("MRData") val mrData: MrDataDto = MrDataDto(),
+) {
+    @Serializable
+    data class MrDataDto(
+        @SerialName("RaceTable") val raceTable: RaceTableDto = RaceTableDto(),
+    )
+
+    @Serializable
+    data class RaceTableDto(
+        val season: String? = null,
+        val round: String? = null,
+        @SerialName("Races") val races: List<RaceDto> = emptyList(),
+    )
+
+    @Serializable
+    data class RaceDto(
+        val season: String? = null,
+        val round: String? = null,
+        val raceName: String? = null,
+        // Ergast qualifying carries the race's `date`/`time` on the Race, not a
+        // quali-only schedule — there is no separate qua1y date/time on the wire.
+        // These round through to the domain `qualyDate`/`qualyTime` fields, which
+        // the UI does not currently render, so the discrepancy is inert.
+        val date: String? = null,
+        val time: String? = null,
+        @SerialName("Circuit") val circuit: CircuitDto = CircuitDto(),
+        @SerialName("QualifyingResults") val qualifyingResults: List<QualifyingResultDto> = emptyList(),
+    )
+
+    @Serializable
+    data class CircuitDto(
+        val circuitId: String = "",
+        val circuitName: String? = null,
+        @SerialName("Location") val location: LocationDto = LocationDto(),
+    )
+
+    @Serializable
+    data class LocationDto(
+        val locality: String? = null,
+        val country: String? = null,
+    )
+
+    @Serializable
+    data class QualifyingResultDto(
+        val number: String? = null,
+        val position: String? = null,
+        @SerialName("Driver") val driver: DriverDto = DriverDto(),
+        @SerialName("Constructor") val constructor: ConstructorDto = ConstructorDto(),
+        // Lap-time Strings like "1:30.031"; null when the driver was knocked out
+        // before this segment. Kept un-parsed.
+        @SerialName("Q1") val q1: String? = null,
+        @SerialName("Q2") val q2: String? = null,
+        @SerialName("Q3") val q3: String? = null,
+    )
+
+    @Serializable
+    data class DriverDto(
+        val driverId: String? = null,
+        val permanentNumber: String? = null,
+        val code: String? = null,
+        val givenName: String? = null,
+        val familyName: String? = null,
+    )
+
+    @Serializable
+    data class ConstructorDto(
+        val constructorId: String? = null,
+        val name: String? = null,
     )
 }
 

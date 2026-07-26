@@ -1,73 +1,40 @@
 package com.anpurnama.f1_app.f1
 
 import com.anpurnama.f1_app.core.Outcome
-import com.anpurnama.f1_app.f1.data.PracticeResponseDto
-import com.anpurnama.f1_app.f1.data.getPracticeResults
-import com.anpurnama.f1_app.f1.model.Circuit
-import com.anpurnama.f1_app.f1.model.PracticeResult
 import com.anpurnama.f1_app.f1.model.SessionResult
 import com.anpurnama.f1_app.f1.model.SessionType
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.ServerResponseException
 
+/**
+ * Per-round free-practice results from Jolpica alpha
+ * `/f1/alpha/results/{round_id}/{FP1|FP2|FP3}/` — fetched through the shared
+ * [loadAlpha] loader, the same path the sprint and sprint-qualifying use cases
+ * use. Drives the SessionResult FP1/FP2/FP3 screens via [GetSessionResultUseCase].
+ *
+ * The Jolpica alpha filter for a practice session is the session's own label
+ * (`"FP1"`/`"FP2"`/`"FP3"`). There is no local session-type guard: a non-practice
+ * session reaching here resolves to a filter outside the alpha require set, and
+ * [loadAlpha] maps that to the not-scheduled Outcome — matching the sprint use
+ * cases, whose guard also lives entirely in the alpha layer.
+ *
+ * Pure Kotlin: only the `HttpClient` (injected by Wiring) crosses the
+ * android.* boundary.
+ */
 class GetPracticeResultUseCase(private val client: HttpClient) {
     suspend operator fun invoke(
         year: Int,
         round: Int,
         session: SessionType,
         forceRefresh: Boolean = false,
-    ): Outcome<SessionResult> = try {
-        require(session in setOf(SessionType.FP1, SessionType.FP2, SessionType.FP3))
-        val dto = client.getPracticeResults(year, round, session.shortLabel.lowercase(), forceRefresh)
-        Outcome.Success(dto.toSessionResult(year, round, session))
-    } catch (e: ClientRequestException) {
-        Outcome.Failure("Request failed (${e.response.status.value})")
-    } catch (e: ServerResponseException) {
-        Outcome.Failure("Server error (${e.response.status.value})")
-    } catch (e: Exception) {
-        Outcome.Failure(e.message ?: "Network error")
+    ): Outcome<SessionResult> {
+        val filter = when (session) {
+            SessionType.FP1 -> "FP1"
+            SessionType.FP2 -> "FP2"
+            SessionType.FP3 -> "FP3"
+            // Non-practice session → alpha require rejects → loadAlpha maps to
+            // the not-scheduled "Session is unavailable" outcome.
+            else -> session.shortLabel
+        }
+        return loadAlpha(client, year, round, filter, session, forceRefresh)
     }
-}
-
-internal fun PracticeResponseDto.toSessionResult(
-    year: Int,
-    round: Int,
-    session: SessionType,
-): SessionResult {
-    val race = races
-    val source = when (session) {
-        SessionType.FP1 -> race.fp1Results
-        SessionType.FP2 -> race.fp2Results
-        SessionType.FP3 -> race.fp3Results
-        else -> emptyList()
-    }
-    return SessionResult(
-        year = year,
-        round = race.round?.toIntOrNull() ?: round,
-        raceName = race.raceName.orEmpty(),
-        circuit = Circuit(
-            id = race.circuit.circuitId,
-            name = race.circuit.circuitName.orEmpty(),
-            circuitLengthRaw = race.circuit.circuitLength,
-            corners = race.circuit.corners,
-            city = race.circuit.city,
-            country = race.circuit.country,
-        ),
-        session = session,
-        practiceResults = source.mapIndexed { index, result ->
-            PracticeResult(
-                position = index + 1,
-                time = result.time,
-                driverId = result.driver.driverId.ifBlank { result.driverId },
-                driverName = listOfNotNull(result.driver.name, result.driver.surname)
-                    .filter(String::isNotBlank).joinToString(" ")
-                    .ifBlank { result.driver.driverId.ifBlank { result.driverId } },
-                driverShortName = result.driver.shortName,
-                driverNumber = result.driver.number,
-                teamId = result.team.teamId.ifBlank { result.teamId },
-                teamName = result.team.teamName.orEmpty(),
-            )
-        },
-    )
 }
