@@ -12,6 +12,7 @@ Source files:
 flowchart LR
   subgraph F1App
     NavShell --> BottomBar["NavigationBar\n4 NavigationBarItems"]
+    NavShell --> BackButton["Floating Back button\nsubpages only"]
     NavShell --> NavigationState
     NavigationState -->|map| Stacks["Map<Route, NavBackStack>\n1 per tab"]
     NavigationState -->|toDecoratedEntries| NavDisplay
@@ -96,6 +97,25 @@ list (for exit-through-home). Back behavior:
 - **On a non-start tab root + back** → `pop()` switches back to Homepage.
 - **Any tab with a detail route pushed + back** → pops within that tab's stack.
 
+### Subpage back affordance
+
+Subpages get one shared visual back affordance in `NavShell`, not separate
+per-screen top bars. A parent `nestedScroll` observer tracks when the active
+page content has moved upward; `navigationState.canPopCurrentStack()` plus a
+small scroll threshold shows a floating 48dp circular `BleedingBackButton` only
+after the page has scrolled. Tapping it calls the same `navigator.goBack()` path
+as system Back, so visual back and predictive/system back cannot diverge.
+
+```kotlin
+if (navigationState.canPopCurrentStack() && subpageScrollDistance > 24f) {
+    BleedingBackButton(onClick = { navigator.goBack() })
+}
+```
+
+The scroll distance resets when the active route changes. The button is placed
+with `statusBarsPadding()` so it is tappable below status icons, while the page
+content still draws behind the status bar.
+
 ## `MainActivity`
 
 `MainActivity` is 14 lines:
@@ -117,20 +137,23 @@ is safe; `HomepageScreen` reads `F1App.wiring.getSeason` from there via
 ## Inset contract (ADR 0008)
 
 `enableEdgeToEdge()` makes the app window draw under the system bars
-(mandatory on target SDK 36+). The screens inside `NavDisplay` are
-responsible for opting back into the safe area.
+(mandatory on target SDK 36+). `NavShell` sets
+`Scaffold(contentWindowInsets = WindowInsets(0.dp))` so Scaffold never adds a
+top safe inset. The bottom bar still contributes its own height through
+`innerPadding`.
 
-- **Bottom safe:** every screen's root `Column` applies
-  `Modifier.navigationBarsPadding()`. This accounts for the M3
-  `NavigationBar` in the `Scaffold`'s `bottomBar` slot, which handles
-  its own `navigationBars` inset internally (80dp container + gesture
-  pill inset on a Pixel 7 with gesture nav).
-- **Top bleeds:** the top stays edge-to-edge so the §1 hero card and
-  the §3 `CircuitCard` brand-accent strip can sit at the visual top of
-  the Homepage with the system clock floating over them. The
-  `edge-to-edge` skill's PREFERRED pattern is symmetric
-  `Modifier.padding(innerPadding)`; F1app deliberately deviates. See
+- **Bottom safe:** `NavDisplay` consumes Scaffold `innerPadding`, which comes
+  from the M3 `NavigationBar` in the `bottomBar` slot. The bar handles its own
+  navigation-bar inset internally.
+- **Top safe at rest, scroll-under bleed:** `NavShell` still does not apply a
+  fixed top inset. Scrollable screens add the status-bar inset inside their
+  scroll content (`verticalScroll(...).statusBarsPadding()` or a LazyColumn
+  top spacer), so first content starts below status icons but can pass behind
+  them once the user scrolls up. See
   [lode/decisions/0008-screen-inset-bottom-only-top-bleeds.md](../decisions/0008-screen-inset-bottom-only-top-bleeds.md).
+- **Subpage back:** the floating back button pads itself away from status
+  icons with `statusBarsPadding()`; it does not force the whole screen below
+  the status bar.
 
 `enableEdgeToEdge()` from `ComponentActivity` (not `WindowCompat`)
 auto-handles status-bar icon contrast, so the dark `surfaceContainer`

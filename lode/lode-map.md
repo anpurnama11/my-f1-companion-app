@@ -34,7 +34,7 @@ lode/
     0005-session-results-use-two-apis.md     # Session results: f1api.dev for R/Q/FP, Jolpica alpha for Sprint/SprintQuali
     0006-race-results-hybrid-source.md       # Race results: f1api.dev metadata/fastest-lap + Jolpica standard status/grid
     0007-podium-shape-locked.md            # Past-row podium: text-only InlinePodium, no red P1 background; red = current/active (LIVE only) (ticket 19)
-    0008-screen-inset-bottom-only-top-bleeds.md  # Screen inset treatment: navigationBarsPadding only; top bleeds (ticket 21)
+    0008-screen-inset-bottom-only-top-bleeds.md  # Screen inset treatment: top safe at rest; scroll-under bleed (ticket 21)
     0009-remove-openf1-runtime-dependency.md  # OpenF1 removed; f1api/Jolpica/local F1DB artwork; top speed absent from v1 (ticket 10)
     0010-my-team-content-into-homepage-§3.md  # Variant A wins; no separate My Team tab; §3 is the management surface (ticket 24, build 11)
     0011-countdown-widget-cache-narrow-to-racestart.md  # Widget cache stores only raceStartMillis; pre-race window is a fixed 3d buffer, not cached FP1 (ticket 07)
