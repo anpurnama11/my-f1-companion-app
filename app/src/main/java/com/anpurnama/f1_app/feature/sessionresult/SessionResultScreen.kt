@@ -16,10 +16,16 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +37,8 @@ import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.f1.model.FastestPitstop
 import com.anpurnama.f1_app.f1.model.FastestLap
 import com.anpurnama.f1_app.f1.model.PracticeResult
-import com.anpurnama.f1_app.f1.model.QualifyingResult
+import com.anpurnama.f1_app.f1.model.QualifyingSegment
+import com.anpurnama.f1_app.f1.model.QualifyingSegmentResult
 import com.anpurnama.f1_app.f1.model.RoundResult
 import com.anpurnama.f1_app.f1.model.SessionResult
 import com.anpurnama.f1_app.f1.model.SessionType
@@ -39,6 +46,7 @@ import com.anpurnama.f1_app.f1.model.displayGrid
 import com.anpurnama.f1_app.f1.model.displayStatusOrTime
 import com.anpurnama.f1_app.f1.model.driverForPitstop
 import com.anpurnama.f1_app.f1.model.positionChange
+import com.anpurnama.f1_app.f1.model.toQualifyingSegmentTabs
 import com.anpurnama.f1_app.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,7 +96,7 @@ private fun SessionResultContent(
             }
             items(result.raceResults) { RaceResultRow(it) }
         } else if (result.session == SessionType.Quali || result.session == SessionType.SprintQuali) {
-            items(result.qualifyingResults) { QualifyingRow(it) }
+            item { QualifyingSegmentTabs(result) }
         } else {
             items(result.practiceResults) { PracticeRow(it) }
         }
@@ -151,17 +159,66 @@ private fun RaceResultRow(result: RoundResult) {
 }
 
 @Composable
-private fun QualifyingRow(result: QualifyingResult) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(Modifier.padding(Spacing.normal), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text("P${result.gridPosition}", fontWeight = FontWeight.SemiBold)
-            Text(result.driverName, fontWeight = FontWeight.SemiBold)
-            Text(result.teamName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(listOfNotNull("Q1 ${result.q1}", "Q2 ${result.q2}", "Q3 ${result.q3}")
-                .joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+private fun QualifyingSegmentTabs(result: SessionResult) {
+    val tabs = remember(result.qualifyingResults) { result.qualifyingResults.toQualifyingSegmentTabs() }
+    var selectedTabIndex by rememberSaveable(result.session, result.year, result.round) { mutableIntStateOf(0) }
+    val selectedTab = tabs.getOrNull(selectedTabIndex) ?: return
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        SecondaryTabRow(selectedTabIndex = selectedTabIndex) {
+            tabs.forEachIndexed { index, tab ->
+                Tab(
+                    selected = selectedTabIndex == index,
+                    onClick = { selectedTabIndex = index },
+                    text = { Text(tab.segment.shortLabel) },
+                )
+            }
+        }
+        Text(
+            qualifyingSegmentSummary(selectedTab.segment.shortLabel, selectedTab.advancedCount, selectedTab.eliminatedCount),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        selectedTab.rows.forEach { row ->
+            QualifyingSegmentRow(row)
         }
     }
 }
+
+private fun qualifyingSegmentSummary(segment: String, advancedCount: Int, eliminatedCount: Int): String =
+    when (segment) {
+        "Q3" -> "$segment · $advancedCount classified"
+        else -> "$segment · $advancedCount advanced · $eliminatedCount eliminated"
+    }
+
+@Composable
+private fun QualifyingSegmentRow(result: QualifyingSegmentResult) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+        Column(Modifier.padding(Spacing.normal), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("P${result.segmentPosition}", fontWeight = FontWeight.SemiBold)
+                Text(result.displayTime(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(result.driverName, fontWeight = FontWeight.SemiBold)
+            Text(result.teamName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    result.segmentOutcomeLabel(),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text("Overall P${result.overallPosition}", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+private fun QualifyingSegmentResult.segmentOutcomeLabel(): String = when {
+    eliminated -> "Eliminated in ${segment.shortLabel}"
+    segment == QualifyingSegment.Q3 -> "Final segment"
+    else -> "Advanced"
+}
+
+private fun QualifyingSegmentResult.displayTime(): String =
+    if (time.isNullOrBlank()) "No time" else time
 
 @Composable
 private fun PracticeRow(result: PracticeResult) {

@@ -61,6 +61,8 @@ lode/
     14-driver-team-detail-ui-rewrite.md     # ready — DriverDetail/TeamDetail UI rewrite (two tabs, Compare card vs teammate, About section); consumes F1DB catalog (12) + Wikipedia REST (13) in one use case update (wayfinder 29, ADR 0012 + ADR 0013)
   release/
     build-and-signing.md           # release buildType, signing, R8 (AGP 9 DSL), versioning, output (ticket 15)
+  session-results/
+    qualifying-segment-tabs.md     # Quali/SprintQuali SessionResult renders Q1/Q2/Q3 tabs derived from q1/q2/q3 rows
   widget/
     countdown.md                   # CountdownWidget, CountdownWorker, NextRaceCache [BUILT ticket 07]
   tooling/
