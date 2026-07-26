@@ -97,6 +97,12 @@ class NavigationState(
         backStacks[currentRoute]?.add(route)
     }
 
+    /** True when the active tab is showing a pushed subpage above its root. */
+    fun canPopCurrentStack(): Boolean = (backStacks[currentRoute]?.size ?: 0) > 1
+
+    /** Current active entry; used for route-scoped shell UI state resets. */
+    fun currentStackTop(): NavKey? = backStacks[currentRoute]?.lastOrNull()
+
     /**
      * Pops one entry from the current tab's backstack, or if at the root
      * of a non-start tab, switches to the start tab. Returns `false` when

@@ -1,22 +1,37 @@
 package com.anpurnama.f1_app.core.navigation
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.anpurnama.f1_app.R
@@ -67,6 +82,26 @@ fun NavShell(
         topLevelRoutes = Route.homepageTabs,
     )
     val navigator = remember(navigationState) { Navigator(navigationState) }
+    var subpageScrollDistance by remember { mutableFloatStateOf(0f) }
+    val backButtonScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                // Negative Y means the page content has moved up (user is
+                // scrolling down the document). Positive Y walks the distance
+                // back toward zero as the page returns to the top.
+                subpageScrollDistance = (subpageScrollDistance - consumed.y).coerceAtLeast(0f)
+                return Offset.Zero
+            }
+        }
+    }
+
+    LaunchedEffect(navigationState.currentRoute, navigationState.currentStackTop()) {
+        subpageScrollDistance = 0f
+    }
 
     // Deep-link consumption. The spec is "push RoundDetail onto
     // Homepage as backstack root ([Homepage, RoundDetail]); back
@@ -132,13 +167,54 @@ fun NavShell(
     }
 
     Scaffold(
+        // F1app intentionally keeps content bleeding under the status bar
+        // (ADR 0008). The bottom bar still contributes its height through
+        // `innerPadding`, but Scaffold must not add top safe-area padding.
+        contentWindowInsets = WindowInsets(0.dp),
         bottomBar = { F1BottomBar(navigationState) },
     ) { innerPadding ->
-        NavDisplay(
-            entries = navigationState.toDecoratedEntries(entryProvider),
-            modifier = Modifier.padding(innerPadding),
-            onBack = { navigator.goBack() },
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(backButtonScrollConnection),
+        ) {
+            NavDisplay(
+                entries = navigationState.toDecoratedEntries(entryProvider),
+                modifier = Modifier.padding(innerPadding),
+                onBack = { navigator.goBack() },
+            )
+            if (navigationState.canPopCurrentStack() && subpageScrollDistance > 24f) {
+                BleedingBackButton(
+                    onClick = { navigator.goBack() },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(start = 12.dp, top = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BleedingBackButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.size(48.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 8.dp,
+    ) {
+        IconButton(onClick = onClick) {
+            Icon(
+                painter = painterResource(R.drawable.ic_arrow_back),
+                contentDescription = "Back",
+            )
+        }
     }
 }
 
