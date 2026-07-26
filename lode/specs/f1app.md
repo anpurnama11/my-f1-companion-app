@@ -29,8 +29,11 @@ A single-module Jetpack Compose Android app (`com.anpurnama.f1_app`) with three
 top-level tabs — Homepage, Schedule, Leaderboard — plus Driver / Team
 / Round / Circuit detail pages, and one Jetpack Glance home-screen Countdown
 widget. All F1 data comes from free, zero-auth APIs
-(f1api.dev as primary; OpenF1 for top speed; jolpica for all-time most-wins
-at a circuit), fetched over one Ktor `HttpClient`, cached via HttpCache +
+(f1api.dev for schedule + driver/team/circuit catalogs; Jolpica standard for
+Race + Qualifying results and pit-stops; Jolpica alpha for Sprint, Sprint
+Qualifying, and Free Practice results, translated to Ergast ids at the data
+seam; OpenF1 for top speed; jolpica for all-time most-wins at a circuit),
+fetched over one Ktor `HttpClient`, cached via HttpCache +
 DataStore for offline-first reads. Favorites (2 drivers + 1 team) persist
 locally and drive the Homepage §3 combined favorites card and My Team
 management view. The
@@ -154,13 +157,16 @@ This is the hedge that makes a future KMP port a move instead of a rewrite.
   - `GET /current/drivers`, `GET /current/teams` — Driver / Team detail
   - `GET /current/drivers-championship`, `GET /current/constructors-championship`
     — Leaderboard, Homepage fav-driver / fav-team, detail pages
-  - `GET /{year}/{round}/race`, `GET /{year}/{round}/qualy`,
-    `GET /{year}/{round}/fp1`, `GET /{year}/{round}/fp2`,
-    `GET /{year}/{round}/fp3` — `SessionResult` route for Race / Qualifying /
-    FP1/2/3; also past-list podium (slices `[0..2]` from race results)
-  - Jolpica alpha `GET /f1/alpha/results/{round_id}/SR/` and `/SQ/` —
-    `SessionResult` route for Sprint and Sprint Qualifying results
-    (f1api.dev has no sprint endpoints)
+  - `GET /{year}/drivers` — season-matched driver catalog; the car-number
+    bridge for the Jolpica alpha translator (FP/SQ/SR rows → Ergast canonical
+    ids). HttpCache-shared.
+  - f1api.dev carries **no** race / qualifying / free-practice result
+    endpoints after the Jolpica migration (ADR 0005); those moved to Jolpica
+    (standard for race+quali, alpha for FP/SQ/SR).
+  - Jolpica alpha `GET /f1/alpha/results/{round_id}/{SR|SQ|FP1|FP2|FP3}/` —
+    `SessionResult` route for Sprint, Sprint Qualifying, and Free Practice
+    (f1api.dev has no such endpoints). Rows translated to Ergast ids at the
+    data seam via the car-number bridge; see architecture/id-namespaces.md.
   - `GET /circuits/{circuitId}` — Circuit metadata (cheap; inlined elsewhere
     but called directly for `CircuitDetail`)
 
@@ -173,8 +179,14 @@ This is the hedge that makes a future KMP port a move instead of a rewrite.
     (`stop_duration` is stationary pit time; available from 2024 US GP onwards)
 
 - jolpica extensions:
-  - `GET /{year}/{round}/results.json` — authoritative race `status` and
-    `grid` for `GetRoundResultsUseCase` (merged with f1api.dev race result).
+  - `GET /{year}/{round}/results.json` and `GET /{year}/{round}/qualifying.json`
+    — single source for `GetRoundResultsUseCase` (full Ergast race richness:
+    circuit block, per-row `Constructor`, authoritative `status`, numeric
+    `grid`, `fastestLap`, time/gap, points) and `GetRoundQualifyingUseCase`
+    (per-segment Q1/Q2/Q3, per-row `Constructor` on every row including Q1
+    knockouts). No f1api.dev merge (ADR 0005 supersedes 0006).
+  - `GET /{year}/{round}/pitstops.json` — fastest pit-stop standout card
+    (duration); aligned with the Jolpica-standard race ids.
   - `getCircuitWinners(f1apiCircuitId)` —
     `GET /circuits/{id}/results/1.json`; client-aggregates the top driver +
     top team. `driverId` / `constructorId` match f1api.dev's namespace; only
@@ -212,11 +224,11 @@ behavior.
 | `GetConstructorsStandingsUseCase` | f1api.dev `/current/constructors-championship` | Leaderboard, Homepage fav-team, Team detail, first-launch seed |
 | `GetDriverDetailUseCase(id)` | f1api.dev `/current/drivers` + `/drivers-championship` | Driver detail |
 | `GetTeamDetailUseCase(id)` | f1api.dev `/current/teams` + `/constructors-championship` | Team detail |
-| `GetRoundResultsUseCase(year, round)` | f1api.dev `/{y}/{r}/race` + Jolpica standard `/ergast/f1/{y}/{r}/results.json` (hybrid) | Race `SessionResult`, RoundDetail past-mode podium chips, Past-list podium |
-| `GetRoundQualifyingUseCase(year, round)` | f1api.dev `/{y}/{r}/qualy` | Qualifying `SessionResult` |
-| `GetPracticeResultUseCase(year, round, session)` | f1api.dev `/{y}/{r}/fp1|fp2|fp3` | FP1/FP2/FP3 `SessionResult` |
-| `GetSprintResultUseCase(year, round)` | Jolpica alpha `/f1/alpha/results/{round_id}/SR/` | Sprint `SessionResult` |
-| `GetSprintQualifyingResultUseCase(year, round)` | Jolpica alpha `/f1/alpha/results/{round_id}/SQ/` | Sprint Qualifying `SessionResult` |
+| `GetRoundResultsUseCase(year, round)` | Jolpica standard `/ergast/f1/{y}/{r}/results.json` | Race `SessionResult`, RoundDetail past-mode podium chips, Past-list podium |
+| `GetRoundQualifyingUseCase(year, round)` | Jolpica standard `/ergast/f1/{y}/{r}/qualifying.json` | Qualifying `SessionResult` |
+| `GetPracticeResultUseCase(year, round, session)` | Jolpica alpha `/f1/alpha/results/{round_id}/{FP1|FP2|FP3}/` (ids via car-number bridge) | FP1/FP2/FP3 `SessionResult` |
+| `GetSprintResultUseCase(year, round)` | Jolpica alpha `/f1/alpha/results/{round_id}/SR/` (ids via car-number bridge) | Sprint `SessionResult` |
+| `GetSprintQualifyingResultUseCase(year, round)` | Jolpica alpha `/f1/alpha/results/{round_id}/SQ/` (ids via car-number bridge) | Sprint Qualifying `SessionResult` |
 | `GetSessionResultUseCase(year, round, sessionType)` | branches to the five use cases above | `SessionResult` screen |
 | `GetFastestPitstopUseCase(year, round)` | OpenF1 `/v1/sessions` + `/v1/pit` | Race `SessionResult` standout card |
 | `GetRoundPodiumUseCase(year, round)` | reuses `getRoundResults`, slices `[0..2]` | Schedule > Past list |
@@ -366,7 +378,8 @@ free API and is dropped from v1.
 selected session:
 
 - **Race** — podium chip header (P1/P2/P3 driver abbreviations), Fastest Lap
-  standout card (derived from f1api.dev `fastLap`), Fastest Pitstop standout
+  standout card (derived from the Jolpica standard `fastestLap` block, the race
+  result source after the migration; ADR 0005), Fastest Pitstop standout
   card (OpenF1 `stop_duration`; hidden when unavailable), and a full grid table
   showing position, driver, team, grid-change arrow (hidden for pit-lane starts),
   time/status, and points. `Retired` rows show **"DNF"**; `Did not start` rows show
@@ -377,9 +390,11 @@ selected session:
   fastest-lap time.
 
 The session list is built from the f1api.dev schedule, which includes
-`sprintQualy` and `sprintRace` fields (null when the GP has no sprint). Sprint
-and Sprint Qualifying results come from Jolpica alpha because f1api.dev does
-not provide them. See ADR `0005-session-results-use-two-apis.md`.
+`sprintQualy` and `sprintRace` fields (null when the GP has no sprint). Race +
+Qualifying results come from Jolpica standard; Sprint, Sprint Qualifying, and
+Free Practice results come from Jolpica alpha (translated to Ergast ids via
+the car-number bridge), because f1api.dev provides none of these. See ADR
+`0005-session-results-use-two-apis.md` and architecture/id-namespaces.md.
 
 ### Favorites (Homepage §3)
 
@@ -496,17 +511,19 @@ flowchart LR
   `"5412km"` = 5.412 km). Strip non-digits and **divide by 1000** to
   get real km; `Season.totalKm` is `Double` for precision.
 - Envelope shape differs by endpoint: `/current/next` → `race: [...]` array;
-  `/current` → `races: [...]` array; `/{y}/{r}/race` → `races: {...}` object
-  with `results: [...]`. Three different envelope DTOs.
-- `circuit` is an object in `/current*` but a one-element array in
-  `/{y}/{r}/race` — different DTO per endpoint.
+  `/current` → `races: [...]` array; Jolpica standard
+  `/{y}/{r}/results.json`|`/qualifying.json` → `MRData.RaceTable.Races[]`
+  (Ergast envelope). Different envelope DTOs per source.
 - `/current` `RaceSchedule` now includes `sprintQualy` and `sprintRace` fields
   (nullable) in addition to `fp1`/`fp2`/`fp3`/`qualy`/`race`; the model and UI
   must pick the five active sessions for the weekend.
-- f1api.dev `/{y}/{r}/fp1|fp2|fp3` results have only `time` per driver, no
-  explicit `position` — position is implicit from time ordering.
-- Jolpica alpha results use opaque `round_id` and a different response schema
-  from f1api.dev; the sprint session use cases wrap that translation.
+- Jolpica alpha FP/SQ/SR results use opaque `round_id` + opaque driver/team
+  ids, distinct from Ergast canonical; `loadAlpha` builds a `CarNumberTranslator`
+  from the season-matched `getDrivers(year)` catalog and translates `car_number`
+  → `(driverId, teamId)` at the data seam, with opaque-id fallback when the
+  catalog misses. See architecture/id-namespaces.md (ADR 0005).
+- Jolpica alpha FP results expose per-driver `best lap time` (string); position
+  is implicit from ordering and the mapper assigns it.
 - Three spellings of "firstAppearance" across endpoints
   (`firstAppareance`, `firstAppearance`, `firstParticipationYear`) —
   `@SerialName` per DTO.

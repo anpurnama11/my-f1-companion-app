@@ -31,8 +31,13 @@ uses an adaptive gate (every tick inside a 3d-pre-race / 3h-post-race window,
 `f1app://round/{year}/{round}` deep link; `MainActivity` parses it and
 pushes `Route.RoundDetail` onto the Homepage backstack.
 
-Data from f1api.dev primary, Jolpica standard for race status/grid and
-pit-stop enrichment, and Jolpica alpha for sprint sessions. Circuit artwork
+Data: f1api.dev for schedule + catalogs (season, next race, standings,
+driver/team detail joins, circuit metadata, the season driver catalog that
+bridges the alpha id namespace); Jolpica standard for Race and Qualifying
+results and pit-stop enrichment; Jolpica alpha for Sprint, Sprint Qualifying,
+and Free Practice results, translated to Ergast canonical ids at the data
+seam via the car-number bridge (ADR 0005 / architecture/id-namespaces.md).
+Circuit artwork
 is bundled from a pinned F1DB revision; 2026+ driver headshots and team/car
 renders load from formula1.com Cloudinary paths derived locally from f1api.dev
 name/team fields.

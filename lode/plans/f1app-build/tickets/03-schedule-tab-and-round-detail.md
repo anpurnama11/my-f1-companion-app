@@ -9,6 +9,17 @@ owner: ""
 
 # 03 — Schedule tab + Round detail
 
+> **Post-build supersession note (Jolpica migration, steps 1–6):** the result
+> sources described revisions 2–3 (f1api.dev for Race/Qualifying/FP, hybrid
+> f1api.dev + Jolpica standard race-merge, Jolpica alpha for Sprint/SQ) were
+> replaced by the migration captured in ADR
+> `decisions/0005-session-results-use-two-apis.md` (amended, supersedes 0006):
+> Race + Qualifying now come from Jolpica standard; FP/Sprint/SprintQuali from
+> Jolpica alpha with the car-number id translator; f1api.dev carries schedule
+> + catalogs only. The hybrid race-result source and the f1api race/quali/FP
+> extensions/DTOs are deleted. The body below records the state as built at
+> the time and is retained for history; see ADR 0005 for the current source map.
+
 **What to build:** the Schedule tab becomes real — upcoming rounds show
 session times and past rounds show full podiums (P1/P2/P3). Pull-to-refresh
 re-fetches the schedule. The planned RoundDetail expansion has two modes:

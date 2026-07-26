@@ -114,20 +114,24 @@ Short term → meaning lines. Domain + project language.
   `data class TeamDetail(teamId: String)` open the current detail joins from
   Leaderboard rows. `data class SessionResult(year: Int, round: Int, session: SessionType)` —
   full result list for one session (Race, Qualifying, Sprint, SQuali, FP1/2/3);
-  pushed from a RoundDetail session row. Race status/grid is normalized from
-  the hybrid f1api.dev + Jolpica source; sprint sessions use Jolpica alpha.
+  pushed from a RoundDetail session row. Race + Qualifying come from Jolpica
+  standard (`/results.json`, `/qualifying.json`); Sprint, Sprint Quali, and
+  FP1/2/3 come from Jolpica alpha, translated to Ergast ids via the car-number
+  bridge (ADR 0005 / architecture/id-namespaces.md).
 - **SessionType** — enum of the possible session types across all GPs:
   `FP1`, `FP2`, `FP3`, `SprintQuali`, `Sprint`, `Quali`, `Race`. A single GP
   always uses exactly **five** of these: Sprint weekends use FP1 → SprintQuali
   → Sprint → Quali → Race; non-sprint weekends use FP1 → FP2 → FP3 → Quali →
   Race. Used by `SessionResult` to pick the correct endpoint and to render the
   correct label/short label.
-  Endpoint mapping: Race/Quali/FP1/FP2/FP3 → f1api.dev
-  (`/{year}/{round}/race`, `/qualy`, `/fp1`, `/fp2`, `/fp3`);
-  Sprint/SprintQuali → Jolpica alpha
-  (`/f1/alpha/results/{round_id}/SR/` and `/SQ/`). The session list in
-  `RoundDetail` is built from the f1api.dev schedule (which includes
-  `sprintQualy` and `sprintRace` fields, null when no sprint).
+  Endpoint mapping: Race/Quali → Jolpica standard
+  (`/ergast/f1/{year}/{round}/results.json`, `/qualifying.json`);
+  FP1/FP2/FP3/Sprint/SprintQuali → Jolpica alpha
+  (`/f1/alpha/results/{round_id}/{FP1|FP2|FP3|SR|SQ}/`), translated to Ergast
+  ids via the car-number bridge. The session list in `RoundDetail` is built
+  from the f1api.dev schedule (which includes `sprintQualy` and `sprintRace`
+  fields, null when no sprint). f1api.dev itself carries no race/quali/FP
+  results after the migration (ADR 0005).
 - **NavShell** — `core/navigation/NavShell.kt`; the 4-tab `Scaffold` +
   `NavigationBar` + `NavDisplay` host. Uses Navigation 3 multi-backstack
   (revision 2): each tab owns a persistent `NavBackStack`; switching tabs
@@ -184,7 +188,8 @@ Short term → meaning lines. Domain + project language.
 - **SessionResult** — `[BUILT ticket 03]` `Route.SessionResult(year, round, session)` full result
   list for one session. Race results include a podium chip header (top 3),
   Fastest Lap, and Fastest Pitstop standout cards. Fastest Lap is derived from
-  f1api.dev `fastLap` fields. Fastest Pitstop comes from Jolpica
+  the Jolpica standard `fastestLap` block (the Race results source after the
+  Jolpica migration; ADR 0005). Fastest Pitstop comes from Jolpica
   (`/pitstops.json`, duration). If no pit-stop data exists for the
   round (e.g., pre-2024 US GP), the card is hidden. Other sessions show their
   session-specific result table (Quali/SprintQuali = Q1/Q2/Q3; Sprint = same as

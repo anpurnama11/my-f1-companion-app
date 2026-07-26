@@ -19,8 +19,10 @@ Driver/Team detail is now `[BUILT]`: standings are reused by the tab and joined
 to current driver/team metadata for detail pages. Round detail and the Schedule
 tab are `[BUILT]`: `RoundScreen` derives upcoming/past mode from the race slot,
 uses the year-specific season schedule, and pushes `SessionResult`; session
-results normalize f1api.dev, Jolpica standard/alpha, and optional Jolpica
-pit-stop data through `Wiring`. Circuit artwork is a pinned F1DB build-time
+results normalize Jolpica standard (Race + Qualifying) and Jolpica alpha
+(Sprint / Sprint Quali / Free Practice, via the car-number id translator),
+plus optional Jolpica pit-stops, through `Wiring`; f1api.dev now carries
+schedule + catalogs only (ADR 0005 supersedes 0006). Circuit artwork is a pinned F1DB build-time
 asset catalog; `CircuitDetail` is shipped (ticket 06) as the destination for
 the RoundDetail circuit block.
 

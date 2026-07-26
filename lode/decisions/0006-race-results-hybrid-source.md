@@ -1,6 +1,16 @@
 # 0006 — Race results use a hybrid source
 
-**Status:** accepted
+**Status:** superseded by [0005-session-results-use-two-apis.md](0005-session-results-use-two-apis.md) (amended 2026-07-26)
+
+> **Superseded.** The hybrid merge of f1api.dev race metadata + Jolpica
+> standard `status`/`grid` is fully retired. Jolpica standard
+> `/ergast/f1/{year}/{round}/results.json` carries the full Ergast richness
+> (circuit block, per-row `Constructor`, `status`, `grid`, `fastestLap`,
+> time/gap) in one call, so the driver-number merge bought nothing. `GetRoundResultsUseCase`
+> now makes a single Jolpica standard call; the f1api.dev `/{year}/{round}/race`
+> fetch and its DTO are deleted (step 5). The amended 0005 is the current
+> decision. The body below is retained for the point-in-time record of the
+> hybrid merge.
 
 ## Context
 

@@ -10,6 +10,7 @@ lode/
   lode-map.md                        # this file
   architecture/
     architecture.md                  # module, DI, layers, tech choices (ticket 01) [BUILT]
+    id-namespaces.md                 # two id namespaces (Ergast canonical + Jolpica alpha opaque) + the car-number translator (step 6)
   core/
     navigation.md                    # Navigation 3 4-tab shell shape (ticket 01) [BUILT]
     network.md                       # Ktor HttpClient factory + F1Api extensions
@@ -31,8 +32,8 @@ lode/
     0002-sectionuistate-is-vm-to-ui-transport.md  # SectionUiState is VM→UI transport; Outcome stops at the VM
     0003-derived-sections-load-after-nextrace.md  # Derived sections load after loadNextRace(); no reactive observer
     0004-multi-backstack-tab-navigation.md   # Multi-backstack; per-tab NavBackStack avoids ViewModel destruction on tab switch
-    0005-session-results-use-two-apis.md     # Session results: f1api.dev for R/Q/FP, Jolpica alpha for Sprint/SprintQuali
-    0006-race-results-hybrid-source.md       # Race results: f1api.dev metadata/fastest-lap + Jolpica standard status/grid
+    0005-session-results-use-two-apis.md     # accepted (amended 2026-07-26; supersedes 0006) — R+Q on Jolpica standard; FP+SR+SQ on Jolpica alpha (car-number translator to Ergast canonical); f1api.dev only for schedule+catalogs. Two namespaces only (Ergast canonical + alpha opaque); see architecture/id-namespaces.md.
+    0006-race-results-hybrid-source.md       # superseded by 0005 (amended 2026-07-26) — was: f1api.dev metadata/fastest-lap + Jolpica standard status/grid merge; hybrid merge retired (Jolpica standard /results.json is single source)
     0007-podium-shape-locked.md            # Past-row podium: text-only InlinePodium, no red P1 background; red = current/active (LIVE only) (ticket 19)
     0008-screen-inset-bottom-only-top-bleeds.md  # Screen inset treatment: top safe at rest; scroll-under bleed (ticket 21)
     0009-remove-openf1-runtime-dependency.md  # OpenF1 removed; f1api/Jolpica/local F1DB artwork; top speed absent from v1 (ticket 10)
@@ -45,7 +46,7 @@ lode/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)
       02-homepage-section-1-and-section-3.md    # shipped — Homepage §1 countdown + §3 combined favorites/nearest-GP cards (2027-01-15)
-      03-schedule-tab-and-round-detail.md       # shipped — Schedule + two-mode Round detail + SessionResult/hybrid results
+      03-schedule-tab-and-round-detail.md       # shipped — Schedule + two-mode Round detail + SessionResult (post-migration: Jolpica standard R/Q + Jolpica alpha FP/SQ/SR; supersession note in ticket)
       04-leaderboard-and-driver-team-detail.md  # shipped — leaderboard + driver/team detail
       05-my-team-tab-and-favorites-picker.md    # shipped — My Team slots + bottom-sheet picker
       06-circuit-detail.md                      # shipped — Circuit detail page (most-wins + metadata, ticket 06, 2026-07-25)
