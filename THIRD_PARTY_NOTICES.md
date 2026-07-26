@@ -15,3 +15,33 @@ To reproduce the checked-in resources from that pin, run:
 ```bash
 python3 tools/f1db/import-circuit-artwork.py
 ```
+
+## Wikipedia REST summary
+
+The "About" biography text on the redesigned DriverDetail and
+TeamDetail screens is fetched from the [Wikipedia REST API
+summary endpoint](https://en.wikipedia.org/api/rest_v1/page/summary/{title})
+at runtime via
+`app/src/main/java/com/anpurnama/f1_app/f1/data/WikipediaApi.kt`
+(constants: `WIKIPEDIA_REST_BASE`, `WIKIPEDIA_USER_AGENT`; DTO:
+`WikipediaSummary`; extension: `HttpClient.getWikipediaSummary`).
+
+The summary text (`extract`) is reused under [CC BY-SA
+4.0](https://creativecommons.org/licenses/by-sa/4.0/). Attribution
+("From Wikipedia, the free encyclopedia, under CC BY-SA 4.0" +
+link to the article URL) is rendered in the UI by the screen
+layer; the article URL is the `contentUrl` field on the
+`WikipediaSummary` DTO.
+
+The Wikimedia edge requires a project-identifying `User-Agent`
+header — the constant `WIKIPEDIA_USER_AGENT` carries
+`F1app/1.0 (https://github.com/anpurnama/F1app)`. The contact URL
+in that constant is the only project-side identifier sent to
+Wikipedia; no API key, no auth, no telemetry.
+
+To reproduce the same response shape, fetch directly:
+
+```bash
+curl -H "User-Agent: F1app/1.0 (https://github.com/anpurnama/F1app)" \
+  "https://en.wikipedia.org/api/rest_v1/page/summary/Andrea_Kimi_Antonelli"
+```
