@@ -12,13 +12,13 @@ Play Console / AAB / `bundletool` in scope.
   RSA-2048, alias `f1app-release`, validity 10000 days.
   Cert SHA-256: `66ee22de9426c9c2ac1b35030e74fa862481eb8669da5a038f7f993632dcec1b`.
 - Credentials live in a git-ignored `keystore.properties` at the repo root
-  (added to `.gitignore`):
+  (added to `.gitignore`). Keep concrete values only in that local file:
 
 ```properties
-storeFile=/Users/anpurnama/.android/f1app-release.jks
-storePassword=f1app-store-2026
-keyAlias=f1app-release
-keyPassword=f1app-store-2026   # PKCS12 ignores this; equals storePassword
+storeFile=<absolute path to local release keystore>
+storePassword=<local secret>
+keyAlias=<local alias>
+keyPassword=<local secret>   # PKCS12 usually ignores this; often equals storePassword
 ```
 
 **Invariant:** never commit the keystore, `keystore.properties`, or the password
@@ -71,17 +71,36 @@ android.r8.gradual.support=true
 
 ### Keep rules
 
-None needed today. Rationale:
-- App code is the Compose scaffold (theme + `MainActivity`) — no reflection.
-- Compose + kotlinx.serialization ship consumer rules transitively; the new
-  DSL applies default Android keep rules.
-- Ticket 04 contract: `F1Api.kt` extensions are pure Kotlin `suspend fun`s
-  (no Retrofit `@GET` interfaces); DTOs use `@SerialName` so kotlinx.serialization
-  generates serializers (no R8 keep needed).
+One app-level rule is required today because WorkManager initializes its
+internal Room database reflectively during AndroidX Startup. In release/R8,
+`androidx.work.impl.WorkDatabase_Impl` must keep its generated no-arg
+constructor or launch fails before `MainActivity` with
+`NoSuchMethodException: androidx.work.impl.WorkDatabase_Impl.<init>[]`.
 
-If R8 strips something at runtime once feature code lands, place keep rules in
-`src/<variant>/keepRules/*.keep` (AGP 9 source-set convention) — not a top-level
-`proguard-rules.pro`. Run the `r8-analyzer` skill for a keep-rule audit.
+Rule location: `app/src/main/keepRules/rules.keep` (AGP 9 source-set
+convention, not top-level `proguard-rules.pro`):
+
+```proguard
+-keep class androidx.work.impl.WorkDatabase_Impl {
+    public <init>();
+}
+```
+
+Validation contract for release/R8 edits:
+
+```bash
+./gradlew :app:assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
+adb logcat -c
+adb shell monkey -p com.anpurnama.f1_app 1
+adb shell pidof com.anpurnama.f1_app
+adb shell dumpsys activity activities | grep -E 'topResumedActivity|ResumedActivity'
+adb logcat -b crash -d -t 100 | grep -i 'com.anpurnama.f1_app\|FATAL EXCEPTION' || true
+```
+
+The keep rule must appear in
+`app/build/outputs/mapping/release/configuration.txt`, and the seeded
+constructor should appear in `seeds.txt`.
 
 ## Versioning
 

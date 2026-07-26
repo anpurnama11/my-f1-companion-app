@@ -10,3 +10,10 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# WorkManager initializes its internal Room database through reflection in
+# release builds. Keep the generated no-arg constructor so R8 does not remove
+# or rewrite it into a shape that WorkManager cannot reflectively instantiate.
+-keep class androidx.work.impl.WorkDatabase_Impl {
+    public <init>();
+}
