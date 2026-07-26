@@ -7,7 +7,10 @@ package com.anpurnama.f1_app.widget.countdown
  * can be represented without the worker fabricating fake race data.
  *
  * Field semantics:
- *  - [startMillis] is the race session start in epoch millis (UTC).
+ *  - [sessionName] names the session the widget is counting down to
+ *    or showing as live (Free Practice 1/2/3, Sprint Qualifying,
+ *    Sprint, Qualifying, Race).
+ *  - [startMillis] is that session start in epoch millis (UTC).
  *    `0L` is the off-season sentinel — the worker writes this when
  *    `/current/next` returns an empty `race` array, and the reducer
  *    maps it to [CountdownState.SeasonOver].
@@ -29,6 +32,7 @@ data class NextRaceSnapshot(
     val circuitName: String = "",
     val circuitCountry: String? = null,
     val circuitId: String = "",
+    val sessionName: String = "Race",
     val startMillis: Long = 0L,
     val lastSyncedMillis: Long = 0L,
 )

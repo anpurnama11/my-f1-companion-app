@@ -1,6 +1,13 @@
 package com.anpurnama.f1_app.widget.countdown
 
+import com.anpurnama.f1_app.f1.model.Circuit
+import com.anpurnama.f1_app.f1.model.NextRace
+import com.anpurnama.f1_app.f1.model.Race
+import com.anpurnama.f1_app.f1.model.RaceSchedule
+import com.anpurnama.f1_app.f1.model.Season
+import com.anpurnama.f1_app.f1.model.SessionSlot
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -10,10 +17,8 @@ import org.junit.Test
  * network. No `android.*` dependencies (no Context, no WorkManager
  * harness), so this stays in `src/test/` next to the reducer.
  *
- * The gate is the one from the wayfinder 07 + ticket 07 spec, with
- * the v1 simplification: only `raceStartMillis` is in the cache, so
- * "in the race window" is approximated as `now < raceStart + 3h`.
- * That approximation is documented in the worker's KDoc.
+ * The gate is the one from the wayfinder 07 + ticket 07 spec: the cached
+ * selected session start controls the 3-day pre-window and 3-hour live window.
  */
 class CountdownWorkerGateTest {
 
@@ -34,6 +39,48 @@ class CountdownWorkerGateTest {
             startMillis = startMillis,
             lastSyncedMillis = lastSynced,
         )
+
+    private fun nextRace() = NextRace(
+        year = 2026,
+        round = 1,
+        raceName = "Bahrain GP",
+        raceId = "bahrain_2026",
+        laps = 57,
+        circuit = Circuit(
+            id = "bahrain",
+            name = "Bahrain International Circuit",
+            circuitLengthRaw = "5412km",
+            corners = 15,
+            city = "Sakhir",
+            country = "Bahrain",
+        ),
+        raceDate = "2026-03-08",
+        raceTime = "15:00:00Z",
+    )
+
+    private fun season() = Season(
+        year = 2026,
+        completedGp = 0,
+        totalKm = 0.0,
+        totalLaps = 0,
+        progressPercent = 0f,
+        races = listOf(
+            Race(
+                round = 1,
+                name = "Bahrain GP",
+                circuit = nextRace().circuit,
+                winnerId = null,
+                laps = 57,
+                schedule = RaceSchedule(
+                    fp1 = SessionSlot("2026-03-06", "11:30:00Z"),
+                    fp2 = SessionSlot("2026-03-06", "15:00:00Z"),
+                    fp3 = SessionSlot("2026-03-07", "12:30:00Z"),
+                    qualy = SessionSlot("2026-03-07", "16:00:00Z"),
+                    race = SessionSlot("2026-03-08", "15:00:00Z"),
+                ),
+            ),
+        ),
+    )
 
     // -------- first cold launch (no cache) --------
 
@@ -89,10 +136,10 @@ class CountdownWorkerGateTest {
     }
 
     @Test
-    fun `cache fresh and now after the race window does not fetch`() {
+    fun `cache fresh and selected session expired fetches to advance`() {
         val now = start + threeHours + 5 * oneMin  // 5 min past the window
         val snap = snapshot(lastSynced = now - 1 * oneMin)
-        assertFalse(CountdownWorker.shouldFetch(current = snap, nowMillis = now))
+        assertTrue(CountdownWorker.shouldFetch(current = snap, nowMillis = now))
     }
 
     @Test
@@ -120,5 +167,46 @@ class CountdownWorkerGateTest {
         val now = 1_700_000_000_000L
         val snap = snapshot(startMillis = 0L, lastSynced = now - 90 * oneMin)
         assertTrue(CountdownWorker.shouldFetch(current = snap, nowMillis = now))
+    }
+
+    @Test
+    fun `widget session chooses free practice before weekend starts`() {
+        val session = CountdownWorker.widgetSession(
+            nextRace = nextRace(),
+            season = season(),
+            nowMillis = kotlinx.datetime.Instant.parse("2026-03-06T10:00:00Z").toEpochMilliseconds(),
+        )
+
+        assertEquals("Free Practice 1", session.name)
+        assertEquals(
+            kotlinx.datetime.Instant.parse("2026-03-06T11:30:00Z").toEpochMilliseconds(),
+            session.startMillis,
+        )
+    }
+
+    @Test
+    fun `widget session advances to qualifying after practice windows`() {
+        val session = CountdownWorker.widgetSession(
+            nextRace = nextRace(),
+            season = season(),
+            nowMillis = kotlinx.datetime.Instant.parse("2026-03-07T15:31:00Z").toEpochMilliseconds(),
+        )
+
+        assertEquals("Qualifying", session.name)
+    }
+
+    @Test
+    fun `widget session falls back to race when season schedule is unavailable`() {
+        val session = CountdownWorker.widgetSession(
+            nextRace = nextRace(),
+            season = null,
+            nowMillis = kotlinx.datetime.Instant.parse("2026-03-06T10:00:00Z").toEpochMilliseconds(),
+        )
+
+        assertEquals("Race", session.name)
+        assertEquals(
+            kotlinx.datetime.Instant.parse("2026-03-08T15:00:00Z").toEpochMilliseconds(),
+            session.startMillis,
+        )
     }
 }

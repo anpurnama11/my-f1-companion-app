@@ -20,10 +20,23 @@ States computed render-time by `reduceCountdownState(nowMillis, snapshot)` (pure
 | `LiveNow` | `start <= now < start + 3h` | "LIVE NOW" in circuit accent + device-local GP date/time |
 | `RaceComplete` | `now >= start + 3h` | "RACE COMPLETE" transient + device-local GP date/time |
 
+The cached `startMillis` is the selected widget session start, not always the
+race start. The worker prefers the current/next session from the round schedule
+(`Free Practice 1/2/3`, `Sprint Qualifying`, `Sprint`, `Qualifying`, `Race`),
+falling back to the race session when the full season schedule is unavailable.
+
 **Visual** (dark `Surface` body + full-bleed ~6dp `Circuits.forId(circuitId)` accent strip):
 - body `Surface` (#0d0d0d) with `Spacing.normal`-style 16dp padding
 - 6dp accent strip at the top in the circuit's brand color (or neutral padding when no circuit)
-- race name (bold) + circuit + country + state-specific label (countdown / LIVE NOW / RACE COMPLETE / off-season / no-data) + device-local GP date/time
+- race name (bold) + circuit + country + state-specific label (countdown / LIVE NOW / RACE COMPLETE / off-season / no-data) + session name plus device-local start date/time
+
+```mermaid
+flowchart TB
+    cache[NextRaceCache snapshot] --> reducer[reduceCountdownState]
+    reducer --> glance[CountdownWidget Glance content]
+    glance --> launcher[Launcher RemoteViews widget]
+    launcher --> deeplink[f1app://round/{year}/{round}]
+```
 
 **Deep link** (tap on the body): `Intent.ACTION_VIEW` to `f1app://round/{year}/{round}` via Glance
 `clickable(actionStartActivity(intent))`. Args come from the cached snapshot. `MainActivity`
@@ -40,7 +53,7 @@ retry).
 (Android 15) with auto-mobile: app installs; `F1App.onCreate` enqueues
 one `PeriodicWorkRequest`; the first worker tick runs and writes the
 DataStore cache (`files/datastore/next_race.preferences_pb`, 300 bytes,
-all 8 typed keys populated with the real next race — Hungarian Grand
+typed keys populated with the real next race — Hungarian Grand
 Prix 2026, matching what Homepage §1 renders). JobScheduler shows
 exactly one active job for the worker, next-fire ≈ 13.7 min after
 enqueue (15-min floor, consistent). Deep link `f1app://round/2026/7`
@@ -49,29 +62,45 @@ delivered via `adb am start`: foreground hit fired `onNewIntent`
 Homepage backstack; RoundScreen rendered "Round 7" with its Round
 header and a loading ProgressBar; back returned to the Homepage.
 
-**Not smoke-verified on device:** the actual launcher widget render
-(no widget on the home screen) and the `RetryAction` trampoline path
-(no way to tap a non-existent widget). Both rely on Glance 1.1.1
-standard plumbing (`GlanceAppWidgetReceiver` + the auto-merged
+**Launcher render:** the widget renders on Pixel Launcher with content description
+`F1 Countdown`, a dark rounded card, circuit accent strip, race/circuit copy,
+countdown, and session + local start label. Existing placed widgets keep their current
+launcher cell span until the user resizes or re-adds them; the provider info
+controls the default and allowed bounds for new placements/resizes.
+
+**Not smoke-verified on device:** the `RetryAction` trampoline path. It relies on
+Glance 1.1.1 standard plumbing (`GlanceAppWidgetReceiver` + the auto-merged
 `ActionTrampolineActivity` + `actionRunCallback<RetryAction>()` +
-`WorkManager.enqueueOneTime`). The trampolines and
-`ActionCallbackBroadcastReceiver` are present in the release APK
-manifest. Acceptable v1 risk; revisit if a real launcher surfaces a
-failure.
+`WorkManager.enqueueOneTime`). The trampolines and `ActionCallbackBroadcastReceiver`
+are present in the release APK manifest. Acceptable v1 risk; revisit if a real
+launcher surfaces a failure.
 
 **Sizing** (per `res/xml/countdown_widget_info.xml`):
-`minWidth 115dp`, `minHeight 256dp`, `maxResizeWidth 130dp`, `maxResizeHeight 624dp`,
-`minResizeWidth 56dp`, `minResizeHeight 120dp`, `resizeMode horizontal|vertical`,
-`updatePeriodMillis 0` (worker `updateAll` is the re-render driver), `widgetCategory home_screen`,
+`minWidth 180dp`, `minHeight 80dp`, `minResizeWidth 56dp`, `minResizeHeight 56dp`,
+`resizeMode horizontal|vertical`, no max resize width/height. The default placement
+targets a wider, short card; omitting max bounds lets Pixel Launcher accept wider
+resize drags instead of clamping at the previous 130dp maximum width. The lower height
+bound lets already-placed widgets shrink down after resizing. `updatePeriodMillis 0`
+(worker `updateAll` is the re-render driver), `widgetCategory home_screen`,
 `initialLayout @layout/countdown_widget_initial` (trivial dark placeholder; replaced by
-`provideGlance` on first bind). `previewLayout` omitted — the launcher's widget picker
-falls back to a generated preview.
+`provideGlance` on first bind).
+
+**Widget picker preview:** provider info supplies both `previewImage` and
+`previewLayout` so launchers do not fall back to the app icon. `previewImage` is a
+static rounded dark card drawable with the green accent strip for broad launcher
+compatibility. `previewLayout` is a small RemoteViews-compatible XML mock with sample
+copy (`Bahrain Grand Prix`, `Qualifying`, `Sat 7 Mar · 16:00`) for Android 12+
+launchers that inflate layout previews. The accent strip is a zero-text `TextView`, not
+a plain `View`, because Pixel Launcher failed to load the preview when the layout
+contained an unsupported plain `View`. These previews are picker-only; runtime rendering
+remains the Glance composition.
 
 ## CountdownWorker
 
 Periodic `CoroutineWorker` in `app/.../widget/countdown/CountdownWorker.kt` (15-min
 WorkManager floor, `NETWORK_TYPE_CONNECTED` constraint, exponential backoff). Polls
-`GetNextRaceUseCase(forceRefresh = true)`. Enqueued by `F1App.onCreate()` via
+`GetNextRaceUseCase(forceRefresh = true)` for the canonical round, then `GetSeasonUseCase`
+for the current/next session label and start. Enqueued by `F1App.onCreate()` via
 `CountdownWorker.enqueuePeriodic(context)` using `ExistingPeriodicWorkPolicy.UPDATE` so a
 re-launch with a tuned schedule takes effect without first canceling.
 
@@ -79,15 +108,14 @@ re-launch with a tuned schedule takes effect without first canceling.
 
 - `snapshot == null` → fetch (first cold launch).
 - `now - lastSyncedMillis >= 60min` → fetch (cache stale).
+- `now >= startMillis + 3h` → fetch (the selected session expired; advance promptly).
 - `startMillis > 0L && nowMillis in [startMillis - 3d, startMillis + 3h)` → fetch (in race window).
 - Otherwise → skip; the next 15-min periodic tick decides again.
 
-**V1 simplification** (tickets 07 spec / wayfinder 07 lock). The literal spec window is
-`[FP1_start, race_start + 3h]`. The widget cache only stores `raceStartMillis` to keep the
-worker narrow and the cache small, so the v1 approximation uses a fixed 3-day pre-race
-buffer in place of `FP1_start`: 3 days before through 3 hours after the race. Slightly
-wider than the literal spec by ~1 day; cheaper than caching the full session schedule.
-Documented compromise; revisit if pre-FP1 freshness becomes a real user complaint.
+**Session selection.** The worker selects the first scheduled session whose start is not
+more than the 3-hour live window in the past. During FP1 it still shows Free Practice 1;
+after that window it advances to the next session. If the season schedule fails or lacks
+the round, the worker writes the race session label/start as a safe fallback.
 
 **Fetch failure policy.** Per data-layer invariant: the cache is **never cleared** on a
 network failure. The next successful tick writes the new data; a failed tick returns
@@ -111,6 +139,7 @@ typed keys:
 - `next_race_circuit: String`
 - `next_race_circuit_country: String` (empty when absent)
 - `next_race_circuit_id: String` (for the accent strip)
+- `next_race_session_name: String` (display label, defaults to `Race` for old caches)
 - `next_race_round: Int`
 - `next_race_season: Int`
 - `next_race_last_synced_millis: Long` (worker's adaptive-gate input)
@@ -137,5 +166,7 @@ and the Glance widget — one DataStore, one source of truth, file under
 - `app/src/main/java/com/anpurnama/f1_app/widget/countdown/data/NextRaceCache.kt`
 - `app/src/main/res/xml/countdown_widget_info.xml`
 - `app/src/main/res/layout/countdown_widget_initial.xml`
+- `app/src/main/res/layout/countdown_widget_preview.xml`
+- `app/src/main/res/drawable/countdown_widget_preview.xml`
 - `app/src/test/java/com/anpurnama/f1_app/widget/countdown/CountdownStateTest.kt`
 - `app/src/test/java/com/anpurnama/f1_app/widget/countdown/CountdownWorkerGateTest.kt`

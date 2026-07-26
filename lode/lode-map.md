@@ -37,9 +37,10 @@ lode/
     0008-screen-inset-bottom-only-top-bleeds.md  # Screen inset treatment: top safe at rest; scroll-under bleed (ticket 21)
     0009-remove-openf1-runtime-dependency.md  # OpenF1 removed; f1api/Jolpica/local F1DB artwork; top speed absent from v1 (ticket 10)
     0010-my-team-content-into-homepage-§3.md  # Variant A wins; no separate My Team tab; §3 is the management surface (ticket 24, build 11)
-    0011-countdown-widget-cache-narrow-to-racestart.md  # Widget cache stores only raceStartMillis; pre-race window is a fixed 3d buffer, not cached FP1 (ticket 07)
+    0011-countdown-widget-cache-narrow-to-racestart.md  # superseded by 0014; prior race-only widget cache decision
     0012-gap-f-detail-page-data-sources.md       # GAP-F data sources: F1DB build-time + Wikipedia REST (ticket 26)
     0013-compare-card-vs-teammate.md         # Compare card on DriverDetail = vs teammate; rejected: vs another driver = dropped Driver Comparison feature (ticket 29)
+    0014-countdown-widget-shows-next-session.md  # Widget cache stores selected current/next session name+start, falling back to Race
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)

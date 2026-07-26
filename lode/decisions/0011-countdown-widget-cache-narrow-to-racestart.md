@@ -1,7 +1,7 @@
 ---
 id: 11
 title: Countdown widget cache stores only raceStartMillis; pre-race window is a fixed 3d buffer
-status: accepted
+status: superseded by 0014
 date: 2026-07-25
 ticket: 07
 ---

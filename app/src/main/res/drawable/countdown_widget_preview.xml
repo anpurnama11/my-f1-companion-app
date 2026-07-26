@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static fallback for launchers that do not inflate previewLayout. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#0D0D0D" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <item android:gravity="top" android:height="6dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#008844" />
+            <corners
+                android:topLeftRadius="18dp"
+                android:topRightRadius="18dp" />
+        </shape>
+    </item>
+</layer-list>

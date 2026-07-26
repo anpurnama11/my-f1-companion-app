@@ -34,6 +34,7 @@ class CountdownStateTest {
         raceName: String = "Bahrain GP",
         circuitName: String = "Bahrain International Circuit",
         circuitCountry: String? = "Bahrain",
+        sessionName: String = "Race",
         lastSyncedMillis: Long = start - oneDay,
     ) = NextRaceSnapshot(
         year = year,
@@ -42,6 +43,7 @@ class CountdownStateTest {
         circuitName = circuitName,
         circuitCountry = circuitCountry,
         circuitId = circuitId,
+        sessionName = sessionName,
         startMillis = startMillis,
         lastSyncedMillis = lastSyncedMillis,
     )
@@ -87,7 +89,8 @@ class CountdownStateTest {
         assertEquals("Bahrain GP", cd.raceName)
         assertEquals("Bahrain", cd.circuitCountry)
         assertEquals("bahrain", cd.circuitId)
-        assertEquals(start, cd.raceStartMillis)
+        assertEquals("Race", cd.sessionName)
+        assertEquals(start, cd.sessionStartMillis)
     }
 
     @Test
@@ -204,7 +207,8 @@ class CountdownStateTest {
         assertEquals("Bahrain International Circuit", state.circuitName)
         assertEquals("Bahrain", state.circuitCountry)
         assertEquals("bahrain", state.circuitId)
-        assertEquals(start, state.raceStartMillis)
+        assertEquals("Race", state.sessionName)
+        assertEquals(start, state.sessionStartMillis)
         // The widget builds the deep-link URI from these two values.
         assertEquals(2026, state.year)
         assertEquals(1, state.round)
@@ -226,6 +230,8 @@ class CountdownStateTest {
         // strip is present on both.
         assertEquals("bahrain", live.circuitId)
         assertEquals("bahrain", done.circuitId)
+        assertEquals("Race", live.sessionName)
+        assertEquals("Race", done.sessionName)
         assertEquals(2026, live.year)
         assertEquals(1, live.round)
     }

@@ -67,14 +67,14 @@ import kotlinx.datetime.toLocalDateTime
  *
  * **Sizing.** `SizeMode.Single` — one layout for all cells. The
  * `AppWidgetProviderInfo` XML in `res/xml/countdown_widget_info.xml`
- * sets the system's `minWidth`/`minHeight`/`resizeMode`.
+ * sets the system's default size, lower resize bounds, and resize mode.
  */
 class CountdownWidget : GlanceAppWidget() {
 
-    // Single layout for all cells. The provider-info XML handles
-    // resize boundaries; the visual contract is the same regardless
-    // of cell size (the long countdown text wraps to 2 lines on the
-    // narrowest allowed width, which the design accepts).
+    // Single layout for all cells. The provider-info XML handles the
+    // default size and lower resize bounds; the visual contract is the
+    // same regardless of cell size (the long countdown text wraps to 2
+    // lines on the narrowest allowed width, which the design accepts).
     override val sizeMode: SizeMode = SizeMode.Single
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -192,7 +192,7 @@ private fun CountdownBody(state: CountdownState.Countdown) {
         )
         Spacer(modifier = GlanceModifier.height(8.dp))
         Text(
-            text = state.raceStartMillis.toDeviceLocalDateTimeLabel(),
+            text = sessionAndStartLabel(state.sessionName, state.sessionStartMillis),
             style = TextStyle(
                 color = ColorProvider(OnSurfaceVariant),
                 fontSize = 12.sp,
@@ -240,7 +240,7 @@ private fun LiveNowBody(state: CountdownState.LiveNow) {
         )
         Spacer(modifier = GlanceModifier.height(8.dp))
         Text(
-            text = state.raceStartMillis.toDeviceLocalDateTimeLabel(),
+            text = sessionAndStartLabel(state.sessionName, state.sessionStartMillis),
             style = TextStyle(
                 color = ColorProvider(OnSurfaceVariant),
                 fontSize = 12.sp,
@@ -287,7 +287,7 @@ private fun RaceCompleteBody(state: CountdownState.RaceComplete) {
         )
         Spacer(modifier = GlanceModifier.height(8.dp))
         Text(
-            text = state.raceStartMillis.toDeviceLocalDateTimeLabel(),
+            text = sessionAndStartLabel(state.sessionName, state.sessionStartMillis),
             style = TextStyle(
                 color = ColorProvider(OnSurfaceVariant),
                 fontSize = 12.sp,
@@ -383,6 +383,9 @@ internal fun formatCountdown(days: Int, hours: Int, minutes: Int): String = when
 
 internal fun circuitAndCountry(name: String, country: String?): String =
     if (country.isNullOrBlank()) name else "$name, $country"
+
+internal fun sessionAndStartLabel(sessionName: String, startMillis: Long): String =
+    "$sessionName · ${startMillis.toDeviceLocalDateTimeLabel()}"
 
 /**
  * "Sun 23 Mar · 15:00" in the device's local time zone. Matches the

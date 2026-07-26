@@ -15,6 +15,10 @@ import androidx.glance.appwidget.updateAll
 import com.anpurnama.f1_app.F1App
 import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.f1.model.NextRace
+import com.anpurnama.f1_app.f1.model.Season
+import com.anpurnama.f1_app.f1.model.SessionTime
+import com.anpurnama.f1_app.f1.model.SessionType
+import com.anpurnama.f1_app.f1.model.toWeekendSchedule
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.Clock
@@ -36,20 +40,18 @@ import java.util.concurrent.TimeUnit
  *
  *  - `snapshot == null` → fetch (first cold launch, no cache yet).
  *  - `now - lastSyncedMillis >= 60min` → fetch (cache is stale).
+ *  - `startMillis > 0L && nowMillis >= startMillis + 3h` → fetch (selected
+ *    session expired; advance to the next session promptly).
  *  - `startMillis > 0L && nowMillis in [startMillis - 3d, startMillis + 3h)` →
- *    fetch (inside the race window — keep the countdown / LIVE
+ *    fetch (inside the selected session window — keep the countdown / LIVE
  *    transition prompt).
  *  - Otherwise → skip; the next periodic tick decides again.
  *
- * **V1 simplification.** The design's "race window" is
- * `[FP1_start, race_start + 3h]`. The widget cache only stores
- * `raceStartMillis` (not the full session schedule) to keep the
- * worker narrow and the cache small. So the v1 approximation
- * uses a fixed 3-day pre-race buffer in place of `FP1_start`:
- * 3 days before through 3 hours after the race. Slightly wider
- * than the literal spec by ~1 day; cheaper than caching the
- * full session schedule. Documented compromise; revisit if
- * pre-FP1 freshness becomes a real user complaint.
+ * **Session selection.** `/current/next` remains the canonical source
+ * for the round/deep-link data. The worker also reads the current
+ * season schedule and stores the current/next session label + start
+ * (Free Practice, Qualifying, Sprint, Race). If season lookup fails,
+ * the cache falls back to the race session.
  *
  * **Fetch failure policy.** Per the data-layer invariant: the cache
  * is **never cleared** on a network failure. The next successful
@@ -84,7 +86,11 @@ class CountdownWorker(
                 if (nextRace == null) {
                     cache.writeOffSeason(lastSyncedMillis = now)
                 } else {
-                    val startMillis = raceStartMillis(nextRace)
+                    val season = when (val seasonOutcome = wiring.getSeason(forceRefresh = true)) {
+                        is Outcome.Success -> seasonOutcome.data
+                        is Outcome.Failure, Outcome.Loading -> null
+                    }
+                    val session = widgetSession(nextRace = nextRace, season = season, nowMillis = now)
                     cache.write(
                         NextRaceSnapshot(
                             year = nextRace.year,
@@ -93,7 +99,8 @@ class CountdownWorker(
                             circuitName = nextRace.circuit.name,
                             circuitCountry = nextRace.circuit.country,
                             circuitId = nextRace.circuit.id,
-                            startMillis = startMillis,
+                            sessionName = session.name,
+                            startMillis = session.startMillis,
                             lastSyncedMillis = now,
                         )
                     )
@@ -121,14 +128,10 @@ class CountdownWorker(
         private const val PRE_RACE_WINDOW_MS = 3L * 24 * 60 * 60 * 1000  // 3 days
 
         /**
-         * "In the race window" = `[start - 3d, start + 3h]`. The 3-day
-         * pre-race buffer mirrors the spec's intent: the design's
-         * literal window is `[FP1_start, race_start + 3h]`, where
-         * FP1 lands Friday afternoon. v1 doesn't cache FP1 (see the
-         * worker's KDoc), so the v1 approximation polls every tick
-         * starting 3 days before the race. Wider than the literal
-         * spec by ~1 day; cheaper than caching the full session
-         * schedule.
+         * "In the selected session window" = `[start - 3d, start + 3h]`.
+         * The 3-day pre-session buffer keeps the widget fresh around a
+         * race weekend while the 60-minute stale gate handles ordinary
+         * far-future schedule changes.
          */
 
         /**
@@ -208,6 +211,7 @@ class CountdownWorker(
             if (nowMillis - current.lastSyncedMillis >= CACHE_STALE_MS) return true
             val start = current.startMillis
             if (start > 0L) {
+                if (nowMillis >= start + RACE_WINDOW_MS) return true
                 val windowStart = start - PRE_RACE_WINDOW_MS
                 val windowEnd = start + RACE_WINDOW_MS
                 if (nowMillis in windowStart..<windowEnd) return true
@@ -233,5 +237,46 @@ class CountdownWorker(
             return runCatching { Instant.parse(composed).toEpochMilliseconds() }
                 .getOrElse { 0L }
         }
+
+        internal fun widgetSession(
+            nextRace: NextRace,
+            season: Season?,
+            nowMillis: Long,
+        ): WidgetSession {
+            val fallback = WidgetSession(
+                name = SessionType.Race.widgetLabel(),
+                startMillis = raceStartMillis(nextRace),
+            )
+            val sessions = season
+                ?.races
+                ?.firstOrNull { it.round == nextRace.round }
+                ?.schedule
+                ?.toWeekendSchedule()
+                ?.sessions
+                .orEmpty()
+            val session = sessions.firstOrNull { nowMillis < it.start.toEpochMilliseconds() + RACE_WINDOW_MS }
+                ?: return fallback
+            return WidgetSession(
+                name = session.widgetLabel(),
+                startMillis = session.start.toEpochMilliseconds(),
+            )
+        }
     }
+}
+
+internal data class WidgetSession(
+    val name: String,
+    val startMillis: Long,
+)
+
+private fun SessionTime.widgetLabel(): String = type.widgetLabel()
+
+private fun SessionType.widgetLabel(): String = when (this) {
+    SessionType.FP1 -> "Free Practice 1"
+    SessionType.FP2 -> "Free Practice 2"
+    SessionType.FP3 -> "Free Practice 3"
+    SessionType.SprintQuali -> "Sprint Qualifying"
+    SessionType.Sprint -> "Sprint"
+    SessionType.Quali -> "Qualifying"
+    SessionType.Race -> "Race"
 }

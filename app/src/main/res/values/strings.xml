@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">F1-app</string>
     <string name="widget_label">F1 Countdown</string>
+    <string name="widget_description">Shows the next Formula 1 session countdown.</string>
 </resources>

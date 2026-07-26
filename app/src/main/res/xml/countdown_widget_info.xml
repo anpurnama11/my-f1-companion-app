@@ -3,9 +3,12 @@
   Countdown widget provider info.
 
   Sizing per the wayfinder 07 lock:
-    - minWidth 115dp / minHeight 256dp — minimum size the user can drop.
-    - maxResizeWidth 130dp / maxResizeHeight 624dp — upper resize bound.
-    - minResizeWidth 56dp / minResizeHeight 120dp — lower resize bound.
+    - minWidth 180dp / minHeight 80dp — default drop size targets a
+      landscape-ish short card instead of the old narrow/tall column.
+    - minResizeWidth 56dp / minResizeHeight 56dp — lower resize bound.
+    - no maxResizeWidth/maxResizeHeight — launchers may expand the
+      widget wider; Pixel Launcher previously refused wider drags when
+      maxResizeWidth capped the provider at 130dp.
     - resizeMode horizontal|vertical — freely resizable on both axes.
     - no `configure` attribute — no config activity, plain drop-and-go.
     - updatePeriodMillis 0 — Glance re-render is driven by the
@@ -18,20 +21,19 @@
       ignores its content (the `provideGlance` composable is the
       real source of truth). Reusing a trivial empty layout avoids
       any flash-of-default-content on first install.
-    - previewLayout — omitted intentionally. The launcher's widget
-      picker falls back to a generated preview from the widget's
-      own composable. Adding a separate XML layout would mean
-      keeping the design in two places; revisit if a launcher
-      actually refuses to render the default.
+    - previewImage + previewLayout — widget-picker previews so
+      launchers do not fall back to the app icon. Runtime rendering
+      still comes from Glance.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="115dp"
-    android:minHeight="256dp"
-    android:maxResizeWidth="130dp"
-    android:maxResizeHeight="624dp"
+    android:minWidth="180dp"
+    android:minHeight="80dp"
     android:minResizeWidth="56dp"
-    android:minResizeHeight="120dp"
+    android:minResizeHeight="56dp"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
+    android:description="@string/widget_description"
     android:widgetCategory="home_screen"
-    android:initialLayout="@layout/countdown_widget_initial" />
+    android:initialLayout="@layout/countdown_widget_initial"
+    android:previewImage="@drawable/countdown_widget_preview"
+    android:previewLayout="@layout/countdown_widget_preview" />

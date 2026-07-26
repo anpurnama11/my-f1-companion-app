@@ -19,8 +19,8 @@ import kotlinx.coroutines.flow.map
  *
  * **Typed keys, no JSON blob.** Per the design: a serialized JSON
  * payload would couple the cache to the model shape and force a
- * migration on every rename. The 8 typed keys ride along with the
- * snapshot's 8 fields.
+ * migration on every rename. The typed keys ride along with the
+ * snapshot fields.
  *
  * **Off-season encoding.** The off-season sentinel is
  * `startMillis == 0L` and only that key + `lastSyncedMillis` is
@@ -58,6 +58,7 @@ class NextRaceCache(private val dataStore: DataStore<Preferences>) {
             prefs[CIRCUIT_NAME] = snapshot.circuitName
             prefs[CIRCUIT_COUNTRY] = snapshot.circuitCountry.orEmpty()
             prefs[CIRCUIT_ID] = snapshot.circuitId
+            prefs[SESSION_NAME] = snapshot.sessionName
             prefs[ROUND] = snapshot.round
             prefs[SEASON] = snapshot.year
             prefs[LAST_SYNCED] = snapshot.lastSyncedMillis
@@ -79,6 +80,7 @@ class NextRaceCache(private val dataStore: DataStore<Preferences>) {
             prefs.remove(CIRCUIT_NAME)
             prefs.remove(CIRCUIT_COUNTRY)
             prefs.remove(CIRCUIT_ID)
+            prefs.remove(SESSION_NAME)
             prefs.remove(ROUND)
             prefs.remove(SEASON)
         }
@@ -97,6 +99,7 @@ class NextRaceCache(private val dataStore: DataStore<Preferences>) {
             circuitName = this[CIRCUIT_NAME] ?: "",
             circuitCountry = this[CIRCUIT_COUNTRY]?.takeIf { it.isNotEmpty() },
             circuitId = this[CIRCUIT_ID] ?: "",
+            sessionName = this[SESSION_NAME] ?: "Race",
             startMillis = startMillis,
             lastSyncedMillis = lastSynced,
         )
@@ -110,6 +113,7 @@ class NextRaceCache(private val dataStore: DataStore<Preferences>) {
         private val CIRCUIT_NAME = stringPreferencesKey("next_race_circuit")
         private val CIRCUIT_COUNTRY = stringPreferencesKey("next_race_circuit_country")
         private val CIRCUIT_ID = stringPreferencesKey("next_race_circuit_id")
+        private val SESSION_NAME = stringPreferencesKey("next_race_session_name")
         private val ROUND = intPreferencesKey("next_race_round")
         private val SEASON = intPreferencesKey("next_race_season")
         private val LAST_SYNCED = longPreferencesKey("next_race_last_synced_millis")
