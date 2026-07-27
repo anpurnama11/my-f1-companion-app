@@ -135,7 +135,7 @@ fun HomepageScreen(
                 weekendSchedule = sections.weekendSchedule,
             )
             Section2Season(sections.season)
-            Section3NearestGp(
+            Section3Favorites(
                 favorites = sections.favorites,
                 drivers = sections.drivers,
                 constructors = sections.constructors,
@@ -282,7 +282,6 @@ private fun FavoriteEntry(
     driverName: String? = null,
     driverSurname: String? = null,
 ) {
-    val accent = teamId?.let(com.anpurnama.f1_app.ui.theme.TeamColors::forId)
     val year = currentSeasonYear()
     val imageUrl = if (teamId == null) {
         null
@@ -300,28 +299,19 @@ private fun FavoriteEntry(
             .padding(end = Spacing.normal),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (accent != null && accent != Color.Unspecified) {
-            // The accent tag covers the visual identity surface: it's
-            // the AsyncImage when the CDN has an asset, the swatch
-            // when the URL is null (e.g. year < 2026), and absent
-            // entirely when the teamId is unknown. The
-            // `unknownTeam_omitsAccentBar` androidTest pins the
-            // unknown-team absence case.
+        if (imageUrl != null) {
             Box(
                 modifier = Modifier
-                    .testTag(accentTag)
                     .size(64.dp)
-                    .background(accent),
+                    .clip(RoundedCornerShape(size = 16.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                if (imageUrl != null) {
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                    )
-                }
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
             }
         }
         Column(
