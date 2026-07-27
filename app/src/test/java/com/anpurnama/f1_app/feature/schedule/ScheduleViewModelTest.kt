@@ -20,36 +20,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Rung 2: ViewModel state transitions for [ScheduleViewModel].
- *
- * Verifies the init-less + section-independence contract from
- * ticket 01 / 02 carried into the Schedule tab, plus the
- * revision-1 specifics:
- *  1. First collector sees Loading then Success(Season) when the
- *     `/current` call resolves.
- *  2. Section independence: a failing `/current` blanks the season
- *     and clears every per-row map.
- *  3. **Revision 1 — warmUp eagerly fires per-row loads.** After
- *     the season resolves, the VM fires `loadPodium` for every
- *     (country-bearing). Past rounds + circuit images are all
- *     resolved to Content after warmUp. This is the fix for the
- *     refresh-nukes-content bug: a refresh that only wrote the
- *     per-row maps to Loading would leave them stuck on Loading
- *     because the screen's `LaunchedEffect(race.round)` does NOT
- *     re-fire on a same-key re-render.
- *  4. **Revision 1 — RMW race is fixed.** Per-row writes use
- *     atomic `MutableStateFlow.update { }`, so concurrent
- *     `loadPodium` calls on different rounds
- *     never lose updates.
- *  5. `retryPodium(round)` re-fires the failing round only.
- *  6. Pull-to-refresh re-fires the season use case with
- *     `forceRefresh = true`, then re-fires every past round's
- *     `/race` for each past round.
- *
- * The use cases are hand-rolled fakes — `suspend (...) -> Outcome<…>`
- * lambdas. No mocking library.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScheduleViewModelTest {
 
@@ -85,13 +55,10 @@ class ScheduleViewModelTest {
         year = 2026,
         races = listOf(BAHRAIN, SAUDI, FUTURE, NO_COUNTRY),
         completedGp = 2,
-        // Bahrain 5412 + Saudi 6275 = 11687 meters = 11.687 km
         totalKm = 11.687, totalLaps = 107, progressPercent = 2f / 3f,
     )
 
     private fun podium(race: Race): RoundPodium {
-        // VER and PER are the two winners in the test data; put the
-        // race's winner at P1 and the other at P2.
         val isVerWinner = race.winnerId == "verstappen"
         return RoundPodium(
             topThree = listOf(
@@ -127,12 +94,6 @@ class ScheduleViewModelTest {
 
     private suspend fun TestScope.startCollecting(vm: ScheduleViewModel) {
         val job = backgroundScope.launch { vm.uiState.collect {} }
-        // Per lode/practices.md: the first 2 emissions are
-        // `initialValue` (Loading) + first post-load emission.
-        // Capturing the transition with `take(2).toList()` is what
-        // pins the init-less contract; `advanceUntilIdle` afterwards
-        // flushes every per-row launch fired in `loadSeason`'s
-        // Content branch.
         vm.uiState.take(2).toList()
         testScheduler.advanceUntilIdle()
         job.cancel()
@@ -168,11 +129,6 @@ class ScheduleViewModelTest {
         val vm = fakeVm()
 
         startCollecting(vm)
-        // After warmUp the VM has already fired `loadPodium` for
-        // every past round in `loadSeason`'s Content branch
-        // (revision 1: refresh-nukes-content fix). advanceUntilIdle
-        // flushes the launches. Past rounds (1, 2) → Content;
-        // upcoming (11, 12) → absent from the podium map.
         val state = vm.uiState.value as ScheduleViewModel.UiState.Sections
         assertTrue(state.season is SectionUiState.Content)
         assertTrue("podium[1] should be Content after warmUp, was ${state.podiums[1]}",
@@ -182,8 +138,6 @@ class ScheduleViewModelTest {
         assertEquals(null, state.podiums[11])
         assertEquals(null, state.podiums[12])
 
-        // The screen's per-row LaunchedEffect is now a no-op
-        // (idempotency guard): the slot is already Content.
         vm.loadPodium(year = 2026, round = 1, forceRefresh = false)
         testScheduler.advanceUntilIdle()
         val loaded = vm.uiState.value as ScheduleViewModel.UiState.Sections
@@ -197,7 +151,6 @@ class ScheduleViewModelTest {
     @Test
     fun `season failure blanks the screen and clears every per-row map`() = runTest {
         var podiumCalls = 0
-        var imageCalls = 0
         val vm = fakeVm(
             getSeason = { Outcome.Failure("boom") },
             getPodium = { _, _, _ -> podiumCalls++; Outcome.Success(podium(BAHRAIN)) }
@@ -207,7 +160,6 @@ class ScheduleViewModelTest {
         val state = vm.uiState.value as ScheduleViewModel.UiState.Sections
         assertTrue(state.season is SectionUiState.Error)
         assertEquals(0, podiumCalls)
-        assertEquals(0, imageCalls)
         assertTrue("podiums must be empty when season failed", state.podiums.isEmpty())
     }
 
@@ -249,12 +201,10 @@ class ScheduleViewModelTest {
         )
 
         startCollecting(vm)
-        // After warmUp, both past rounds have been fired.
         assertEquals(listOf(1, 2), calls)
 
         vm.retryPodium(round = 2)
         testScheduler.advanceUntilIdle()
-        // Only round 2 retried.
         assertEquals(listOf(1, 2, 2), calls)
     }
 
@@ -276,13 +226,7 @@ class ScheduleViewModelTest {
 
     @Test
     fun `refresh re-fires loadPodium for every past round and resolves to Content`() = runTest {
-        // Pins the revision-1 fix for the refresh-nukes-content bug.
-        // Before the fix, `loadSeason(true)` reset past rows to
-        // Loading and the screen's `LaunchedEffect(race.round)` did
-        // NOT re-fire (same key → no re-execute), so the cells
-        // stayed stuck on Loading until nav-away-and-back. The
-        // fix: `loadSeason`'s Content branch re-fires `loadPodium`
-        // for every past round itself.
+        // A same-key effect does not restart after refresh, so the ViewModel owns these reloads.
         val podiumCalls = mutableListOf<Int>()
         val vm = fakeVm(
             getPodium = { _, round, _ ->
@@ -301,7 +245,6 @@ class ScheduleViewModelTest {
         vm.refresh()
         testScheduler.advanceUntilIdle()
         val after = vm.uiState.value as ScheduleViewModel.UiState.Sections
-        // Refresh re-fired both past rounds.
         assertEquals("refresh re-fires every past round",
             listOf(1, 2, 1, 2), podiumCalls)
         assertTrue("podium[1] should be Content after refresh, was ${after.podiums[1]}",
@@ -312,12 +255,7 @@ class ScheduleViewModelTest {
 
     @Test
     fun `concurrent loadPodium writes do not lose updates (RMW race fix)`() = runTest {
-        // Pins the revision-1 fix for the RMW race. Before the fix,
-        // `podiumsState.value = podiumsState.value + (round to ...)`
-        // was a non-atomic RMW; two concurrent `loadPodium` calls on
-        // different rounds could interleave so one Content write was
-        // lost. The fix is atomic `MutableStateFlow.update { it + ... }`
-        // — a single CAS — which cannot lose updates.
+        // Concurrent StateFlow writes must preserve both completed rows.
         val vm = fakeVm()
 
         val collectJob = backgroundScope.launch { vm.uiState.collect {} }
@@ -325,16 +263,12 @@ class ScheduleViewModelTest {
         testScheduler.advanceUntilIdle()
         collectJob.cancel()
 
-        // After warmUp both past rounds are Content. Force the slot
-        // back to Loading so two concurrent writes race to Content.
-        // We do that by calling `loadPodium(..., forceRefresh = true)`.
         val j1 = backgroundScope.launch { vm.loadPodium(2026, 1, forceRefresh = true) }
         val j2 = backgroundScope.launch { vm.loadPodium(2026, 2, forceRefresh = true) }
         testScheduler.advanceUntilIdle()
         j1.join(); j2.join()
 
         val state = vm.uiState.value as ScheduleViewModel.UiState.Sections
-        // Both rounds resolved to Content — neither write was lost.
         assertTrue("podium[1] should be Content, was ${state.podiums[1]}",
             state.podiums[1] is SectionUiState.Content)
         assertTrue("podium[2] should be Content, was ${state.podiums[2]}",

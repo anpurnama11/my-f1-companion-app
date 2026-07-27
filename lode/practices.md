@@ -101,7 +101,7 @@ com.anpurnama.f1_app/
      GetRoundResultsUseCase, GetRoundQualifyingUseCase,
      GetCircuitMostWinsUseCase,
      GetRoundPodiumUseCase}.kt
-  ui/theme/{Color,Theme,Type}.kt    # dark-only M3 theme — ticket 02. No Tokens.kt: F1 palettes (Circuits, Tyres, result accents) are grouped objects in Color.kt, not a separate file.
+  ui/theme/{Color,Theme,Type}.kt    # dark-only M3 theme — ticket 02. No Tokens.kt: core tokens and the Circuits palette live in Color.kt.
   feature/
     homepage/{HomepageScreen,HomepageViewModel,HomepageViewModelFactory}.kt  # combines 5 use cases
     schedule/{ScheduleScreen,ScheduleViewModel,...}.kt

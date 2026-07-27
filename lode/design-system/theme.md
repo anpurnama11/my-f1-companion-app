@@ -30,36 +30,25 @@ conclusions now live here and in `ui/theme/`.
 
 `onPrimary/onSecondary/onTertiary/onError` are `#ffffff` (`On*` vals).
 
-## F1 result-highlight accents
-
-Domain aliases over the core palette so a theme change flows through badges:
-- `DriversChampionship` = #2267dd
-- `FastestLap` = `F1Tertiary` (#583ff2)
-- `PolePosition` = `DriversChampionship`
-- `DriverOfDay` = `FLError` (#fa1a24)
-
 ## F1-specific palettes (`object` singletons in `Color.kt`)
 
 Kept as standalone `Color` constants, **never folded into a custom token object
-or `Tokens.kt`** — fewest files (BSSN). Two objects cover the in-scope screens
-(Dashboard / Driver / Team / Round detail + Countdown):
+or `Tokens.kt`** — fewest files (BSSN). One object covers the circuit-accent
+surfaces in the in-scope screens and Countdown widget:
 
-- **`Circuits`** — 23 per-track brand colors (AbuDhabi..UsaMiami). One `val`
+- **`Circuits`** — 21 per-track brand colors (AbuDhabi..UsaMiami). One `val`
   per circuit, kebab-case keys flattened to CamelCase.
-- **`Tyres`** — six Pirelli compounds as text+background pairs
-  (`Soft`/`SoftBg` ... `Wet`/`WetBg`, plus `Unknown`/`UnknownBg`).
 
 ### Contract
 
 - **Circuits:** use as accent **backgrounds** on dark surfaces; **never as
   text** on dark (too saturated for readability, per the design's do's/don'ts).
-- **Tyres:** always pair text color with its `-Bg` background — a tyre pill is
-  `Tyres.Soft` text on `Tyres.SoftBg` background, never one without the other.
 
 ### Out-of-scope palettes (deliberately NOT transcribed)
 
 - **Collaborator colors** (8) — only the dropped Firebase-backed content
   screens consumed them ([map](../wayfinder/f1app/map.md) "Out of scope").
+- **Pirelli tyre compounds** — no shipped surface consumes tyre pills.
 - **Pit-wall status set** — redundant with core `secondary`/`error` and out of
   scope for the 4 in-app screens / Countdown widget.
 - **`mclaren` / `nina` / `formula2`** — boxbox-club-specific or feeder-scope,

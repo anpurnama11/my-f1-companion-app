@@ -93,12 +93,9 @@ Short term → meaning lines. Domain + project language.
 - **Spacing** — `object` in `Theme.kt` exposing the 8-step 4–32dp scale
   (xs / sm / md / normal / semiLg / lg / xl / xxl). Use for paddings/gaps per the
   design's "consistent scale" rule.
-- **Circuits** — `object` in `Color.kt`; 23 per-circuit brand colors
+- **Circuits** — `object` in `Color.kt`; 21 per-circuit brand colors
   (Circuits.AbuDhabi..Circuits.UsaMiami). Accent backgrounds on dark only, never
   text on dark.
-- **Tyres** — `object` in `Color.kt`; six Pirelli compounds as text+background pairs
-  (Tyres.Soft + Tyres.SoftBg ... Tyres.Wet + Tyres.WetBg, plus Unknown/UnknownBg).
-  Always pair the two halves.
 - **F1Api** — Ktor endpoint extensions and base URL constants for f1api.dev and
   Jolpica. Detail: [core/network.md](core/network.md).
 - **HttpClientFactory** — builds the shared Ktor `HttpClient` used by all use cases

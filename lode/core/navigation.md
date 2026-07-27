@@ -35,12 +35,13 @@ with parameters that the deserializer reads from `data` on the intent / deeplink
 | Route | Type | Content this slice | Lands |
 |---|---|---|---|
 | `Route.Homepage` | `data object` | `HomepageScreen` (real, §2 aggregates) | [BUILT] |
-| `Route.Schedule` | `data object` | `PlaceholderScreen("Schedule")` | [BUILT] placeholder |
+| `Route.Schedule` | `data object` | `ScheduleScreen` | [BUILT] ticket 03 |
 | `Route.Leaderboard` | `data object` | `LeaderboardScreen` | [BUILT] ticket 04 |
-| `Route.MyTeam` | `data object` | `PlaceholderScreen("My Team")` | [BUILT] placeholder |
+| `Route.MyTeam` | `data object` | `MyTeamScreen` | [BUILT] ticket 05 |
 | `Route.DriverDetail(driverId)` | `data class` | `DriverScreen` | [BUILT] ticket 04 |
 | `Route.TeamDetail(teamId)` | `data class` | `TeamScreen` | [BUILT] ticket 04 |
-| `Route.RoundDetail(year, round)` | `data class` | — | ticket 03 |
+| `Route.RoundDetail(year, round)` | `data class` | `RoundScreen` | [BUILT] ticket 03 |
+| `Route.SessionResult(year, round, session)` | `data class` | `SessionResultScreen` | [BUILT] ticket 03 |
 | `Route.CircuitDetail(circuitId)` | `data class` | `CircuitScreen` | [BUILT] ticket 06 |
 
 ## Nav 3 1.1.4 surface used

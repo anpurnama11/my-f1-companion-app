@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Required for HttpClientFactory's Ktor CIO calls to f1api.dev. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -19,9 +18,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.F1app"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -52,12 +49,6 @@
                     android:host="round" />
             </intent-filter>
         </activity>
-
-        <!--
-          Countdown widget receiver. Sits beside the activity in
-          the same <application>; the meta-data binds the receiver
-          to the AppWidgetProviderInfo XML in res/xml/.
-        -->
         <receiver
             android:name=".widget.countdown.CountdownWidgetReceiver"
             android:exported="true"

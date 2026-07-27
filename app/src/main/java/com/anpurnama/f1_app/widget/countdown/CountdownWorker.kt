@@ -19,49 +19,13 @@ import com.anpurnama.f1_app.f1.model.Season
 import com.anpurnama.f1_app.f1.model.SessionTime
 import com.anpurnama.f1_app.f1.model.SessionType
 import com.anpurnama.f1_app.f1.model.toWeekendSchedule
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import java.util.concurrent.TimeUnit
 
 /**
- * Periodic `CoroutineWorker` that refreshes the [NextRaceCache] the
- * Countdown widget reads. Enqueued by [F1App.onCreate] (periodic) and
- * by the widget's "tap to retry" affordance (one-time, see
- * [enqueueOneTime]).
- *
- * **Schedule.** 15-minute WorkManager floor with the
- * `NETWORK_TYPE_CONNECTED` constraint and exponential backoff. One
- * `PeriodicWorkRequest` for the whole app lifetime; the adaptive
- * gate in [doWork] decides whether the current tick actually fetches.
- *
- * **Adaptive gate** (per ticket 07 + wayfinder 07):
- *
- *  - `snapshot == null` → fetch (first cold launch, no cache yet).
- *  - `now - lastSyncedMillis >= 60min` → fetch (cache is stale).
- *  - `startMillis > 0L && nowMillis >= startMillis + 3h` → fetch (selected
- *    session expired; advance to the next session promptly).
- *  - `startMillis > 0L && nowMillis in [startMillis - 3d, startMillis + 3h)` →
- *    fetch (inside the selected session window — keep the countdown / LIVE
- *    transition prompt).
- *  - Otherwise → skip; the next periodic tick decides again.
- *
- * **Session selection.** `/current/next` remains the canonical source
- * for the round/deep-link data. The worker also reads the current
- * season schedule and stores the current/next session label + start
- * (Free Practice, Qualifying, Sprint, Race). If season lookup fails,
- * the cache falls back to the race session.
- *
- * **Fetch failure policy.** Per the data-layer invariant: the cache
- * is **never cleared** on a network failure. The next successful
- * tick writes the new data; a failed tick returns
- * [Result.success] (the 15-min periodic tick is the retry path —
- * double-scheduling via `Result.retry` would be redundant and
- * could stall the next periodic run).
- *
- * **On success.** Writes the new snapshot, then calls
- * [CountdownWidget.updateAll] to repaint every active instance.
+ * Refreshes widget cache on WorkManager's 15-minute cadence. Failures preserve cached data and
+ * return [Result.success], so the next periodic tick—not a second retry schedule—tries again.
  */
 class CountdownWorker(
     appContext: Context,
@@ -105,16 +69,11 @@ class CountdownWorker(
                         )
                     )
                 }
-                // Repaint every instance of the widget with the new
-                // cache state. The next render will hit the new data
-                // via `cache.observe()`.
                 CountdownWidget().updateAll(applicationContext)
                 Result.success()
             }
             is Outcome.Failure, Outcome.Loading -> {
-                // Leave the cache alone — never clear on failure
-                // (per data-layer invariant). The next periodic tick
-                // is the retry path.
+                // Preserve the last known widget state until a later successful tick.
                 Result.success()
             }
         }
@@ -124,27 +83,13 @@ class CountdownWorker(
         const val UNIQUE_PERIODIC_NAME = "f1app_countdown_widget_periodic"
         const val UNIQUE_ONETIME_NAME = "f1app_countdown_widget_onetime"
 
-        private const val CACHE_STALE_MS = 60L * 60 * 1000  // 60 min
-        private const val PRE_RACE_WINDOW_MS = 3L * 24 * 60 * 60 * 1000  // 3 days
+        private const val CACHE_STALE_MS = 60L * 60 * 1000
+        private const val PRE_RACE_WINDOW_MS = 3L * 24 * 60 * 60 * 1000
 
-        /**
-         * "In the selected session window" = `[start - 3d, start + 3h]`.
-         * The 3-day pre-session buffer keeps the widget fresh around a
-         * race weekend while the 60-minute stale gate handles ordinary
-         * far-future schedule changes.
-         */
-
-        /**
-         * Public enqueue API. Called by `F1App.onCreate()` at process
-         * start. `ExistingPeriodicWorkPolicy.UPDATE` so changing the
-         * schedule (e.g. tuning the cache-stale threshold) takes
-         * effect on the next app launch without first needing to
-         * cancel the existing spec.
-         */
+        /** UPDATE applies changed scheduling constraints to the existing periodic work. */
         fun enqueuePeriodic(
             context: Context,
             networkType: NetworkType = NetworkType.CONNECTED,
-            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         ) {
             val request = PeriodicWorkRequestBuilder<CountdownWorker>(
                 repeatInterval = 15, repeatIntervalTimeUnit = TimeUnit.MINUTES,
@@ -164,23 +109,9 @@ class CountdownWorker(
                 ExistingPeriodicWorkPolicy.UPDATE,
                 request,
             )
-            // Touch the dispatcher arg so a future override compiles
-            // cleanly; today we delegate to the WorkManager pool.
-            @Suppress("UNUSED_VARIABLE")
-            val unused = ioDispatcher
         }
 
-        /**
-         * "Tap to retry" path for the [CountdownState.NoRaceData]
-         * state. One-time, network-constrained. `REPLACE` so a
-         * second tap cancels any in-flight retry rather than
-         * queueing a second one.
-         *
-         * Not expedited: a regular one-time work is plenty for "the
-         * user opened their phone to glance at the widget and
-         * nothing was there". Expedited jobs are quota-bound; no
-         * reason to spend the budget on this.
-         */
+        /** REPLACE prevents repeated taps from queuing duplicate retries. */
         fun enqueueOneTime(
             context: Context,
             networkType: NetworkType = NetworkType.CONNECTED,
@@ -199,13 +130,6 @@ class CountdownWorker(
             )
         }
 
-        /**
-         * Visible-for-test hook. Decides whether the current tick
-         * should fetch. Pure: `nowMillis` and the cached snapshot
-         * are the only inputs. The same function shape would be
-         * trivial to unit-test in isolation if a test wants to pin
-         * the 60-min gate independently of the worker harness.
-         */
         internal fun shouldFetch(current: NextRaceSnapshot?, nowMillis: Long): Boolean {
             if (current == null) return true
             if (nowMillis - current.lastSyncedMillis >= CACHE_STALE_MS) return true
@@ -219,17 +143,7 @@ class CountdownWorker(
             return false
         }
 
-        /**
-         * Compose a f1api.dev `raceDate` ("YYYY-MM-DD") +
-         * `raceTime` ("HH:MM:SSZ") pair into epoch millis via
-         * `kotlinx.datetime.Instant.parse`. The combined wire
-         * shape is `"YYYY-MM-DDTHH:MM:SSZ"`, which is exactly
-         * what `Instant.parse` accepts.
-         *
-         * Returns `0L` on a malformed or missing pair, which the
-         * reducer maps to [CountdownState.SeasonOver]. The next
-         * successful worker tick overwrites it with a real value.
-         */
+        /** Missing or malformed API date/time becomes the off-season `0L` sentinel. */
         internal fun raceStartMillis(nextRace: NextRace): Long {
             val date = nextRace.raceDate ?: return 0L
             val time = nextRace.raceTime ?: return 0L

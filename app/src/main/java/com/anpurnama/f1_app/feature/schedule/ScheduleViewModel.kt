@@ -22,40 +22,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Schedule tab ViewModel — drives both the Upcoming list and the Past
- * list, plus per-row podium fetches.
- *
- *  - [GetSeasonUseCase] (ticket 01) feeds the whole tab; the season
- *    response carries the per-round past/upcoming split via
- *    `Race.winnerId`.
- *  - [GetRoundPodiumUseCase] drives per-row past-row podiums (one
- *    `/race` call per past round).
- *
- *  Section independence is the contract: every surface has its own
- *  [SectionUiState] and no composite use case. Per-row podiums are
- *  independent — a single past round's `/race` failure is a retry row,
- *  not a screen blank.
- *
- *  Init-less: first subscription triggers the warmUp; the cold
- *  stream is `stateIn(Lazily)` so the first load fires once and
- *  subsequent subscribers read the hot `StateFlow` without
- *  re-firing. Re-fire is via [refresh] (pull-to-refresh) only.
- *  Backed by the server-cached data layer (10-min f1api.dev,
- *  1-hr jolpica) so a hot upstream
- *  is cheap.
- *
- *  Refresh re-fires the season with `forceRefresh = true` and, in the
- *  Content branch, re-fires every past round's `/race` and every
- *  race data. This is the only path that re-loads
- *  per-row state — the screen's `LaunchedEffect(race.round)` does NOT
- *  re-fire on a same-key re-render, so the VM must own the re-fire
- *  (revision 1: fix the refresh-nukes-content bug; see
- *  `ScheduleViewModelRefreshAfterContentTest`).
- *
- *  Concurrency: per-row writes to [podiumsState] use atomic
- *  `MutableStateFlow.update { }` (not non-atomic RMW), so concurrent
- *  `loadPodium` calls on different rounds never lose updates
- *  (revision 1: fix the RMW race; see `ScheduleViewModelRmwRaceTest`).
+ * Holds independently-failing season and per-round podium state. Refresh reloads rows here
+ * because a same-key UI effect does not restart; concurrent row updates must stay atomic.
  */
 class ScheduleViewModel(
     private val getSeason: suspend (forceRefresh: Boolean) -> Outcome<Season>,
@@ -67,14 +35,7 @@ class ScheduleViewModel(
 ) : ViewModel() {
 
     sealed interface UiState {
-        /**
-         * The independently-failing surfaces on the Schedule tab:
-         *  - `season` — the list itself (failure here = whole list is
-         *    the `OutcomeContent` failure UI; no past rounds to show).
-         *  - `podiums` — per-round podium state, keyed by round
-         *    (1-based). Failure on one round = retry row; the other
-         *    past rounds keep their content.
-         */
+        /** A failed podium leaves the season and other rows available. */
         data class Sections(
             val season: SectionUiState<Season>,
             val year: Int,
@@ -114,27 +75,18 @@ class ScheduleViewModel(
         }
     }
 
-    /**
-     * Public pull-to-refresh. Re-fires `/current` with
-     * `forceRefresh = true` (NO_CACHE) and, in the Content branch,
-     * re-fires every past round's `/race`. Upcoming rows have no podium fetch.
-     */
+    /** Forces the season and every past podium to reload. */
     fun refresh() {
         viewModelScope.launch {
             loadSeason(forceRefresh = true)
         }
     }
 
-    /**
-     * Per-row retry. Re-fires a single past round's `/race` call with
-     * `forceRefresh = true` (the cached value is the stale one that
-     * just failed; retry expects a fresh hit). A retry is rejected while
-     * the season or requested row is already loading.
-     */
+    /** Rejects a retry while the season or requested row is loading. */
     fun retryPodium(round: Int): Boolean {
         val year = yearState.value
         if (year == 0 || podiumsState.value[round] is SectionUiState.Loading) {
-            return false // schedule or this row is already loading
+            return false
         }
         viewModelScope.launch {
             loadPodium(year = year, round = round, forceRefresh = true)
@@ -152,9 +104,6 @@ class ScheduleViewModel(
                 yearState.value = season.year
 
                 val pastRounds = season.races.filter { it.winnerId != null }
-                // Seed both per-row maps to Loading so the screen
-                // shows spinners immediately. Both writes are atomic
-                // assignments of new maps (not RMW), so no race.
                 podiumsState.value = if (pastRounds.isEmpty()) emptyMap()
                     else pastRounds.associate { it.round to SectionUiState.Loading }
 
@@ -166,23 +115,11 @@ class ScheduleViewModel(
                 yearState.value = 0
                 podiumsState.value = emptyMap()
             }
-            is SectionUiState.Loading -> {
-                // `getSeason` does not emit Loading in practice; the VM
-                // sets Loading itself before the call. No-op.
-            }
+            is SectionUiState.Loading -> Unit
         }
     }
 
-    /**
-     * Loads a single past round's podium into the per-row map.
-     * Idempotent on Content unless `forceRefresh` is true (the
-     * refresh path explicitly bypasses the cache to re-fetch
-     * round-trip after a pull; the screen's `LaunchedEffect` is the
-     * cold-open path and gets the no-op fast path).
-     *
-     * Both writes use atomic [MutableStateFlow.update] so concurrent
-     * calls on different rounds never lose updates.
-     */
+    /** Atomic updates prevent concurrent row loads from losing state. */
     suspend fun loadPodium(year: Int, round: Int, forceRefresh: Boolean) {
         if (!forceRefresh &&
             podiumsState.value[round] is SectionUiState.Content
@@ -192,12 +129,6 @@ class ScheduleViewModel(
     }
 }
 
-/**
- * `viewModelFactory` builder. Mirrors the Homepage pattern — the
- * factory captures the use case instance refs from `Wiring`; the VM
- * takes `suspend (...) -> Outcome<…>` lambdas so it never sees the
- * `Wiring` types.
- */
 fun scheduleViewModelFactory(
     getSeason: GetSeasonUseCase,
     getRoundPodium: GetRoundPodiumUseCase,

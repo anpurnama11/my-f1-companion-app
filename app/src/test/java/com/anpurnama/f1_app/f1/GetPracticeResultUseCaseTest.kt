@@ -25,31 +25,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Rung 2 at the use-case level for [GetPracticeResultUseCase]. The use case
- * routes FP1/FP2/FP3 through the shared Jolpica alpha loader. Alpha's opaque
- * driver/team ids (`driver_…`, `team_…`) are translated to Ergast canonical ids
- * (`max_verstappen`, `red_bull`) via the season-matched f1api driver catalog
- * (the car-number bridge) — see [CarNumberTranslator].
- *
- * Verifies:
- *  - 200 + valid alpha FP envelope + catalog → Success(SessionResult) with
- *    `practiceResults` populated and ids **translated** to Ergast canonical.
- *  - Catalog fetch fails (404) → translator EMPTY → rows keep alpha opaque ids
- *    (graceful: the screen still renders; only future deep links unresolved).
- *  - A car number absent from the catalog → that row keeps its opaque id while
- *    present car numbers still translate.
- *  - The season-matched catalog `/api/{year}/drivers` is fetched.
- *  - Round not on the alpha calendar → Failure("Session is unavailable").
- *  - A non-practice session reaching the use case → filter outside the alpha
- *    require set → loadAlpha maps "Invalid session filter" to not-scheduled.
- *  - Alpha returns an empty results array → Success with empty practiceResults.
- *  - 4xx at the results endpoint → Failure with the status-coded message.
- *  - Results URL hits `/f1/alpha/results/{roundId}/FP1/`; FP2/FP3 route to own filters.
- *  - `forceRefresh = true` sends `Cache-Control: no-cache` on the results and
- *    the catalog fetches.
- *  - A malformed alpha response surfaces a real error (not masked as not-scheduled).
- */
 class GetPracticeResultUseCaseTest {
 
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
@@ -71,8 +46,6 @@ class GetPracticeResultUseCaseTest {
         headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
     )
 
-    // Alpha round-id lookup hits `/core/rounds/?year=...`; the extension picks
-    // the entry whose `number` matches the requested round.
     private val ROUNDS_BODY = """
         { "data": [
             { "id": "round_test1", "number": 1, "name": "Bahrain Grand Prix" },
@@ -80,9 +53,6 @@ class GetPracticeResultUseCaseTest {
         ] }
     """.trimIndent()
 
-    // Season-matched f1api driver catalog (`/api/{year}/drivers`) — the car-
-    // number → Ergast id bridge. car_number 1 (VER) → max_verstappen/red_bull;
-    // car_number 16 (LEC) → leclerc/ferrari.
     private val DRIVERS_BODY = """
         { "season": 2024, "drivers": [
             { "driverId": "max_verstappen", "name": "Max", "surname": "Verstappen",
@@ -92,9 +62,6 @@ class GetPracticeResultUseCaseTest {
         ] }
     """.trimIndent()
 
-    // Alpha FP1 rows reference opaque ids (driver_ver/team_rbr, driver_lec/
-    // team_fer) and car_numbers 1 & 16. After translation the domain rows carry
-    // the catalog's Ergast ids (max_verstappen/red_bull, leclerc/ferrari).
     private val FP1_BODY = """
         { "data": {
             "code": "FP1", "title": "Practice 1",
@@ -124,13 +91,6 @@ class GetPracticeResultUseCaseTest {
         } }
     """.trimIndent()
 
-    /**
-     * Handler serving the round-id lookup, the season-matched driver catalog,
-     * and steering results responses. `onRequest` is invoked for EVERY request
-     * before routing, so tests can observe paths/headers on any of the three
-     * fetches (rounds / results / catalog). `drivers = null` simulates a
-     * catalog outage (404 → translator EMPTY → opaque-id fallback).
-     */
     private fun alphaHandler(
         roundsBody: String = ROUNDS_BODY,
         drivers: String? = DRIVERS_BODY,
@@ -157,16 +117,13 @@ class GetPracticeResultUseCaseTest {
         assertEquals(2024, sr.year)
         assertEquals(1, sr.round)
         assertEquals("Bahrain Grand Prix", sr.raceName)
-        // Alpha supplies no circuit in the mapped SessionResult (consistent with
-        // the sprint path — the SessionResult screen doesn't render circuit here).
+        // Alpha responses do not supply circuit data.
         assertEquals("", sr.circuit.id)
         assertEquals(2, sr.practiceResults.size)
 
         val p1 = sr.practiceResults[0]
         assertEquals(1, p1.position)
         assertEquals("1:30.000", p1.time)
-        // Translated: alpha opaque driver_ver/team_rbr → Ergast max_verstappen/
-        // red_bull via the car-number bridge (car_number 1 → catalog entry).
         assertEquals("max_verstappen", p1.driverId)
         assertEquals("Max Verstappen", p1.driverName)
         assertEquals("VER", p1.driverShortName)
@@ -183,8 +140,6 @@ class GetPracticeResultUseCaseTest {
 
     @Test
     fun `invoke keeps alpha opaque ids when the driver catalog fetch fails`() = runTest {
-        // Catalog 404 → translator EMPTY → rows keep their alpha opaque ids.
-        // The load still succeeds: only future deep links would be unresolved.
         val out = useCase(alphaHandler(drivers = null))
             .invoke(year = 2024, round = 1, session = SessionType.FP1)
         assertTrue("expected Success, was $out", out is Outcome.Success)
@@ -197,8 +152,6 @@ class GetPracticeResultUseCaseTest {
 
     @Test
     fun `invoke keeps the alpha opaque id for a car number missing from the catalog`() = runTest {
-        // LEC's car_number 16 is absent from the catalog → that row keeps its
-        // opaque id; VER (number 1 present) still translates.
         val partialCatalog = """
             { "season": 2024, "drivers": [
                 { "driverId": "max_verstappen", "name": "Max", "surname": "Verstappen",
@@ -220,8 +173,6 @@ class GetPracticeResultUseCaseTest {
         val out = useCase(alphaHandler(onRequest = { requestedPaths += it.url.fullPath }))
             .invoke(year = 2024, round = 1, session = SessionType.FP1)
         assertTrue(out is Outcome.Success)
-        // The catalog path is season-matched (/api/{year}/drivers), so past
-        // rounds resolve car numbers against that year's drivers, not current.
         assertTrue(
             "season-matched catalog fetch missing: $requestedPaths",
             requestedPaths.any { it.contains("/api/2024/drivers") },
@@ -230,7 +181,6 @@ class GetPracticeResultUseCaseTest {
 
     @Test
     fun `invoke returns Failure Session is unavailable when round is not on the alpha calendar`() = runTest {
-        // Rounds list omits round 99 → getJolpicaAlphaRoundId returns null.
         val out = useCase(alphaHandler(roundsBody = """
             { "data": [ { "id": "round_test1", "number": 1, "name": "Bahrain Grand Prix" } ] }
         """.trimIndent())).invoke(year = 2024, round = 99, session = SessionType.FP1)
@@ -240,9 +190,6 @@ class GetPracticeResultUseCaseTest {
 
     @Test
     fun `invoke maps an invalid session filter to the not-scheduled failure`() = runTest {
-        // A non-practice session (Race) resolves to filter "RACE", which the
-        // alpha require rejects. loadAlpha maps that "Invalid session filter"
-        // guard to "Session is unavailable" — the results endpoint is never hit.
         var resultsHits = 0
         val out = useCase(alphaHandler(results = {
             resultsHits++
@@ -302,10 +249,6 @@ class GetPracticeResultUseCaseTest {
 
     @Test
     fun `invoke surfaces a malformed alpha response as a real error, not not-scheduled`() = runTest {
-        // A broken alpha payload must NOT be masked as "Session is unavailable".
-        // kotlinx.serialization's SerializationException is an IllegalArgumentException;
-        // loadAlpha matches only the "Invalid session filter" message, so this
-        // deserialization failure surfaces its real message as a generic Failure.
         val out = useCase(alphaHandler(results = {
             jsonOk("{ this is not valid json }")
         })).invoke(year = 2024, round = 1, session = SessionType.FP1)
@@ -314,13 +257,6 @@ class GetPracticeResultUseCaseTest {
         assertTrue("deserialization error must surface its real message, was: $msg",
             msg != "Session is unavailable" && msg != "Network error")
     }
-
-    // Note: loadAlpha rethrows kotlinx.coroutines.CancellationException from the
-    // catalog fetch (it uses a try/catch, not runCatching, precisely so a
-    // cancelled load is NOT silently turned into a degraded Success with opaque
-    // ids). This is not asserted via MockEngine here because ktor wraps a
-    // CancellationException thrown from the mock handler before it reaches the
-    // try/catch; the rethrow path is correct-by-construction and reviewed.
 
     @Test
     fun `invoke with forceRefresh sends the no-cache header on results and catalog`() = runTest {

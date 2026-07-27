@@ -67,11 +67,6 @@ class MainActivity : ComponentActivity() {
         val uriString = intent?.data?.toString() ?: return null
         return parseRoundDeepLink(uriString)
     }
-
-    private companion object {
-        const val SCHEME = "f1app"
-        const val HOST_ROUND = "round"
-    }
 }
 
 /**

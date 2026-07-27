@@ -28,9 +28,6 @@ class WikipediaApiTest {
 
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
-    // Mirror the F1ApiTest shape: MockEngine + ContentNegotiation + expectSuccess.
-    // HttpCache is NOT installed in the default client — the cache-hit test
-    // below has its own client setup so the test boundary is explicit.
     private fun mockClient(
         handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
     ): HttpClient = HttpClient(MockEngine(handler)) {
@@ -38,12 +35,7 @@ class WikipediaApiTest {
         install(ContentNegotiation) { json(json) }
     }
 
-    // String overload of `respond` (Ktor wraps the body itself; wrapping in
-    // ByteReadChannel up front confuses the deserializer — same pitfall
-    // documented in F1ApiTest). Uses the `headers { }` builder for two
-    // headers — the vararg `headersOf(...)` overload expects
-    // `Pair<String, List<String>>` per entry, which is the wrong shape
-    // for a flat `(name, value, name, value)` call.
+    // MockEngine must receive a String; pre-wrapping it breaks ContentNegotiation.
     private fun MockRequestHandleScope.jsonOk(
         body: String,
         cacheControl: String = "public, max-age=86400",
@@ -82,7 +74,6 @@ class WikipediaApiTest {
 
         val summary = client.getWikipediaSummary("Andrea_Kimi_Antonelli")
 
-        // The f1api.dev URL slug auto-redirects to the canonical title.
         assertEquals("Kimi Antonelli", summary.title)
         assertEquals(
             "https://en.wikipedia.org/wiki/Kimi_Antonelli",
@@ -93,9 +84,6 @@ class WikipediaApiTest {
             "extract should be non-empty, was: '${summary.extract}'",
             summary.extract.isNotEmpty(),
         )
-        // The mobile URL is dropped (mapper only forwards desktop); unknown
-        // wire fields (`wikibase_item`, `pageid`) are tolerated by
-        // `ignoreUnknownKeys = true` and never reach the model.
         assertEquals("/api/rest_v1/page/summary/Andrea_Kimi_Antonelli", capturedPath)
         assertTrue(
             "expected User-Agent header starting with F1app/1.0, was: $capturedUserAgent",
@@ -148,9 +136,6 @@ class WikipediaApiTest {
 
         client.getWikipediaSummary("Mercedes-Benz_in_Formula_One")
 
-        // Underscores and hyphens are sub-delim / unreserved in RFC 3986
-        // path segments — they pass through Ktor's URLBuilder.path() encoding
-        // unchanged. No `%5F` or `%2D` in the path.
         assertEquals(
             "/api/rest_v1/page/summary/Mercedes-Benz_in_Formula_One",
             capturedPath,
@@ -203,12 +188,6 @@ class WikipediaApiTest {
 
         val summary = client.getWikipediaSummary("Kimi_Antonelli")
 
-        // `requireNotNull` over `assertNotNull(...)!!` — JUnit 4's
-        // `assertNotNull` returns the argument as a platform type with no
-        // Kotlin contract, so the compiler cannot smart-cast the result
-        // to non-null and the `!!` workaround doesn't help here either.
-        // `requireNotNull` (Kotlin stdlib) carries the contract that
-        // makes the result non-null at the type level.
         assertNotNull("expected thumbnail in summary", summary.thumbnail)
         val thumb: WikipediaThumbnail = requireNotNull(summary.thumbnail)
         assertEquals(220, thumb.width)
@@ -222,10 +201,7 @@ class WikipediaApiTest {
     @Test
     fun `getWikipediaSummary cache-hits on the second call within the TTL`() = runTest {
         val callCount = AtomicInteger(0)
-        // Real FileStorage in a temp dir — proves the HttpCache plugin's
-        // disk persistence path is end-to-end functional. The MockEngine
-        // is the only call counter; if HttpCache hits, the second
-        // invocation never reaches the engine.
+        // Use real disk storage to cover the configured cache path.
         val cacheDir = kotlin.io.path.createTempDirectory("f1app-wiki-cache-").toFile()
         try {
             val client = HttpClient(
@@ -248,9 +224,7 @@ class WikipediaApiTest {
                 install(HttpCache) { publicStorage(FileStorage(cacheDir)) }
             }
 
-            // First call: hits the engine.
             val first = client.getWikipediaSummary("Kimi_Antonelli")
-            // Second call: served from disk cache; the engine is NOT called again.
             val second = client.getWikipediaSummary("Kimi_Antonelli")
 
             assertEquals(1, callCount.get())

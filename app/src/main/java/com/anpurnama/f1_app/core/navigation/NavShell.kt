@@ -254,16 +254,3 @@ private enum class TopLevelDestination(
     Leaderboard(Route.Leaderboard, "Leaderboard", R.drawable.ic_leaderboard_outline),
     MyTeam(Route.MyTeam, "My Team", R.drawable.ic_myteam_outline),
 }
-
-@Composable
-private fun PlaceholderScreen(title: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "$title — coming soon",
-            style = MaterialTheme.typography.titleLarge,
-        )
-    }
-}

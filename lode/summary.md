@@ -1,7 +1,7 @@
 # F1app summary
 
 `com.anpurnama.f1_app` — dark-first Jetpack Compose F1 app. Greenfield scaffold
-(`F1appTheme`, `Circuits`/`Tyres` palettes, Navigation 3 multi-backstack `NavShell`)
+(`F1appTheme`, `Circuits` palette, Navigation 3 multi-backstack `NavShell`)
 plus Homepage foundation with three sections (§1 upcoming-session countdown,
 §2 season aggregates, §3 combined favorites + nearest-GP circuit cards) and
 the Schedule tab (Material 3 `SecondaryTabRow` plus

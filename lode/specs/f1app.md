@@ -495,9 +495,8 @@ flowchart LR
 - `darkColorScheme()` built from named `Color` vals. `F1Shapes`
   (`small 2 / medium 8 / large 14 / extraLarge 16` dp) + 8-rung `Spacing`
   (4–32dp: xs/sm/md/normal/semiLg/lg/xl/xxl). M3 default typography.
-- `Circuits` `object` — 23 per-circuit brand colours (backgrounds only on
-  dark, never text). `Tyres` `object` — six Pirelli compounds as
-  text+background pairs (always pair the two halves).
+- `Circuits` `object` — 21 per-circuit brand colours (backgrounds only on
+  dark, never text).
 
 ### Schema noise locked into DTOs (no decisions, recorded for implementation)
 
@@ -628,8 +627,7 @@ reserved for them:
 4. Compose UI screen smokes (`Homepage`, `Schedule`, `Leaderboard`, `My
    Team`, `DriverDetail`, `TeamDetail`, `RoundDetail`, `CircuitDetail`) via
    `androidx.compose.ui:ui-test-junit4`.
-5. Theme token screenshot tests (`Circuits.forId`, `Tyres.Soft` +
-   `Tyres.SoftBg` pairing).
+5. Theme token screenshot tests (`Circuits.forId`).
 
 **Libraries:** `kotlin.test` + JUnit4 (Android default, no new catalog entry)
 + `ktor-client-mock` (transitively present via CIO). No Mockito/MockK — the

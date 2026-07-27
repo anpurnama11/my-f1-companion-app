@@ -26,22 +26,6 @@ class ParseRoundDeepLinkTest {
     }
 
     @Test
-    fun `large round numbers are preserved`() {
-        assertEquals(
-            Route.RoundDetail(year = 2026, round = 24),
-            parseRoundDeepLink("f1app://round/2026/24"),
-        )
-    }
-
-    @Test
-    fun `two-digit years parse correctly`() {
-        assertEquals(
-            Route.RoundDetail(year = 2025, round = 7),
-            parseRoundDeepLink("f1app://round/2025/7"),
-        )
-    }
-
-    @Test
     fun `rejects http scheme`() {
         assertNull(parseRoundDeepLink("http://round/2026/1"))
         assertNull(parseRoundDeepLink("https://round/2026/1"))

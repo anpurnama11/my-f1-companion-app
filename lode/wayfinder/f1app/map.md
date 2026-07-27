@@ -42,7 +42,7 @@ plans, and (d) no design decision in the codebase is unrecorded.
   `:app`, manual `Wiring` DI, MVVM init-less + sealed `Outcome<T>` + UseCase seam,
   Navigation 3; Ktor/CIO (not Retrofit) so `f1/` ports to a future KMP `:shared`.
 - [Design system → Compose Material3 theme](tickets/02-design-system-theme.md) —
-  dark-only `F1appTheme`; `Circuits`/`Tyres` palettes as `object`s in `Color.kt`; M3
+  dark-only `F1appTheme`; `Circuits` palette as an `object` in `Color.kt`; M3
   default typography; `F1Shapes` (2/8/14/16dp) + 8-rung `Spacing`. (Also the only ticket
   shipped as code so far.)
 - [Data layer & widget refresh](tickets/03-data-layer-and-refresh.md) — no `F1Repository`
