@@ -1,6 +1,7 @@
 package com.anpurnama.f1_app
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,7 +32,9 @@ class MainActivity : ComponentActivity() {
         // edge-to-edge: keep the system from drawing a contrast scrim over the
         // gesture-pill / 3-button nav area — it would wash out the dark
         // surfaceContainer bottom bar. See edge-to-edge skill checklist.
-        window.isNavigationBarContrastEnforced = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         pendingDeepLinkRoute = parseDeepLink(intent)
         setContent {
             F1appTheme {

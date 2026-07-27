@@ -78,6 +78,11 @@ flowchart TD
   `NextRaceCache`); `MainActivity` parses the URI into a `RoundDetail` nav key
   and pushes it on Homepage as backstack root. Custom scheme only — no App
   Links / `autoVerify` (single-app, no public web domain).
+- **System bars:** `MainActivity` calls `enableEdgeToEdge()`. Its `NavigationBar`
+  needs contrast enforcement disabled to retain the dark bottom-bar surface, but
+  `Window.isNavigationBarContrastEnforced` exists only from API 29; the call is
+  guarded by `Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q` for the app's API-24
+  minimum. Earlier Android versions still receive edge-to-edge without that override.
 - **Network:** Ktor Client, **CIO engine** (KMP-safe, ports to every target
   unchanged). `ContentNegotiation` (`kotlinx.serialization` JSON) + `HttpCache` plugin
   (native HTTP response caching — ~10MB file cache, `max-stale` tolerance for offline
