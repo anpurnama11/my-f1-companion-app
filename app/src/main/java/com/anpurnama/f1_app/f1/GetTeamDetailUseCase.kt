@@ -1,10 +1,10 @@
 package com.anpurnama.f1_app.f1
 
 import com.anpurnama.f1_app.core.Outcome
-import com.anpurnama.f1_app.f1.data.ConstructorsChampionshipResponseDto
 import com.anpurnama.f1_app.f1.data.CurrentTeamsResponseDto
-import com.anpurnama.f1_app.f1.data.getConstructorsChampionship
+import com.anpurnama.f1_app.f1.data.JolpicaConstructorStandingsResponseDto
 import com.anpurnama.f1_app.f1.data.getCurrentTeams
+import com.anpurnama.f1_app.f1.data.getJolpicaConstructorStandings
 import com.anpurnama.f1_app.f1.model.ConstructorStanding
 import com.anpurnama.f1_app.f1.model.TeamDetail
 import io.ktor.client.HttpClient
@@ -18,7 +18,7 @@ class GetTeamDetailUseCase(private val client: HttpClient) {
         forceRefresh: Boolean = false,
     ): Outcome<TeamDetail> = try {
         val teamResponse = client.getCurrentTeams(forceRefresh)
-        val championshipResponse = client.getConstructorsChampionship(forceRefresh)
+        val championshipResponse = client.getJolpicaConstructorStandings(forceRefresh)
         teamResponse.toTeamDetail(teamId, championshipResponse)
     } catch (e: ClientRequestException) {
         Outcome.Failure("Request failed (${e.response.status.value})")
@@ -33,20 +33,22 @@ class GetTeamDetailUseCase(private val client: HttpClient) {
 
 internal fun CurrentTeamsResponseDto.toTeamDetail(
     teamId: String,
-    championship: ConstructorsChampionshipResponseDto,
+    championship: JolpicaConstructorStandingsResponseDto,
 ): Outcome<TeamDetail> {
     val team = teams.firstOrNull { it.teamId == teamId }
         ?: return Outcome.Failure("Team not found")
-    val standing = championship.constructorsChampionship
-        .firstOrNull { it.teamId == teamId }
+    val entries = championship.mrData.standingsTable.standingsLists
+        .firstOrNull()?.constructorStandings ?: emptyList()
+    val standing = entries
+        .firstOrNull { it.constructor.constructorId == teamId }
         ?.let { entry ->
             ConstructorStanding(
-                teamId = entry.teamId,
-                position = entry.position,
-                points = entry.points,
-                wins = entry.wins,
-                teamName = entry.team.teamName.orEmpty(),
-                country = entry.team.country,
+                teamId = entry.constructor.constructorId.orEmpty(),
+                position = entry.position?.toIntOrNull() ?: 0,
+                points = (entry.points?.toDoubleOrNull()?.toInt()) ?: 0,
+                wins = entry.wins?.toIntOrNull() ?: 0,
+                teamName = entry.constructor.name.orEmpty(),
+                country = entry.constructor.nationality,
             )
         }
 

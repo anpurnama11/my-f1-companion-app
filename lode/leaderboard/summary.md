@@ -33,9 +33,9 @@ flowchart LR
   DriversTab -->|driverId| DriverDetail
   ConstructorsTab -->|teamId| TeamDetail
   DriverDetail --> DriversAPI["/current/drivers"]
-  DriverDetail --> DriverChamp["/current/drivers-championship"]
+  DriverDetail --> DriverChamp["Jolpica /current/driverStandings.json"]
   TeamDetail --> TeamsAPI["/current/teams"]
-  TeamDetail --> TeamChamp["/current/constructors-championship"]
+  TeamDetail --> TeamChamp["Jolpica /current/constructorStandings.json"]
   DriverChamp --> DriverSnapshot[DriverStanding]
   TeamChamp --> TeamSnapshot[ConstructorStanding]
 ```
@@ -46,8 +46,9 @@ flowchart LR
 - ViewModels are init-less: first collection starts the load; refresh is the
   only forced re-fetch path and sends `Cache-Control: no-cache`.
 - Driver and constructor leaderboard sections fail independently.
-- DTOs use the live underscored championship keys as their single canonical
-  wire contract.
+- Standings source is Jolpica (MRData envelope), not f1api.dev. DTOs use
+  the Jolpica `@SerialName`-annotated PascalCase keys (see
+  [ADR 0016](../decisions/0016-standings-source-move-to-jolpica.md)).
 - `f1/` remains Android-free so this slice can move to future KMP shared code.
 
 ## Planned: GAP-F detail-page redesign (ticket 26, follow-ups 27/28/29)

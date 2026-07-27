@@ -85,14 +85,14 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
-private val RACE_DURATION = 3.hours
+private val RACE_DURATION = 2.hours
 
 /**
  * Homepage — three sections, each section fails independently.
  *
  *  - §1 Next-race countdown card
  *  - §2 Season progress aggregates (carried over from ticket 01)
- *  - §3 Favorites card plus nearest GP card
+ *  - §3 Favorites card
  *
  * The screen reads the VM's `UiState.Sections` and renders each section
  * via the shared `OutcomeContent` family — Loading/Failure/Success, each
@@ -694,10 +694,10 @@ private fun SeasonStatRow(label: String, value: String) {
     }
 }
 
-// ─── §3 Nearest GP ────────────────────────────────────────────────────────
+// ─── §3 Favorites ────────────────────────────────────────────────────────
 
 @Composable
-private fun Section3NearestGp(
+private fun Section3Favorites(
     favorites: SectionUiState<Favorites>,
     drivers: SectionUiState<List<DriverStanding>>,
     constructors: SectionUiState<List<ConstructorStanding>>,

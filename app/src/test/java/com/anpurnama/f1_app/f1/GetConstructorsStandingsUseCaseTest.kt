@@ -1,7 +1,7 @@
 package com.anpurnama.f1_app.f1
 
 import com.anpurnama.f1_app.core.Outcome
-import com.anpurnama.f1_app.f1.data.F1API_BASE
+import com.anpurnama.f1_app.f1.data.JOLPICA_BASE
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -32,7 +32,7 @@ class GetConstructorsStandingsUseCaseTest {
         HttpClient(MockEngine(handler)) {
             expectSuccess = true
             install(ContentNegotiation) { json(json) }
-            defaultRequest { url(F1API_BASE) }
+            defaultRequest { url(JOLPICA_BASE) }
         }
     )
 
@@ -45,11 +45,22 @@ class GetConstructorsStandingsUseCaseTest {
     @Test
     fun `invoke returns Success list on 200`() = runTest {
         val body = """
-            { "season": 2026,
-              "constructors_championship": [
-                { "teamId": "mercedes", "position": 1, "points": 358, "wins": 8,
-                  "team": { "teamName": "Mercedes Formula 1 Team", "country": "Germany" } }
-              ]
+            {
+              "MRData": {
+                "StandingsTable": {
+                  "season": "2026",
+                  "round": "11",
+                  "StandingsLists": [{
+                    "ConstructorStandings": [{
+                      "position": "1",
+                      "points": "358",
+                      "wins": "8",
+                      "Constructor": { "constructorId": "mercedes", "name": "Mercedes Formula 1 Team",
+                                       "nationality": "German" }
+                    }]
+                  }]
+                }
+              }
             }
         """.trimIndent()
         val out = useCase { jsonOk(body) }.invoke()

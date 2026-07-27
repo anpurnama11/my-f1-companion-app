@@ -1,38 +1,46 @@
 package com.anpurnama.f1_app.f1
 
-import com.anpurnama.f1_app.f1.data.ConstructorsChampionshipResponseDto
+import com.anpurnama.f1_app.f1.data.JolpicaConstructorStandingsResponseDto
 import com.anpurnama.f1_app.f1.toConstructorStandings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Rung 1 mapper test for the constructors' championship DTO. Pure mapping.
+ * Rung 1 mapper test for the constructors' championship DTO (Jolpica source).
+ * Pure mapping.
  */
 class ConstructorStandingsMapperTest {
 
     @Test
     fun `toConstructorStandings maps every entry into a domain model`() {
-        val dto = ConstructorsChampionshipResponseDto(
-            season = 2026,
-            constructorsChampionship = listOf(
-                ConstructorsChampionshipResponseDto.ConstructorsChampionshipEntryDto(
-                    teamId = "mercedes",
-                    points = 358,
-                    position = 1,
-                    wins = 8,
-                    team = ConstructorsChampionshipResponseDto.TeamInfoDto(
-                        teamName = "Mercedes Formula 1 Team",
-                        country = "Germany",
-                    ),
-                ),
-                ConstructorsChampionshipResponseDto.ConstructorsChampionshipEntryDto(
-                    teamId = "ferrari",
-                    points = 285,
-                    position = 2,
-                    wins = 2,
-                    team = ConstructorsChampionshipResponseDto.TeamInfoDto(
-                        teamName = "Scuderia Ferrari",
-                        country = "Italy",
+        val dto = JolpicaConstructorStandingsResponseDto(
+            mrData = JolpicaConstructorStandingsResponseDto.MrDataDto(
+                standingsTable = JolpicaConstructorStandingsResponseDto.StandingsTableDto(
+                    standingsLists = listOf(
+                        JolpicaConstructorStandingsResponseDto.StandingsListDto(
+                            constructorStandings = listOf(
+                                JolpicaConstructorStandingsResponseDto.ConstructorStandingEntryDto(
+                                    position = "1",
+                                    points = "358",
+                                    wins = "8",
+                                    constructor = JolpicaConstructorStandingsResponseDto.ConstructorDto(
+                                        constructorId = "mercedes",
+                                        name = "Mercedes Formula 1 Team",
+                                        nationality = "German",
+                                    ),
+                                ),
+                                JolpicaConstructorStandingsResponseDto.ConstructorStandingEntryDto(
+                                    position = "2",
+                                    points = "285",
+                                    wins = "2",
+                                    constructor = JolpicaConstructorStandingsResponseDto.ConstructorDto(
+                                        constructorId = "ferrari",
+                                        name = "Scuderia Ferrari",
+                                        nationality = "Italian",
+                                    ),
+                                ),
+                            ),
+                        ),
                     ),
                 ),
             ),
@@ -45,13 +53,25 @@ class ConstructorStandingsMapperTest {
         assertEquals(358, standings[0].points)
         assertEquals(8, standings[0].wins)
         assertEquals("Mercedes Formula 1 Team", standings[0].teamName)
-        assertEquals("Germany", standings[0].country)
+        assertEquals("German", standings[0].country)
         assertEquals("ferrari", standings[1].teamId)
     }
 
     @Test
     fun `toConstructorStandings returns an empty list on an empty envelope`() {
-        val dto = ConstructorsChampionshipResponseDto(season = 2026)
+        val dto = JolpicaConstructorStandingsResponseDto()
+        assertEquals(emptyList<Any>(), dto.toConstructorStandings())
+    }
+
+    @Test
+    fun `toConstructorStandings returns an empty list when StandingsLists is empty`() {
+        val dto = JolpicaConstructorStandingsResponseDto(
+            mrData = JolpicaConstructorStandingsResponseDto.MrDataDto(
+                standingsTable = JolpicaConstructorStandingsResponseDto.StandingsTableDto(
+                    standingsLists = emptyList(),
+                ),
+            ),
+        )
         assertEquals(emptyList<Any>(), dto.toConstructorStandings())
     }
 }

@@ -2,9 +2,9 @@ package com.anpurnama.f1_app.f1
 
 import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.f1.data.CurrentDriversResponseDto
-import com.anpurnama.f1_app.f1.data.DriversChampionshipResponseDto
+import com.anpurnama.f1_app.f1.data.JolpicaDriverStandingsResponseDto
 import com.anpurnama.f1_app.f1.data.getCurrentDrivers
-import com.anpurnama.f1_app.f1.data.getDriversChampionship
+import com.anpurnama.f1_app.f1.data.getJolpicaDriverStandings
 import com.anpurnama.f1_app.f1.model.DriverDetail
 import com.anpurnama.f1_app.f1.model.DriverStanding
 import io.ktor.client.HttpClient
@@ -18,7 +18,7 @@ class GetDriverDetailUseCase(private val client: HttpClient) {
         forceRefresh: Boolean = false,
     ): Outcome<DriverDetail> = try {
         val driverResponse = client.getCurrentDrivers(forceRefresh)
-        val championshipResponse = client.getDriversChampionship(forceRefresh)
+        val championshipResponse = client.getJolpicaDriverStandings(forceRefresh)
         driverResponse.toDriverDetail(driverId, championshipResponse)
     } catch (e: ClientRequestException) {
         Outcome.Failure("Request failed (${e.response.status.value})")
@@ -33,25 +33,28 @@ class GetDriverDetailUseCase(private val client: HttpClient) {
 
 internal fun CurrentDriversResponseDto.toDriverDetail(
     driverId: String,
-    championship: DriversChampionshipResponseDto,
+    championship: JolpicaDriverStandingsResponseDto,
 ): Outcome<DriverDetail> {
     val driver = drivers.firstOrNull { it.driverId == driverId }
         ?: return Outcome.Failure("Driver not found")
-    val standing = championship.driversChampionship
-        .firstOrNull { it.driverId == driverId }
+    val entries = championship.mrData.standingsTable.standingsLists
+        .firstOrNull()?.driverStandings ?: emptyList()
+    val standing = entries
+        .firstOrNull { it.driver.driverId == driverId }
         ?.let { entry ->
+            val team = entry.constructors.firstOrNull()
             DriverStanding(
-                driverId = entry.driverId,
-                teamId = entry.teamId,
-                position = entry.position,
-                points = entry.points,
-                wins = entry.wins,
-                driverName = listOfNotNull(entry.driver.name, entry.driver.surname)
+                driverId = entry.driver.driverId.orEmpty(),
+                teamId = team?.constructorId.orEmpty(),
+                position = entry.position?.toIntOrNull() ?: 0,
+                points = (entry.points?.toDoubleOrNull()?.toInt()) ?: 0,
+                wins = entry.wins?.toIntOrNull() ?: 0,
+                driverName = listOfNotNull(entry.driver.givenName, entry.driver.familyName)
                     .joinToString(" ")
-                    .ifBlank { entry.driver.shortName.orEmpty() },
-                driverShortName = entry.driver.shortName,
-                driverNumber = entry.driver.number,
-                teamName = entry.team.teamName,
+                    .ifBlank { entry.driver.code.orEmpty() },
+                driverShortName = entry.driver.code,
+                driverNumber = entry.driver.permanentNumber?.toIntOrNull(),
+                teamName = team?.name,
             )
         }
     val teamName = standing?.teamName?.takeIf { it.isNotBlank() } ?: "Unknown team"

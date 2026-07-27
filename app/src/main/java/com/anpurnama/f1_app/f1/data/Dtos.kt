@@ -102,61 +102,6 @@ data class NextRaceResponseDto(
     }
 }
 
-// f1api.dev /current/drivers-championship envelope.
-@Serializable
-data class DriversChampionshipResponseDto(
-    val season: Int = 0,
-    @SerialName("drivers_championship") val driversChampionship: List<DriversChampionshipEntryDto> = emptyList(),
-) {
-    @Serializable
-    data class DriversChampionshipEntryDto(
-        val driverId: String = "",
-        val teamId: String = "",
-        val points: Int = 0,
-        val position: Int = 0,
-        val wins: Int = 0,
-        val driver: DriverInfoDto = DriverInfoDto(),
-        val team: TeamInfoDto = TeamInfoDto(),
-    )
-
-    @Serializable
-    data class DriverInfoDto(
-        val name: String? = null,
-        val surname: String? = null,
-        val shortName: String? = null,
-        val nationality: String? = null,
-        val number: Int? = null,
-    )
-
-    @Serializable
-    data class TeamInfoDto(
-        val teamName: String? = null,
-        val country: String? = null,
-    )
-}
-
-// f1api.dev /current/constructors-championship envelope.
-@Serializable
-data class ConstructorsChampionshipResponseDto(
-    val season: Int = 0,
-    @SerialName("constructors_championship") val constructorsChampionship: List<ConstructorsChampionshipEntryDto> = emptyList(),
-) {
-    @Serializable
-    data class ConstructorsChampionshipEntryDto(
-        val teamId: String = "",
-        val points: Int = 0,
-        val position: Int = 0,
-        val wins: Int = 0,
-        val team: TeamInfoDto = TeamInfoDto(),
-    )
-
-    @Serializable
-    data class TeamInfoDto(
-        val teamName: String? = null,
-        val country: String? = null,
-    )
-}
-
 // f1api.dev /current/drivers envelope. The detail endpoint is a separate
 // list from the championship endpoint, so the use case joins it by driverId.
 @Serializable
@@ -477,6 +422,87 @@ data class JolpicaPitStopsResponseDto(
     data class PitStopDto(
         val driverId: String? = null,
         val duration: String? = null,
+    )
+}
+
+// ── Jolpica /current/driverStandings.json ─────────────────────
+@Serializable
+data class JolpicaDriverStandingsResponseDto(
+    @SerialName("MRData") val mrData: MrDataDto = MrDataDto(),
+) {
+    @Serializable
+    data class MrDataDto(
+        @SerialName("StandingsTable") val standingsTable: StandingsTableDto = StandingsTableDto(),
+    )
+
+    @Serializable
+    data class StandingsTableDto(
+        @SerialName("StandingsLists") val standingsLists: List<StandingsListDto> = emptyList(),
+    )
+
+    @Serializable
+    data class StandingsListDto(
+        @SerialName("DriverStandings") val driverStandings: List<DriverStandingEntryDto> = emptyList(),
+    )
+
+    @Serializable
+    data class DriverStandingEntryDto(
+        val position: String? = null,
+        val points: String? = null,
+        val wins: String? = null,
+        @SerialName("Driver") val driver: DriverDto = DriverDto(),
+        @SerialName("Constructors") val constructors: List<ConstructorDto> = emptyList(),
+    )
+
+    @Serializable
+    data class DriverDto(
+        val driverId: String? = null,
+        val permanentNumber: String? = null,
+        val code: String? = null,
+        val givenName: String? = null,
+        val familyName: String? = null,
+    )
+
+    @Serializable
+    data class ConstructorDto(
+        val constructorId: String? = null,
+        val name: String? = null,
+    )
+}
+
+// ── Jolpica /current/constructorStandings.json ─────────────────
+@Serializable
+data class JolpicaConstructorStandingsResponseDto(
+    @SerialName("MRData") val mrData: MrDataDto = MrDataDto(),
+) {
+    @Serializable
+    data class MrDataDto(
+        @SerialName("StandingsTable") val standingsTable: StandingsTableDto = StandingsTableDto(),
+    )
+
+    @Serializable
+    data class StandingsTableDto(
+        @SerialName("StandingsLists") val standingsLists: List<StandingsListDto> = emptyList(),
+    )
+
+    @Serializable
+    data class StandingsListDto(
+        @SerialName("ConstructorStandings") val constructorStandings: List<ConstructorStandingEntryDto> = emptyList(),
+    )
+
+    @Serializable
+    data class ConstructorStandingEntryDto(
+        val position: String? = null,
+        val points: String? = null,
+        val wins: String? = null,
+        @SerialName("Constructor") val constructor: ConstructorDto = ConstructorDto(),
+    )
+
+    @Serializable
+    data class ConstructorDto(
+        val constructorId: String? = null,
+        val name: String? = null,
+        val nationality: String? = null,
     )
 }
 

@@ -1,44 +1,62 @@
 package com.anpurnama.f1_app.f1
 
-import com.anpurnama.f1_app.f1.data.DriversChampionshipResponseDto
+import com.anpurnama.f1_app.f1.data.JolpicaDriverStandingsResponseDto
 import com.anpurnama.f1_app.f1.toDriverStandings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Rung 1 mapper test for the drivers' championship DTO. Pure mapping.
+ * Rung 1 mapper test for the drivers' championship DTO (Jolpica source).
+ * Pure mapping.
  */
 class DriverStandingsMapperTest {
 
     @Test
     fun `toDriverStandings maps every entry into a domain model`() {
-        val dto = DriversChampionshipResponseDto(
-            season = 2026,
-            driversChampionship = listOf(
-                DriversChampionshipResponseDto.DriversChampionshipEntryDto(
-                    driverId = "antonelli",
-                    teamId = "mercedes",
-                    points = 204,
-                    position = 1,
-                    wins = 6,
-                    driver = DriversChampionshipResponseDto.DriverInfoDto(
-                        name = "Andrea",
-                        surname = "Kimi Antonelli",
-                        shortName = "ANT",
-                        number = 12,
-                    ),
-                ),
-                DriversChampionshipResponseDto.DriversChampionshipEntryDto(
-                    driverId = "hamilton",
-                    teamId = "ferrari",
-                    points = 159,
-                    position = 2,
-                    wins = 1,
-                    driver = DriversChampionshipResponseDto.DriverInfoDto(
-                        name = "Lewis",
-                        surname = "Hamilton",
-                        shortName = "HAM",
-                        number = 44,
+        val dto = JolpicaDriverStandingsResponseDto(
+            mrData = JolpicaDriverStandingsResponseDto.MrDataDto(
+                standingsTable = JolpicaDriverStandingsResponseDto.StandingsTableDto(
+                    standingsLists = listOf(
+                        JolpicaDriverStandingsResponseDto.StandingsListDto(
+                            driverStandings = listOf(
+                                JolpicaDriverStandingsResponseDto.DriverStandingEntryDto(
+                                    position = "1",
+                                    points = "204",
+                                    wins = "6",
+                                    driver = JolpicaDriverStandingsResponseDto.DriverDto(
+                                        driverId = "antonelli",
+                                        permanentNumber = "12",
+                                        code = "ANT",
+                                        givenName = "Andrea Kimi",
+                                        familyName = "Antonelli",
+                                    ),
+                                    constructors = listOf(
+                                        JolpicaDriverStandingsResponseDto.ConstructorDto(
+                                            constructorId = "mercedes",
+                                            name = "Mercedes",
+                                        ),
+                                    ),
+                                ),
+                                JolpicaDriverStandingsResponseDto.DriverStandingEntryDto(
+                                    position = "2",
+                                    points = "159",
+                                    wins = "1",
+                                    driver = JolpicaDriverStandingsResponseDto.DriverDto(
+                                        driverId = "hamilton",
+                                        permanentNumber = "44",
+                                        code = "HAM",
+                                        givenName = "Lewis",
+                                        familyName = "Hamilton",
+                                    ),
+                                    constructors = listOf(
+                                        JolpicaDriverStandingsResponseDto.ConstructorDto(
+                                            constructorId = "ferrari",
+                                            name = "Ferrari",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
                     ),
                 ),
             ),
@@ -64,25 +82,49 @@ class DriverStandingsMapperTest {
     }
 
     @Test
-    fun `toDriverStandings tolerates a missing surname`() {
-        // The schema has `name` and `surname` both optional; a partial
-        // row should not crash the mapper. Trim the trailing space.
-        val dto = DriversChampionshipResponseDto(
-            driversChampionship = listOf(
-                DriversChampionshipResponseDto.DriversChampionshipEntryDto(
-                    driverId = "x",
-                    teamId = "y",
-                    driver = DriversChampionshipResponseDto.DriverInfoDto(name = "Solo"),
+    fun `toDriverStandings tolerates a missing givenName`() {
+        val dto = JolpicaDriverStandingsResponseDto(
+            mrData = JolpicaDriverStandingsResponseDto.MrDataDto(
+                standingsTable = JolpicaDriverStandingsResponseDto.StandingsTableDto(
+                    standingsLists = listOf(
+                        JolpicaDriverStandingsResponseDto.StandingsListDto(
+                            driverStandings = listOf(
+                                JolpicaDriverStandingsResponseDto.DriverStandingEntryDto(
+                                    driver = JolpicaDriverStandingsResponseDto.DriverDto(
+                                        driverId = "x",
+                                        code = "XYZ",
+                                    ),
+                                    constructors = listOf(
+                                        JolpicaDriverStandingsResponseDto.ConstructorDto(
+                                            constructorId = "y",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
                 ),
             ),
         )
         val standings = dto.toDriverStandings()
-        assertEquals("Solo", standings[0].driverName)
+        assertEquals("XYZ", standings[0].driverName)
     }
 
     @Test
     fun `toDriverStandings returns an empty list on an empty envelope`() {
-        val dto = DriversChampionshipResponseDto(season = 2026)
+        val dto = JolpicaDriverStandingsResponseDto()
+        assertEquals(emptyList<Any>(), dto.toDriverStandings())
+    }
+
+    @Test
+    fun `toDriverStandings returns an empty list when StandingsLists is empty`() {
+        val dto = JolpicaDriverStandingsResponseDto(
+            mrData = JolpicaDriverStandingsResponseDto.MrDataDto(
+                standingsTable = JolpicaDriverStandingsResponseDto.StandingsTableDto(
+                    standingsLists = emptyList(),
+                ),
+            ),
+        )
         assertEquals(emptyList<Any>(), dto.toDriverStandings())
     }
 }

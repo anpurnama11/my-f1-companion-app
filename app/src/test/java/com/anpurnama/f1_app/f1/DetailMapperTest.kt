@@ -1,11 +1,11 @@
 package com.anpurnama.f1_app.f1
 
-import com.anpurnama.f1_app.f1.data.ConstructorsChampionshipResponseDto
 import com.anpurnama.f1_app.f1.data.CurrentTeamsResponseDto
 import com.anpurnama.f1_app.f1.data.CurrentTeamDto
 import com.anpurnama.f1_app.f1.data.CurrentDriversResponseDto
 import com.anpurnama.f1_app.f1.data.CurrentDriverDto
-import com.anpurnama.f1_app.f1.data.DriversChampionshipResponseDto
+import com.anpurnama.f1_app.f1.data.JolpicaDriverStandingsResponseDto
+import com.anpurnama.f1_app.f1.data.JolpicaConstructorStandingsResponseDto
 import com.anpurnama.f1_app.core.Outcome
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -31,23 +31,32 @@ class DetailMapperTest {
                 ),
             ),
         )
-        val championship = DriversChampionshipResponseDto(
-            driversChampionship = listOf(
-                DriversChampionshipResponseDto.DriversChampionshipEntryDto(
-                    driverId = "antonelli",
-                    teamId = "mercedes",
-                    points = 204,
-                    position = 1,
-                    wins = 6,
-                    driver = DriversChampionshipResponseDto.DriverInfoDto(
-                        name = "Andrea",
-                        surname = "Kimi Antonelli",
-                        shortName = "ANT",
-                        number = 12,
-                    ),
-                    team = DriversChampionshipResponseDto.TeamInfoDto(
-                        teamName = "Mercedes Formula 1 Team",
-                        country = "Germany",
+        val championship = JolpicaDriverStandingsResponseDto(
+            mrData = JolpicaDriverStandingsResponseDto.MrDataDto(
+                standingsTable = JolpicaDriverStandingsResponseDto.StandingsTableDto(
+                    standingsLists = listOf(
+                        JolpicaDriverStandingsResponseDto.StandingsListDto(
+                            driverStandings = listOf(
+                                JolpicaDriverStandingsResponseDto.DriverStandingEntryDto(
+                                    position = "1",
+                                    points = "204",
+                                    wins = "6",
+                                    driver = JolpicaDriverStandingsResponseDto.DriverDto(
+                                        driverId = "antonelli",
+                                        permanentNumber = "12",
+                                        code = "ANT",
+                                        givenName = "Andrea Kimi",
+                                        familyName = "Antonelli",
+                                    ),
+                                    constructors = listOf(
+                                        JolpicaDriverStandingsResponseDto.ConstructorDto(
+                                            constructorId = "mercedes",
+                                            name = "Mercedes Formula 1 Team",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
                     ),
                 ),
             ),
@@ -78,16 +87,24 @@ class DetailMapperTest {
                 ),
             ),
         )
-        val championship = ConstructorsChampionshipResponseDto(
-            constructorsChampionship = listOf(
-                ConstructorsChampionshipResponseDto.ConstructorsChampionshipEntryDto(
-                    teamId = "cadillac",
-                    points = 0,
-                    position = 11,
-                    wins = 0,
-                    team = ConstructorsChampionshipResponseDto.TeamInfoDto(
-                        teamName = "Cadillac Formula 1 Team",
-                        country = "United States",
+        val championship = JolpicaConstructorStandingsResponseDto(
+            mrData = JolpicaConstructorStandingsResponseDto.MrDataDto(
+                standingsTable = JolpicaConstructorStandingsResponseDto.StandingsTableDto(
+                    standingsLists = listOf(
+                        JolpicaConstructorStandingsResponseDto.StandingsListDto(
+                            constructorStandings = listOf(
+                                JolpicaConstructorStandingsResponseDto.ConstructorStandingEntryDto(
+                                    position = "11",
+                                    points = "0",
+                                    wins = "0",
+                                    constructor = JolpicaConstructorStandingsResponseDto.ConstructorDto(
+                                        constructorId = "cadillac",
+                                        name = "Cadillac Formula 1 Team",
+                                        nationality = "United States",
+                                    ),
+                                ),
+                            ),
+                        ),
                     ),
                 ),
             ),
@@ -108,11 +125,11 @@ class DetailMapperTest {
     fun `detail joins return a failure for an unknown stable id`() {
         val driverResult = CurrentDriversResponseDto().toDriverDetail(
             driverId = "missing",
-            championship = DriversChampionshipResponseDto(),
+            championship = JolpicaDriverStandingsResponseDto(),
         )
         val teamResult = CurrentTeamsResponseDto().toTeamDetail(
             teamId = "missing",
-            championship = ConstructorsChampionshipResponseDto(),
+            championship = JolpicaConstructorStandingsResponseDto(),
         )
 
         assertTrue(driverResult is Outcome.Failure)

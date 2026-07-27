@@ -70,8 +70,10 @@ built once per `loadAlpha` call and threads `driverId`/`teamId` through the
 per-row mappers, with an opaque-id fallback when the catalog misses.
 
 f1api.dev keeps its role for **schedule + catalogs only**: `getSeason` /
-`getCurrent`, championships, `getDrivers(year)` / `getCurrentDrivers` /
+`getCurrent`, `getDrivers(year)` / `getCurrentDrivers` /
 `getCurrentTeams`, `getCircuit` / `getCircuitWinners`.
+Championship standings moved to Jolpica in
+[ADR 0016](0016-standings-source-move-to-jolpica.md).
 
 ## Why
 

@@ -4,8 +4,8 @@ import com.anpurnama.f1_app.f1.data.F1API_BASE
 import com.anpurnama.f1_app.f1.data.getCurrent
 import com.anpurnama.f1_app.f1.data.getCurrentDrivers
 import com.anpurnama.f1_app.f1.data.getCurrentTeams
-import com.anpurnama.f1_app.f1.data.getConstructorsChampionship
-import com.anpurnama.f1_app.f1.data.getDriversChampionship
+import com.anpurnama.f1_app.f1.data.getJolpicaConstructorStandings
+import com.anpurnama.f1_app.f1.data.getJolpicaDriverStandings
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -164,19 +164,79 @@ class F1ApiTest {
     }
 
     @Test
-    fun `championship endpoints decode the live underscored keys`() = runTest {
+    fun `jolpica standings endpoints decode MRData envelope`() = runTest {
+        val driverBody = """{
+          "MRData": {
+            "StandingsTable": {
+              "season": "2026",
+              "round": "11",
+              "StandingsLists": [{
+                "DriverStandings": [{
+                  "position": "1",
+                  "points": "219",
+                  "wins": "6",
+                  "Driver": {"driverId": "antonelli", "permanentNumber": "12", "code": "ANT", "givenName": "Andrea Kimi", "familyName": "Antonelli"},
+                  "Constructors": [{"constructorId": "mercedes", "name": "Mercedes"}]
+                }]
+              }]
+            }
+          }
+        }""".trimIndent()
+        val constructorBody = """{
+          "MRData": {
+            "StandingsTable": {
+              "season": "2026",
+              "round": "11",
+              "StandingsLists": [{
+                "ConstructorStandings": [{
+                  "position": "1",
+                  "points": "379",
+                  "wins": "8",
+                  "Constructor": {"constructorId": "mercedes", "name": "Mercedes", "nationality": "German"}
+                }]
+              }]
+            }
+          }
+        }""".trimIndent()
+
         val client = client { req ->
-            if (req.url.fullPath.endsWith("drivers-championship")) {
-                jsonOk("""{"drivers_championship":[{"driverId":"antonelli"}]}""")
+            if (req.url.fullPath.contains("driverStandings.json")) {
+                jsonOk(driverBody)
             } else {
-                jsonOk("""{"constructors_championship":[{"teamId":"mercedes"}]}""")
+                jsonOk(constructorBody)
             }
         }
 
-        val drivers = client.getDriversChampionship()
-        val teams = client.getConstructorsChampionship()
+        val drivers = client.getJolpicaDriverStandings()
+        val teams = client.getJolpicaConstructorStandings()
 
-        assertEquals("antonelli", drivers.driversChampionship.single().driverId)
-        assertEquals("mercedes", teams.constructorsChampionship.single().teamId)
+        val driverEntry = drivers.mrData.standingsTable.standingsLists
+            .single().driverStandings.single()
+        assertEquals("antonelli", driverEntry.driver.driverId)
+        assertEquals("219", driverEntry.points)
+
+        val constructorEntry = teams.mrData.standingsTable.standingsLists
+            .single().constructorStandings.single()
+        assertEquals("mercedes", constructorEntry.constructor.constructorId)
+        assertEquals("379", constructorEntry.points)
+    }
+
+    @Test
+    fun `jolpica standings with forceRefresh sends the no-cache header`() = runTest {
+        val paths = mutableListOf<String>()
+        val cacheControls = mutableListOf<String?>()
+        val client = client { req ->
+            paths += req.url.fullPath
+            cacheControls += req.headers[HttpHeaders.CacheControl]
+            jsonOk("""{"MRData":{"StandingsTable":{"StandingsLists":[]}}}""")
+        }
+        client.getJolpicaDriverStandings(forceRefresh = true)
+        client.getJolpicaConstructorStandings()
+
+        assertTrue(
+            "expected no-cache on drivers, was: ${cacheControls[0]}",
+            cacheControls[0]?.contains("no-cache", ignoreCase = true) == true,
+        )
+        assertEquals(null, cacheControls[1])
     }
 }

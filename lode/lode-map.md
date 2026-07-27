@@ -43,6 +43,7 @@ lode/
     0013-compare-card-vs-teammate.md         # Compare card on DriverDetail = vs teammate; rejected: vs another driver = dropped Driver Comparison feature (ticket 29)
     0014-countdown-widget-shows-next-session.md  # Widget cache stores selected current/next session name+start, falling back to Race
     0015-upcoming-session-result-button-buffer.md  # UpcomingWeekend Results button gated by per-session start buffer (6–12h); not raw start<=now
+    0016-standings-source-move-to-jolpica.md  # Standings source: f1api.dev → Jolpica; MRData envelope, string→Int coercion, Constructors[] array handling
   plans/
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)

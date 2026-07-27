@@ -1,7 +1,7 @@
 package com.anpurnama.f1_app.f1
 
 import com.anpurnama.f1_app.core.Outcome
-import com.anpurnama.f1_app.f1.data.F1API_BASE
+import com.anpurnama.f1_app.f1.data.JOLPICA_BASE
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -32,7 +32,7 @@ class GetDriversStandingsUseCaseTest {
         HttpClient(MockEngine(handler)) {
             expectSuccess = true
             install(ContentNegotiation) { json(json) }
-            defaultRequest { url(F1API_BASE) }
+            defaultRequest { url(JOLPICA_BASE) }
         }
     )
 
@@ -45,11 +45,23 @@ class GetDriversStandingsUseCaseTest {
     @Test
     fun `invoke returns Success list on 200`() = runTest {
         val body = """
-            { "season": 2026,
-              "drivers_championship": [
-                { "driverId": "antonelli", "teamId": "mercedes", "position": 1, "points": 204, "wins": 6,
-                  "driver": { "name": "Andrea", "surname": "Kimi Antonelli", "shortName": "ANT", "number": 12 } }
-              ]
+            {
+              "MRData": {
+                "StandingsTable": {
+                  "season": "2026",
+                  "round": "11",
+                  "StandingsLists": [{
+                    "DriverStandings": [{
+                      "position": "1",
+                      "points": "204",
+                      "wins": "6",
+                      "Driver": { "driverId": "antonelli", "permanentNumber": "12", "code": "ANT",
+                                  "givenName": "Andrea Kimi", "familyName": "Antonelli" },
+                      "Constructors": [{ "constructorId": "mercedes", "name": "Mercedes" }]
+                    }]
+                  }]
+                }
+              }
             }
         """.trimIndent()
         val out = useCase { jsonOk(body) }.invoke()

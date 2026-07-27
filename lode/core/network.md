@@ -24,10 +24,15 @@ Held by `Wiring`; one client per process, shared by the widget.
 - `F1API_BASE` — f1api.dev primary
 - `JOLPICA_BASE` — jolpica (ticket 04)
 
-Extensions: `getCurrent`, `getNextRace`, `getDriversChampionship`,
-`getConstructorsChampionship`, `getJolpicaPitStops`, and the existing
+Extensions: `getCurrent`, `getNextRace`, `getJolpicaDriverStandings`,
+`getJolpicaConstructorStandings`, `getJolpicaPitStops`, and the existing
 f1api.dev/Jolpica result extensions.
 Pure Kotlin, zero `android.*` imports (domain-purity invariant).
+
+Standings source was moved from f1api.dev (`getDriversChampionship`/
+`getConstructorsChampionship`) to Jolpica (`getJolpicaDriverStandings`/
+`getJolpicaConstructorStandings`) in commit 0016. See
+[../decisions/0016-standings-source-move-to-jolpica.md](../decisions/0016-standings-source-move-to-jolpica.md)
 
 f1api.dev and Jolpica extensions take a `forceRefresh` flag and add
 `Cache-Control: no-cache` when true. Circuit artwork is resolved from the

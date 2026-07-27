@@ -54,23 +54,25 @@ suspend fun HttpClient.getNextRace(forceRefresh: Boolean = false): NextRaceRespo
 }
 
 /**
- * Drivers' championship standings, position-ordered. Used by Homepage §1
- * (favorites driver cards) and the Leaderboard tab.
+ * Drivers' championship standings from Jolpica, position-ordered.
+ * Used by Homepage §3 (favorites driver cards), the Leaderboard
+ * tab, and Driver detail join.
  */
-suspend fun HttpClient.getDriversChampionship(forceRefresh: Boolean = false): DriversChampionshipResponseDto {
-    val response = get("$F1API_BASE/current/drivers-championship") {
+suspend fun HttpClient.getJolpicaDriverStandings(forceRefresh: Boolean = false): JolpicaDriverStandingsResponseDto {
+    val response = get("$JOLPICA_BASE/current/driverStandings.json") {
         if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body()
 }
 
 /**
- * Constructors' championship standings, position-ordered. Used by Homepage
- * §3 (favorites team card) and the Leaderboard tab, and the first-launch
- * default-seed (the top constructor's two drivers).
+ * Constructors' championship standings from Jolpica, position-ordered.
+ * Used by Homepage §3 (favorites team card), the Leaderboard tab,
+ * the first-launch default-seed (top team's two drivers), and Team
+ * detail join.
  */
-suspend fun HttpClient.getConstructorsChampionship(forceRefresh: Boolean = false): ConstructorsChampionshipResponseDto {
-    val response = get("$F1API_BASE/current/constructors-championship") {
+suspend fun HttpClient.getJolpicaConstructorStandings(forceRefresh: Boolean = false): JolpicaConstructorStandingsResponseDto {
+    val response = get("$JOLPICA_BASE/current/constructorStandings.json") {
         if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body()
