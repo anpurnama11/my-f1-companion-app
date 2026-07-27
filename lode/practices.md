@@ -120,6 +120,20 @@ com.anpurnama.f1_app/
 
 - **Ponytail / BSSN:** simplest system that works; no speculative abstraction.
   Look before you write — reuse a sibling helper before reimplementing.
+- **Every construct earns its place:** add code, parameters, configuration,
+  abstractions, conversions, comments, and tests only when they change behavior,
+  explain a hidden constraint, prevent a real failure, or make future change
+  simpler. Delete speculative and duplicate constructs.
+- **Comments explain hidden constraints, not code:** reserve them for compatibility,
+  domain rules, external behavior, performance constraints, and trade-offs. Do
+  not narrate obvious implementation or justify a change to a reviewer.
+- **Tests protect behavior, not shape:** add a focused test for a meaningful
+  guarantee, tricky logic, external-system assumption, or likely regression; do
+  not test plumbing, delegation, or incidental implementation details. Prefer
+  the smallest clear behavior test; see [testing/scope.md](testing/scope.md).
+- **Abstractions stay local until proven:** extract only when meaningful
+  duplication, domain clarity, reduced error risk, or a better future tool
+  outweighs the added indirection.
 - **Design reference:** boxbox-club (dark-first F1 design tokens). Lean new app that
   *uses* it as a reference, not a faithful re-skin of every surface.
 - **"If not covered by a free API, it's not built"** — user rule about *features*
