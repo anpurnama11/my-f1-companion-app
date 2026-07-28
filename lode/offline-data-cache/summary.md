@@ -53,7 +53,11 @@ data class CachedResourceEntity(
 ```
 
 
-Cache-aware UI state preserves content. ViewModels map observed snapshots into
+Cache-aware UI state preserves content. The shared UI transport already exposes
+`SectionUiState.Content(data, sync = ContentSyncStatus.Fresh)`, so existing
+non-cache use cases keep fresh-content behavior while future cached resources
+can mark the visible payload as `Stale`, `Refreshing`, or
+`RefreshFailed(message)`. ViewModels map observed snapshots into
 `SectionUiState`: `Loading` and `Error(message)` are only for the no-cached-data
 phase, while `SectionUiState.Content(data, sync)` renders cached data with a
 non-destructive `ContentSyncStatus` (`Fresh`, `Stale`, `Refreshing`, or

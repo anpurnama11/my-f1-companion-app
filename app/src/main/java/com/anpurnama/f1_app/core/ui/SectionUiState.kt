@@ -15,7 +15,17 @@ import com.anpurnama.f1_app.core.Outcome
 sealed interface SectionUiState<out T> {
     data object Loading : SectionUiState<Nothing>
     data class Error(val message: String) : SectionUiState<Nothing>
-    data class Content<T>(val data: T) : SectionUiState<T>
+    data class Content<T>(
+        val data: T,
+        val sync: ContentSyncStatus = ContentSyncStatus.Fresh,
+    ) : SectionUiState<T>
+}
+
+sealed interface ContentSyncStatus {
+    data object Fresh : ContentSyncStatus
+    data object Stale : ContentSyncStatus
+    data object Refreshing : ContentSyncStatus
+    data class RefreshFailed(val message: String) : ContentSyncStatus
 }
 
 /** Collapse a data-layer [Outcome] into a UI [SectionUiState] at the VM seam. */

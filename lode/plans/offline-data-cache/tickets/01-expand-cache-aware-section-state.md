@@ -2,7 +2,7 @@
 id: 01
 title: Expand cache-aware section state
 type: task
-status: ready-for-agent
+status: shipped
 blocked_by: []
 owner: ""
 spec: ../../../specs/offline-data-cache.md
@@ -14,7 +14,7 @@ spec: ../../../specs/offline-data-cache.md
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** shipped
 
 ```kotlin
 sealed interface ContentSyncStatus {
@@ -36,9 +36,9 @@ stateDiagram-v2
     ContentRefreshing --> ContentFailed: refresh fails, keep data
 ```
 
-- [ ] `SectionUiState.Content` carries a sync status with `Fresh` as the default.
-- [ ] Existing `Outcome` mapping still produces fresh content for non-cache use cases.
-- [ ] Existing screen behavior and tests remain equivalent unless they asserted the old exact `Content(data)` shape.
-- [ ] Tests assert `data` and `sync` separately where cache status matters.
+- [x] `SectionUiState.Content` carries a sync status with `Fresh` as the default.
+- [x] Existing `Outcome` mapping still produces fresh content for non-cache use cases.
+- [x] Existing screen behavior and tests remain equivalent unless they asserted the old exact `Content(data)` shape.
+- [x] Tests assert `data` and `sync` separately where cache status matters.
 
 Related: [spec](../../../specs/offline-data-cache.md), [terminology](../../../terminology.md), [ADR 0018](../../../decisions/0018-cache-status-on-section-content.md).

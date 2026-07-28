@@ -52,7 +52,7 @@ lode/
     0019-offline-cache-uses-datastore-snapshots.md  # Proto DataStore CacheState.snapshots; Room only on measured scale/query/contention tripwires
   plans/
     offline-data-cache/tickets/
-      01-expand-cache-aware-section-state.md       # ready — SectionUiState.Content(data, sync) foundation
+      01-expand-cache-aware-section-state.md       # shipped — SectionUiState.Content(data, sync) foundation
       02-add-snapshot-store-and-resource-contracts.md  # ready — CacheState snapshots + resource keys + store tests
       03-cache-current-season-schedule-end-to-end.md   # ready — cached schedule + schedule-gated promotion/pruning
       04-cache-standings-and-catalogs-end-to-end.md    # ready — cached standings/catalogs for Leaderboard/My Team/Homepage
