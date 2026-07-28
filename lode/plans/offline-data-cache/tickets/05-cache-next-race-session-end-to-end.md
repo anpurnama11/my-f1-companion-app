@@ -2,7 +2,7 @@
 id: 05
 title: Cache next race and session end to end
 type: task
-status: ready-for-agent
+status: shipped
 blocked_by: [03]
 owner: ""
 spec: ../../../specs/offline-data-cache.md
@@ -14,7 +14,7 @@ spec: ../../../specs/offline-data-cache.md
 
 **Blocked by:** 03 — Cache current-season schedule end to end.
 
-**Status:** ready-for-agent
+**Status:** shipped
 
 ```kotlin
 sealed interface CacheResourceKey {
@@ -30,10 +30,10 @@ flowchart LR
     Widget[Countdown widget cache] -. separate .- Store
 ```
 
-- [ ] Homepage next race/session content renders from durable cache when offline.
-- [ ] Off-season `null` next-race responses are valid cached payloads.
-- [ ] Refresh preserves visible next-session content and surfaces sync status.
-- [ ] The Countdown widget's existing typed-key cache remains separate and unchanged unless explicitly bridged later.
-- [ ] Next race/session refresh uses the current active season and does not promote season rollover by itself.
+- [x] Homepage next race/session content renders from durable cache when offline.
+- [x] Off-season `null` next-race responses are valid cached payloads.
+- [x] Refresh preserves visible next-session content and surfaces sync status.
+- [x] The Countdown widget's existing typed-key cache remains separate and unchanged unless explicitly bridged later.
+- [x] Next race/session refresh uses the current active season and does not promote season rollover by itself.
 
 Related: [spec](../../../specs/offline-data-cache.md), [widget cache](../../../widget/countdown.md), [ADR 0014](../../../decisions/0014-countdown-widget-shows-next-session.md).

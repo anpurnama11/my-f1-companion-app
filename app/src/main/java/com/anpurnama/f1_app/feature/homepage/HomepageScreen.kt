@@ -756,6 +756,7 @@ private fun rememberHomepageViewModel(): HomepageViewModel {
             getConstructorsStandings = wiring.getConstructorsStandings,
             favoritesCache = wiring.favoritesCache,
             seasonScheduleCacheRepository = wiring.seasonScheduleCacheRepository,
+            currentSeasonResourcesCacheRepository = wiring.currentSeasonResourcesCacheRepository,
         )
     )
 }

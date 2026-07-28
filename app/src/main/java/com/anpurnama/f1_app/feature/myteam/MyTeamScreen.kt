@@ -424,6 +424,7 @@ private fun rememberMyTeamViewModel(): MyTeamViewModel {
             getDriversStandings = wiring.getDriversStandings,
             getConstructorsStandings = wiring.getConstructorsStandings,
             favoritesCache = wiring.favoritesCache,
+            currentSeasonResourcesCacheRepository = wiring.currentSeasonResourcesCacheRepository,
         ),
     )
 }

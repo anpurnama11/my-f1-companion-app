@@ -22,6 +22,43 @@ failed or invalid refreshes preserve the last good season and record
 visible as `Stale`, `Refreshing`, or `RefreshFailed` instead of becoming a
 full-section error.
 
+Standings, current driver/team catalogs, and Homepage next-race/session are
+cached end to end through `CurrentSeasonResourcesCacheRepository`. The repository
+derives its key season from `CacheState.activeSeason`; if no active season exists
+on a first online open, it asks `SeasonScheduleCacheRepository` to refresh the
+schedule and then writes the resource under the promoted season. It never
+promotes rollover itself. Standings and catalogs use year-specific endpoints
+(`/{activeSeason}/driverStandings.json`, `/{activeSeason}/constructorStandings.json`,
+`/{activeSeason}/drivers`, `/{activeSeason}/teams`) so Jolpica or f1api.dev
+`current` rollover skew cannot poison the old active-season key. Empty Jolpica
+standings lists, empty f1api.dev catalogs, and `/current/next` responses with
+`race: []` are valid payloads only when the response `season` still matches the
+active season; a rollover-skewed `/current/next` response from a later season is
+recorded as a failed attempt and is not written under the old key. Homepage,
+Leaderboard, and My Team observe cached standings; Homepage also observes cached
+next race/session. My Team warms driver and team catalogs as production
+resources for picker/detail joins that need the season catalog generation. The
+Countdown widget still reads its separate typed-key `NextRaceCache`.
+
+```kotlin
+currentResources.refreshDriverStandings(RefreshReason.StaleOpen)
+currentResources.refreshNextRace(RefreshReason.PullToRefresh)
+// Empty race array decodes to CachedResource<NextRace?>(data = null, snapshot)
+```
+
+```mermaid
+flowchart LR
+    Active[activeSeason from cached schedule] --> Repo[CurrentSeasonResourcesCacheRepository]
+    Repo --> Standings[(Driver + Constructor standings snapshots)]
+    Repo --> Catalogs[(Driver + Team catalog snapshots)]
+    Repo --> Next[(Next race/session snapshot)]
+    Standings --> Leaderboard
+    Standings --> MyTeam[My Team picker]
+    Standings --> Home[Homepage favorites]
+    Next --> HomeCountdown[Homepage countdown]
+    Widget[Countdown widget] -. separate NextRaceCache .- Next
+```
+
 ```kotlin
 val cached = seasonScheduleCacheRepository.observeCurrentSeason()
 seasonScheduleCacheRepository.refreshCurrentSeason(RefreshReason.PullToRefresh)

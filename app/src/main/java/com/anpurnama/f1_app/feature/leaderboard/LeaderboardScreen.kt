@@ -199,6 +199,10 @@ private fun StandingCard(
 private fun rememberLeaderboardViewModel(): LeaderboardViewModel {
     val wiring = (LocalContext.current.applicationContext as F1App).wiring
     return viewModel(
-        factory = leaderboardViewModelFactory(wiring.getDriversStandings, wiring.getConstructorsStandings),
+        factory = leaderboardViewModelFactory(
+            getDriversStandings = wiring.getDriversStandings,
+            getConstructorsStandings = wiring.getConstructorsStandings,
+            currentSeasonResourcesCacheRepository = wiring.currentSeasonResourcesCacheRepository,
+        ),
     )
 }

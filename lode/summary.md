@@ -47,6 +47,12 @@ renderer (ADR 0002). Single `:app` module; KMP `:shared` extraction deferred.
 Session start labels are converted from API UTC to the device’s local timezone;
 elapsed lap and race result times remain unconverted durations.
 
+Current-season structured cache is partially shipped: schedule, Homepage next
+race/session, driver/constructor standings, and current driver/team catalogs are
+durable DataStore snapshots. Homepage, Leaderboard, and My Team render cached
+content through `SectionUiState.Content(data, sync)` so stale or failed refreshes
+do not blank the last good payload; the Countdown widget cache remains separate.
+
 **Multi-backstack (revision 2):** each tab has its own persistent
 `NavBackStack` — switching tabs no longer destroys ViewModels.
 `rememberSaveableStateHolderNavEntryDecorator` + `rememberViewModelStoreNavEntryDecorator`

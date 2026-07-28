@@ -1,13 +1,15 @@
 # Leaderboard and driver/team detail
 
 The Leaderboard tab loads driver and constructor standings independently from
-f1api.dev and presents them through a Material 3 `SecondaryTabRow` with
+the current-season snapshot cache and presents them through a Material 3 `SecondaryTabRow` with
 **Drivers** and **Constructors** tabs. Only the selected standings list is
 visible, and `HorizontalPager` lets users swipe between the pages. Each row
 displays position, wins, points, and a stable API ID; row clicks push
 `Route.DriverDetail(driverId)` or `Route.TeamDetail(teamId)`. Tab taps animate
-the same pager, while pull-to-refresh and retry re-fetch both independent
-sections.
+the same pager, while pull-to-refresh and retry refresh both independent
+resources. Cached rows stay visible as `Stale`, `Refreshing`, or
+`RefreshFailed(message)` instead of becoming a full-section error after the
+first good payload.
 
 Driver detail joins `/current/drivers` with `/current/drivers-championship` by
 `driverId`. Team detail joins `/current/teams` with
@@ -30,14 +32,24 @@ existing `TeamColors.forId(teamId)` swatch treatment.
 flowchart LR
   Leaderboard --> DriversTab
   Leaderboard --> ConstructorsTab
+  Leaderboard --> CachedStandings["season-scoped cached standings"]
   DriversTab -->|driverId| DriverDetail
   ConstructorsTab -->|teamId| TeamDetail
   DriverDetail --> DriversAPI["/current/drivers"]
   DriverDetail --> DriverChamp["Jolpica /current/driverStandings.json"]
   TeamDetail --> TeamsAPI["/current/teams"]
   TeamDetail --> TeamChamp["Jolpica /current/constructorStandings.json"]
+  CachedStandings --> YearDriverChamp["Jolpica /{activeSeason}/driverStandings.json"]
+  CachedStandings --> YearTeamChamp["Jolpica /{activeSeason}/constructorStandings.json"]
   DriverChamp --> DriverSnapshot[DriverStanding]
   TeamChamp --> TeamSnapshot[ConstructorStanding]
+```
+
+```kotlin
+LeaderboardViewModel(
+    observeCachedDrivers = currentResources.observeDriverStandings(),
+    refreshCachedDrivers = currentResources::refreshDriverStandings,
+)
 ```
 
 ## Invariants and lessons
@@ -49,6 +61,9 @@ flowchart LR
 - Standings source is Jolpica (MRData envelope), not f1api.dev. DTOs use
   the Jolpica `@SerialName`-annotated PascalCase keys (see
   [ADR 0016](../decisions/0016-standings-source-move-to-jolpica.md)).
+- Standings snapshots are season-scoped under the schedule cache's active
+  season; empty early-season lists are valid, and refresh failures only update
+  attempt metadata.
 - `f1/` remains Android-free so this slice can move to future KMP shared code.
 
 ## Planned: GAP-F detail-page redesign (ticket 26, follow-ups 27/28/29)

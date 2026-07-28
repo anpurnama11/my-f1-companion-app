@@ -65,6 +65,16 @@ suspend fun HttpClient.getJolpicaDriverStandings(forceRefresh: Boolean = false):
     return response.body()
 }
 
+suspend fun HttpClient.getJolpicaDriverStandings(
+    year: Int,
+    forceRefresh: Boolean = false,
+): JolpicaDriverStandingsResponseDto {
+    val response = get("$JOLPICA_BASE/$year/driverStandings.json") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
 /**
  * Constructors' championship standings from Jolpica, position-ordered.
  * Used by Homepage §3 (favorites team card), the Leaderboard tab,
@@ -73,6 +83,16 @@ suspend fun HttpClient.getJolpicaDriverStandings(forceRefresh: Boolean = false):
  */
 suspend fun HttpClient.getJolpicaConstructorStandings(forceRefresh: Boolean = false): JolpicaConstructorStandingsResponseDto {
     val response = get("$JOLPICA_BASE/current/constructorStandings.json") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+suspend fun HttpClient.getJolpicaConstructorStandings(
+    year: Int,
+    forceRefresh: Boolean = false,
+): JolpicaConstructorStandingsResponseDto {
+    val response = get("$JOLPICA_BASE/$year/constructorStandings.json") {
         if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body()
@@ -92,6 +112,16 @@ suspend fun HttpClient.getDrivers(
     forceRefresh: Boolean = false,
 ): CurrentDriversResponseDto {
     val response = get("$F1API_BASE/$year/drivers") {
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
+    }
+    return response.body()
+}
+
+suspend fun HttpClient.getTeams(
+    year: Int,
+    forceRefresh: Boolean = false,
+): CurrentTeamsResponseDto {
+    val response = get("$F1API_BASE/$year/teams") {
         if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body()

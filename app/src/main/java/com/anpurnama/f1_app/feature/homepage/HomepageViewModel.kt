@@ -11,6 +11,7 @@ import com.anpurnama.f1_app.core.cache.RefreshReason
 import com.anpurnama.f1_app.core.cache.RefreshResult
 import com.anpurnama.f1_app.core.ui.ContentSyncStatus
 import com.anpurnama.f1_app.core.ui.SectionUiState
+import com.anpurnama.f1_app.core.ui.refreshCachedSection
 import com.anpurnama.f1_app.core.ui.toSection
 import com.anpurnama.f1_app.feature.favorites.Favorites
 import com.anpurnama.f1_app.feature.favorites.FavoritesCache
@@ -18,6 +19,7 @@ import com.anpurnama.f1_app.f1.GetConstructorsStandingsUseCase
 import com.anpurnama.f1_app.f1.GetDriversStandingsUseCase
 import com.anpurnama.f1_app.f1.GetNextRaceUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
+import com.anpurnama.f1_app.f1.cache.CurrentSeasonResourcesCacheRepository
 import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
 import com.anpurnama.f1_app.f1.model.ConstructorStanding
 import com.anpurnama.f1_app.f1.model.DriverStanding
@@ -52,6 +54,12 @@ class HomepageViewModel(
     private val seedIfEmpty: suspend (topTeamId: String, topDriverIds: List<String>) -> Unit,
     private val observeCachedSeason: Flow<CachedResource<Season>?>? = null,
     private val refreshCachedSeason: (suspend (RefreshReason) -> RefreshResult)? = null,
+    private val observeCachedNextRace: Flow<CachedResource<NextRace?>?>? = null,
+    private val refreshCachedNextRace: (suspend (RefreshReason) -> RefreshResult)? = null,
+    private val observeCachedDrivers: Flow<CachedResource<List<DriverStanding>>?>? = null,
+    private val refreshCachedDrivers: (suspend (RefreshReason) -> RefreshResult)? = null,
+    private val observeCachedConstructors: Flow<CachedResource<List<ConstructorStanding>>?>? = null,
+    private val refreshCachedConstructors: (suspend (RefreshReason) -> RefreshResult)? = null,
     private val nowEpochMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : ViewModel() {
 
@@ -124,6 +132,27 @@ class HomepageViewModel(
             }
             ?.launchIn(viewModelScope)
 
+        observeCachedNextRace
+            ?.onEach { cached ->
+                if (cached != null) {
+                    nextRace.value = cached.toSection(nowEpochMs())
+                    deriveWeekendSchedule()
+                }
+            }
+            ?.launchIn(viewModelScope)
+
+        observeCachedDrivers
+            ?.onEach { cached ->
+                if (cached != null) drivers.value = cached.toSection(nowEpochMs())
+            }
+            ?.launchIn(viewModelScope)
+
+        observeCachedConstructors
+            ?.onEach { cached ->
+                if (cached != null) constructors.value = cached.toSection(nowEpochMs())
+            }
+            ?.launchIn(viewModelScope)
+
         viewModelScope.launch {
             loadSeason(false)
             loadNextRace(false)
@@ -171,16 +200,31 @@ class HomepageViewModel(
     }
 
     private suspend fun loadNextRace(forceRefresh: Boolean) {
+        val refresh = refreshCachedNextRace
+        if (observeCachedNextRace != null && refresh != null) {
+            nextRace.refreshCachedSection(forceRefresh, refresh)
+            return
+        }
         nextRace.value = SectionUiState.Loading
         nextRace.value = getNextRace(forceRefresh).toSection()
     }
 
     private suspend fun loadDrivers(forceRefresh: Boolean) {
+        val refresh = refreshCachedDrivers
+        if (observeCachedDrivers != null && refresh != null) {
+            drivers.refreshCachedSection(forceRefresh, refresh)
+            return
+        }
         drivers.value = SectionUiState.Loading
         drivers.value = getDriversStandings(forceRefresh).toSection()
     }
 
     private suspend fun loadConstructors(forceRefresh: Boolean) {
+        val refresh = refreshCachedConstructors
+        if (observeCachedConstructors != null && refresh != null) {
+            constructors.refreshCachedSection(forceRefresh, refresh)
+            return
+        }
         constructors.value = SectionUiState.Loading
         constructors.value = getConstructorsStandings(forceRefresh).toSection()
     }
@@ -215,6 +259,7 @@ fun homepageViewModelFactory(
     getConstructorsStandings: GetConstructorsStandingsUseCase,
     favoritesCache: FavoritesCache,
     seasonScheduleCacheRepository: SeasonScheduleCacheRepository? = null,
+    currentSeasonResourcesCacheRepository: CurrentSeasonResourcesCacheRepository? = null,
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         HomepageViewModel(
@@ -226,6 +271,12 @@ fun homepageViewModelFactory(
             seedIfEmpty = favoritesCache::seedIfEmpty,
             observeCachedSeason = seasonScheduleCacheRepository?.observeCurrentSeason(),
             refreshCachedSeason = seasonScheduleCacheRepository?.let { repo -> repo::refreshCurrentSeason },
+            observeCachedNextRace = currentSeasonResourcesCacheRepository?.observeNextRace(),
+            refreshCachedNextRace = currentSeasonResourcesCacheRepository?.let { repo -> repo::refreshNextRace },
+            observeCachedDrivers = currentSeasonResourcesCacheRepository?.observeDriverStandings(),
+            refreshCachedDrivers = currentSeasonResourcesCacheRepository?.let { repo -> repo::refreshDriverStandings },
+            observeCachedConstructors = currentSeasonResourcesCacheRepository?.observeConstructorStandings(),
+            refreshCachedConstructors = currentSeasonResourcesCacheRepository?.let { repo -> repo::refreshConstructorStandings },
         )
     }
 }
