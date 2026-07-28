@@ -23,8 +23,11 @@ lode/
     summary.md                       # 3-slot favorites management + atomic uniqueness (ticket 05)
   news/
     summary.md                       # parked — RSS news tab design (post-v1; replaces My Team per ticket 25)
+  offline-data-cache/
+    summary.md                       # Proto DataStore current-season typed resource snapshot cache + single-season retention
   specs/
     f1app.md                         # full F1app design contract + current build status
+    offline-data-cache.md            # spec — durable current-season structured-data cache
   testing/
     scope.md                         # testing scope + libs + placement + KMP portability rule (ticket 14)
   decisions/
@@ -44,7 +47,20 @@ lode/
     0014-countdown-widget-shows-next-session.md  # Widget cache stores selected current/next session name+start, falling back to Race
     0015-upcoming-session-result-button-buffer.md  # UpcomingWeekend Results button gated by per-session start buffer (6–12h); not raw start<=now
     0016-standings-source-move-to-jolpica.md  # Standings source: f1api.dev → Jolpica; MRData envelope, string→Int coercion, Constructors[] array handling
+    0017-offline-refresh-coordination.md  # foreground per-resource; background best-effort current-season bundle; per-resource single-flight + schedule-gated rollover
+    0018-cache-status-on-section-content.md  # SectionUiState.Content carries Fresh/Stale/Refreshing/RefreshFailed sync status
+    0019-offline-cache-uses-datastore-snapshots.md  # Proto DataStore CacheState.snapshots; Room only on measured scale/query/contention tripwires
   plans/
+    offline-data-cache/tickets/
+      01-expand-cache-aware-section-state.md       # ready — SectionUiState.Content(data, sync) foundation
+      02-add-snapshot-store-and-resource-contracts.md  # ready — CacheState snapshots + resource keys + store tests
+      03-cache-current-season-schedule-end-to-end.md   # ready — cached schedule + schedule-gated promotion/pruning
+      04-cache-standings-and-catalogs-end-to-end.md    # ready — cached standings/catalogs for Leaderboard/My Team/Homepage
+      05-cache-next-race-session-end-to-end.md         # ready — cached next race/session; widget cache remains separate
+      06-cache-session-results-and-race-enrichments.md # ready — cached session results, podium derivation, pitstops
+      07-cache-non-season-detail-resources.md          # ready — cached circuit metadata/most-wins/Wikipedia summaries
+      08-wire-fixed-periodic-cache-sync.md             # ready — 12h WorkManager bundle through shared coordinator
+      09-offline-cache-validation-and-rollout-hardening.md  # ready — JVM/manual validation gate
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)
       02-homepage-section-1-and-section-3.md    # shipped — Homepage §1 countdown + §3 combined favorites/nearest-GP cards (2027-01-15)
@@ -115,6 +131,16 @@ lode/
       team-imagery.md                  # formula1.com CDN: two systems, slug maps, car/team renders (ticket 13 enrichment #4)
       team-accent.md                   # TeamColors.forId hardcoded map: which API has it, why hardcoded v1, Jolpica alpha migration (ticket 16)
       cloudinary-headshot-paths.md     # driverRef = {name3}{last-surname-token3}01 — pure function, no map, no OpenF1; rules out option C, reframes option B as D (ticket 08 parked)
+    offline-data-cache/
+      map.md                           # current-season durable structured-data cache planning map
+      tickets/
+        01-cache-contract-and-inventory.md       # closed — resources, TTLs, season-promotion contract
+        02-snapshot-store-shape-and-retention.md       # closed — Proto DataStore-style snapshots, single-season retention, Room fallback evidence
+        03-repository-refresh-and-rollover.md    # closed — foreground per-resource + background current-season bundle; single-flight + rollover
+        04-cache-aware-screen-states.md          # closed — SectionUiState.Content(data, sync) preserves cached content through refresh states
+        05-fixed-periodic-sync.md                # closed — 12h fixed WorkManager cadence + TTL gates + calendar-aware session key selection
+        06-offline-cache-validation.md           # closed — hybrid JVM/manual validation + rollout safeguards
+        07-storage-substrate-checkpoint.md       # closed — Proto DataStore map wins; Room cached_resource snapshot rows only on measured fallback tripwires
   tmp/                               # git-ignored session scraps
 ```
 

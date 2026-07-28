@@ -51,6 +51,8 @@ Short term → meaning lines. Domain + project language.
   ticket 20 (`lode/wayfinder/f1app/tickets/20-q3-constructor-caption.md`).
   Domain shape: `ConstructorStanding` data class; Jolpica `Constructor` object.
 
+- **Catalog** — a season-scoped reference list used for lookups and joins, such as current drivers or constructors/teams; it is not a ranked table. Avoid: standings, results, archive.
+
 - **Tour/race/round** — an F1 race weekend. "Round" = a numbered race in a season
   (`RoundDetail(year, round)` route). "Next race" = `/current/next` endpoint from f1api.dev.
 - **CircuitDetail** — `[BUILT ticket 06]` `Route.CircuitDetail(circuitId: String)`,
@@ -139,11 +141,15 @@ Short term → meaning lines. Domain + project language.
   `rememberViewModelStoreNavEntryDecorator`) scope state per-entry.
   Exit-through-home: Homepage is the start route, always rendered.
 - **SectionUiState\<T\>** — the **VM→UI transport** for a screen section: `Loading`,
-  `Error(message)`, `Content(data)`. Lives at `core/ui/SectionUiState.kt`. Named for screen
-  vocabulary (Content/Error), not operation vocabulary (Success/Failure). Each independently-failing
+  `Error(message)`, and currently-built `Content(data)`; the planned cache-aware revision is
+  `Content(data, sync)`. Lives at `core/ui/SectionUiState.kt`. Named for screen
+  vocabulary (Content/Error), not operation vocabulary (Success/Failure). For cache-aware resources,
+  `Loading`/`Error` mean no cached payload exists; once cached data exists, stale/refreshing/failed-refresh
+  status rides on `ContentSyncStatus` so content stays visible. Each independently-failing
   section atom on `HomepageViewModel.UiState.Sections` is a `SectionUiState<T>`. Rendered by the
   shared `OutcomeContent` family. Outcome maps to this at the VM seam via `Outcome.toSection()`;
-  composables never import `Outcome` (ADR 0002).
+  composables never import `Outcome` (ADR 0002; cache-status amendment ADR 0018).
+- **ContentSyncStatus** — planned non-destructive cache/refresh marker carried by cache-aware `SectionUiState.Content`: `Fresh`, `Stale`, `Refreshing`, or `RefreshFailed(message)`. Avoid: treating stale or failed refresh as `SectionUiState.Error`, because that would blank valid cached content.
 - **OutcomeContent** — `core/ui/OutcomeContent.kt`; the shared `SectionUiState<T>` →
   composable family (Loading spinner / Error-with-retry / Content). Pinned for open
   question #2 — every later screen reuses this shape, no per-screen ad-hoc
