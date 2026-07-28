@@ -1,6 +1,6 @@
 # Offline data cache
 
-F1app's planned offline structured-data cache is a single-season, typed resource snapshot store backed by a Proto DataStore-style `CacheState.snapshots` map. The UI reads durable structured API data from typed resource snapshots; Room `cached_resource` snapshot rows are a measured fallback only if payload volume, stale scans, write contention, or future indexed local queries prove the map substrate wrong. The cache is not a fully normalized F1 domain database unless screens need local joins, sorting, or filtering over fields inside payloads. Network refreshes validate payloads and write through the store, while Ktor `HttpCache` remains only a transport optimization. Season rollover is schedule-gated: only a valid f1api.dev `/current` schedule can promote a new active season, and that atomic promotion prunes old season-scoped standings, results, and catalogs immediately. Non-season resources such as circuit metadata, circuit most-wins, and Wikipedia summaries may remain because their keys are not tied to the active season.
+F1app's offline structured-data cache is a single-season, typed resource snapshot store backed by a Proto DataStore-style `CacheState.snapshots` map. The store foundation is built in `core/cache`: `CacheState`, `ResourceSnapshot`, `RefreshAttemptStatus`, `CacheStateSerializer`, and `SnapshotStore` provide durable JSON serialization, corruption-handler recovery, atomic snapshot writes, per-key observation with stable equality, failed-attempt metadata updates, and active-season promotion gated to the canonical `season:<year>:schedule` / `season.schedule` snapshot with season-scoped pruning. F1 resource contracts live in `f1/cache/CacheResourceKeys` as stable string keys for current-season schedule, next race/session, standings, catalogs, session results, pitstops, circuit metadata, circuit most-wins, and Wikipedia summaries. The UI reads durable structured API data from typed resource snapshots; Room `cached_resource` snapshot rows are a measured fallback only if payload volume, stale scans, write contention, or future indexed local queries prove the map substrate wrong. The cache is not a fully normalized F1 domain database unless screens need local joins, sorting, or filtering over fields inside payloads. Network refreshes validate payloads and write through the store, while Ktor `HttpCache` remains only a transport optimization. Season rollover is schedule-gated: only a valid f1api.dev `/current` schedule can promote a new active season. The store enforces the schedule resource contract (`season:<year>:schedule`, `season.schedule`) before that atomic promotion prunes old season-scoped standings, results, and catalogs immediately. Non-season resources such as circuit metadata, circuit most-wins, and Wikipedia summaries may remain because their keys are not tied to the active season.
 
 
 Refresh coordination has two shapes over the same store. Foreground screen refresh is
@@ -77,6 +77,27 @@ refresh can recover. Manual Android checks cover the platform edges: seed online
 force-stop the process, launch offline, and confirm cached current-season
 content renders before any network success; WorkManager checks verify unique
 registration, constraints, interval, and `KEEP` policy, not exact run timing.
+
+Resource keys are persisted strings, not type names:
+
+```kotlin
+val schedule = CacheResourceKeys.currentSeasonSchedule(2026)
+// schedule.value == "season:2026:schedule"
+
+val race = CacheResourceKeys.sessionResults(2026, 4, SessionResultCacheKind.Race)
+// race.value == "season:2026:round:4:session-results:race"
+
+val wiki = CacheResourceKeys.wikipediaSummary("Scuderia Ferrari")
+// wiki.value == "wikipedia:summary:scuderia-ferrari"
+```
+
+`SnapshotStore.recordAttempt(...)` preserves the last good payload:
+
+```kotlin
+store.writeSnapshot(lastGood)
+store.recordAttempt(key, attemptedAtEpochMs = now, RefreshAttemptStatus.Failed("offline"))
+// observeSnapshot(key) still emits lastGood.payloadJson, plus lastAttempt metadata.
+```
 
 ```kotlin
 sealed interface ContentSyncStatus {
