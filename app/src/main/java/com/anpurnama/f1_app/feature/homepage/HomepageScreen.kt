@@ -755,6 +755,7 @@ private fun rememberHomepageViewModel(): HomepageViewModel {
             getDriversStandings = wiring.getDriversStandings,
             getConstructorsStandings = wiring.getConstructorsStandings,
             favoritesCache = wiring.favoritesCache,
+            seasonScheduleCacheRepository = wiring.seasonScheduleCacheRepository,
         )
     )
 }

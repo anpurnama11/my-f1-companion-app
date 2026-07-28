@@ -1,14 +1,23 @@
 package com.anpurnama.f1_app.feature.round
 
 import com.anpurnama.f1_app.core.Outcome
+import com.anpurnama.f1_app.core.cache.CachedResource
+import com.anpurnama.f1_app.core.cache.RefreshReason
+import com.anpurnama.f1_app.core.cache.RefreshResult
+import com.anpurnama.f1_app.core.cache.ResourceSnapshot
 import com.anpurnama.f1_app.core.ui.SectionUiState
+import com.anpurnama.f1_app.f1.cache.CacheResourceKeys
 import com.anpurnama.f1_app.f1.model.Circuit
+import com.anpurnama.f1_app.f1.model.Race
 import com.anpurnama.f1_app.f1.model.QualifyingResult
 import com.anpurnama.f1_app.f1.model.RoundQualifying
 import com.anpurnama.f1_app.f1.model.RoundResult
 import com.anpurnama.f1_app.f1.model.RoundResults
+import com.anpurnama.f1_app.f1.model.Season
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -76,6 +85,26 @@ class RoundViewModelTest {
                 driverShortName = "VER", driverNumber = 33,
                 teamId = "redbull", teamName = "Red Bull Racing"),
         ),
+    )
+
+    private val ROUND_SEASON_2024 = Season(
+        year = 2024,
+        races = listOf(
+            Race(
+                round = 1,
+                name = "Bahrain GP",
+                circuit = Circuit(
+                    id = "bahrain", name = "Bahrain", circuitLengthRaw = "5412km",
+                    corners = 15, city = "Sakhir", country = "Bahrain",
+                ),
+                winnerId = "max_verstappen",
+                laps = 57,
+            )
+        ),
+        completedGp = 1,
+        totalKm = 5.412,
+        totalLaps = 57,
+        progressPercent = 1f,
     )
 
     private fun fakeVm(
@@ -198,5 +227,143 @@ class RoundViewModelTest {
         testScheduler.advanceUntilIdle()
         assertEquals(1, callCount)
         job2.cancel()
+    }
+
+    @Test
+    fun `year-specific round falls back to getSeason when current-season cache is different year`() = runTest {
+        var requestedSeason: Pair<Int, Boolean>? = null
+        val vm = RoundViewModel(
+            year = 2024,
+            round = 1,
+            getRoundResults = { _, _, _ -> Outcome.Success(RACE_RESULTS) },
+            getRoundQualifying = { _, _, _ -> Outcome.Success(QUALY) },
+            getSeason = { year, forceRefresh ->
+                requestedSeason = year to forceRefresh
+                Outcome.Success(ROUND_SEASON_2024)
+            },
+            observeCachedSeason = MutableStateFlow(cachedSeason(ROUND_SEASON_2026)),
+            refreshCachedSeason = { RefreshResult.Failure("should not refresh current cache") },
+        )
+
+        val job = startCollecting(vm)
+        val state = vm.uiState.value as RoundViewModel.UiState.Sections
+        job.cancel()
+
+        assertEquals(2024 to false, requestedSeason)
+        assertTrue(state.season is SectionUiState.Content)
+        assertEquals(2024, (state.season as SectionUiState.Content).data.year)
+    }
+
+    @Test
+    fun `matching current-season cache refreshes through cache without calling getSeason`() = runTest {
+        var networkSeasonCalls = 0
+        val refreshReasons = mutableListOf<RefreshReason>()
+        val cachedSeason = MutableStateFlow<CachedResource<Season>?>(cachedSeason(ROUND_SEASON_2026))
+        val vm = RoundViewModel(
+            year = 2026,
+            round = 1,
+            getRoundResults = { _, _, _ -> Outcome.Success(RACE_RESULTS.copy(year = 2026)) },
+            getRoundQualifying = { _, _, _ -> Outcome.Success(QUALY.copy(year = 2026)) },
+            getSeason = { _, _ ->
+                networkSeasonCalls++
+                Outcome.Success(ROUND_SEASON_2026)
+            },
+            observeCachedSeason = cachedSeason,
+            refreshCachedSeason = { reason ->
+                refreshReasons += reason
+                RefreshResult.Success
+            },
+        )
+
+        val job = startCollecting(vm)
+        job.cancel()
+
+        assertEquals(0, networkSeasonCalls)
+        assertEquals(listOf(RefreshReason.StaleOpen), refreshReasons)
+        val state = vm.uiState.value as RoundViewModel.UiState.Sections
+        assertTrue(state.season is SectionUiState.Content)
+        assertEquals(2026, (state.season as SectionUiState.Content).data.year)
+    }
+
+    @Test
+    fun `matching current-season cache is used even when observer emits after loadSeason starts`() = runTest {
+        var networkSeasonCalls = 0
+        val refreshReasons = mutableListOf<RefreshReason>()
+        val vm = RoundViewModel(
+            year = 2026,
+            round = 1,
+            getRoundResults = { _, _, _ -> Outcome.Success(RACE_RESULTS.copy(year = 2026)) },
+            getRoundQualifying = { _, _, _ -> Outcome.Success(QUALY.copy(year = 2026)) },
+            getSeason = { _, _ ->
+                networkSeasonCalls++
+                Outcome.Failure("offline")
+            },
+            observeCachedSeason = flow {
+                kotlinx.coroutines.delay(1)
+                emit(cachedSeason(ROUND_SEASON_2026))
+            },
+            refreshCachedSeason = { reason ->
+                refreshReasons += reason
+                RefreshResult.Success
+            },
+        )
+
+        val job = startCollecting(vm)
+        val state = vm.uiState.value as RoundViewModel.UiState.Sections
+        job.cancel()
+
+        assertEquals(0, networkSeasonCalls)
+        assertEquals(listOf(RefreshReason.StaleOpen), refreshReasons)
+        assertTrue(state.season is SectionUiState.Content)
+        assertEquals(2026, (state.season as SectionUiState.Content).data.year)
+    }
+
+    @Test
+    fun `rollover during current-season refresh falls back to route year schedule`() = runTest {
+        var requestedSeason: Pair<Int, Boolean>? = null
+        val cachedSeason = MutableStateFlow<CachedResource<Season>?>(cachedSeason(ROUND_SEASON_2026))
+        val vm = RoundViewModel(
+            year = 2026,
+            round = 1,
+            getRoundResults = { _, _, _ -> Outcome.Success(RACE_RESULTS.copy(year = 2026)) },
+            getRoundQualifying = { _, _, _ -> Outcome.Success(QUALY.copy(year = 2026)) },
+            getSeason = { year, forceRefresh ->
+                requestedSeason = year to forceRefresh
+                Outcome.Success(ROUND_SEASON_2026.copy(races = listOf(ROUND_SEASON_2024.races.single().copy(name = "Fallback Bahrain GP"))))
+            },
+            observeCachedSeason = cachedSeason,
+            refreshCachedSeason = {
+                cachedSeason.value = cachedSeason(ROUND_SEASON_2026.copy(year = 2027))
+                RefreshResult.Success
+            },
+        )
+
+        val job = startCollecting(vm)
+        val state = vm.uiState.value as RoundViewModel.UiState.Sections
+        job.cancel()
+
+        assertEquals(2026 to false, requestedSeason)
+        assertTrue(state.season is SectionUiState.Content)
+        val season = state.season as SectionUiState.Content
+        assertEquals(2026, season.data.year)
+        assertEquals("Fallback Bahrain GP", season.data.races.single().name)
+    }
+
+    private val ROUND_SEASON_2026 = ROUND_SEASON_2024.copy(year = 2026)
+
+    private fun cachedSeason(season: Season): CachedResource<Season> {
+        val key = CacheResourceKeys.currentSeasonSchedule(season.year)
+        return CachedResource(
+            data = season,
+            snapshot = ResourceSnapshot(
+                key = key.value,
+                season = season.year,
+                payloadKind = key.payloadKind,
+                payloadVersion = 1,
+                payloadJson = "{}",
+                fetchedAtEpochMs = 100L,
+                staleAfterEpochMs = 200L,
+            ),
+        )
     }
 }

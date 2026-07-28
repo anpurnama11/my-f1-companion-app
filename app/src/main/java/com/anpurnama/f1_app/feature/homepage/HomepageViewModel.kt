@@ -6,6 +6,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.anpurnama.f1_app.core.Outcome
+import com.anpurnama.f1_app.core.cache.CachedResource
+import com.anpurnama.f1_app.core.cache.RefreshReason
+import com.anpurnama.f1_app.core.cache.RefreshResult
+import com.anpurnama.f1_app.core.ui.ContentSyncStatus
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.core.ui.toSection
 import com.anpurnama.f1_app.feature.favorites.Favorites
@@ -14,6 +18,7 @@ import com.anpurnama.f1_app.f1.GetConstructorsStandingsUseCase
 import com.anpurnama.f1_app.f1.GetDriversStandingsUseCase
 import com.anpurnama.f1_app.f1.GetNextRaceUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
+import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
 import com.anpurnama.f1_app.f1.model.ConstructorStanding
 import com.anpurnama.f1_app.f1.model.DriverStanding
 import com.anpurnama.f1_app.f1.model.NextRace
@@ -31,6 +36,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 
 /**
  * Homepage state holder. Each screen section owns an independent
@@ -44,6 +50,9 @@ class HomepageViewModel(
     private val getConstructorsStandings: suspend (forceRefresh: Boolean) -> Outcome<List<ConstructorStanding>>,
     private val favoritesFlow: Flow<Favorites>,
     private val seedIfEmpty: suspend (topTeamId: String, topDriverIds: List<String>) -> Unit,
+    private val observeCachedSeason: Flow<CachedResource<Season>?>? = null,
+    private val refreshCachedSeason: (suspend (RefreshReason) -> RefreshResult)? = null,
+    private val nowEpochMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : ViewModel() {
 
     sealed interface UiState {
@@ -106,6 +115,15 @@ class HomepageViewModel(
             .onEach { favorites.value = SectionUiState.Content(it) }
             .launchIn(viewModelScope)
 
+        observeCachedSeason
+            ?.onEach { cached ->
+                if (cached != null) {
+                    season.value = cached.toSection(nowEpochMs())
+                    deriveWeekendSchedule()
+                }
+            }
+            ?.launchIn(viewModelScope)
+
         viewModelScope.launch {
             loadSeason(false)
             loadNextRace(false)
@@ -127,6 +145,27 @@ class HomepageViewModel(
     }
 
     private suspend fun loadSeason(forceRefresh: Boolean) {
+        val refresh = refreshCachedSeason
+        if (observeCachedSeason != null && refresh != null) {
+            if (season.value is SectionUiState.Content) {
+                season.value = (season.value as SectionUiState.Content<Season>).copy(sync = ContentSyncStatus.Refreshing)
+            } else {
+                season.value = SectionUiState.Loading
+            }
+            val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)
+            if (result is RefreshResult.Success && season.value is SectionUiState.Content) {
+                season.value = (season.value as SectionUiState.Content<Season>).copy(sync = ContentSyncStatus.Fresh)
+            }
+            if (result is RefreshResult.Failure) {
+                val current = season.value
+                season.value = if (current is SectionUiState.Content) {
+                    current.copy(sync = ContentSyncStatus.RefreshFailed(result.message))
+                } else {
+                    SectionUiState.Error(result.message)
+                }
+            }
+            return
+        }
         season.value = SectionUiState.Loading
         season.value = getSeason(forceRefresh).toSection()
     }
@@ -175,6 +214,7 @@ fun homepageViewModelFactory(
     getDriversStandings: GetDriversStandingsUseCase,
     getConstructorsStandings: GetConstructorsStandingsUseCase,
     favoritesCache: FavoritesCache,
+    seasonScheduleCacheRepository: SeasonScheduleCacheRepository? = null,
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         HomepageViewModel(
@@ -184,6 +224,8 @@ fun homepageViewModelFactory(
             getConstructorsStandings = getConstructorsStandings::invoke,
             favoritesFlow = favoritesCache.read(),
             seedIfEmpty = favoritesCache::seedIfEmpty,
+            observeCachedSeason = seasonScheduleCacheRepository?.observeCurrentSeason(),
+            refreshCachedSeason = seasonScheduleCacheRepository?.let { repo -> repo::refreshCurrentSeason },
         )
     }
 }

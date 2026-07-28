@@ -1,7 +1,13 @@
 package com.anpurnama.f1_app.core.di
 
 import android.content.Context
+import androidx.datastore.core.DataStoreFactory
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.anpurnama.f1_app.core.cache.CacheState
+import com.anpurnama.f1_app.core.cache.CacheStateSchemaMigration
+import com.anpurnama.f1_app.core.cache.CacheStateSerializer
+import com.anpurnama.f1_app.core.cache.SnapshotStore
 import com.anpurnama.f1_app.core.network.HttpClientFactory
 import com.anpurnama.f1_app.feature.favorites.FavoritesCache
 import com.anpurnama.f1_app.widget.countdown.data.NextRaceCache
@@ -21,6 +27,7 @@ import com.anpurnama.f1_app.f1.GetSprintQualifyingResultUseCase
 import com.anpurnama.f1_app.f1.GetSprintResultUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import com.anpurnama.f1_app.f1.GetTeamDetailUseCase
+import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
 import io.ktor.client.HttpClient
 import java.io.File
 
@@ -63,6 +70,24 @@ class Wiring(context: Context) {
     val getFastestPitstop: GetFastestPitstopUseCase = GetFastestPitstopUseCase(httpClient)
     val getCircuit: GetCircuitUseCase = GetCircuitUseCase(httpClient)
     val getCircuitMostWins: GetCircuitMostWinsUseCase = GetCircuitMostWinsUseCase(httpClient)
+
+    val snapshotStore: SnapshotStore = SnapshotStore(
+        DataStoreFactory.create(
+            serializer = CacheStateSerializer,
+            corruptionHandler = ReplaceFileCorruptionHandler { CacheState.Default },
+            migrations = listOf(CacheStateSchemaMigration),
+            produceFile = {
+                File(File(appContext.filesDir, "datastore"), "cache-state.json").apply {
+                    parentFile?.mkdirs()
+                }
+            },
+        )
+    )
+
+    val seasonScheduleCacheRepository: SeasonScheduleCacheRepository = SeasonScheduleCacheRepository(
+        store = snapshotStore,
+        client = httpClient,
+    )
 
     val favoritesCache: FavoritesCache = FavoritesCache(
         PreferenceDataStoreFactory.create {

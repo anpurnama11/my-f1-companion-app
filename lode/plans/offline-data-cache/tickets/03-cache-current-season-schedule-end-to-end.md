@@ -2,7 +2,7 @@
 id: 03
 title: Cache current-season schedule end to end
 type: task
-status: ready-for-agent
+status: shipped
 blocked_by: [01, 02]
 owner: ""
 spec: ../../../specs/offline-data-cache.md
@@ -14,7 +14,7 @@ spec: ../../../specs/offline-data-cache.md
 
 **Blocked by:** 01 — Expand cache-aware section state; 02 — Add snapshot store and resource contracts.
 
-**Status:** ready-for-agent
+**Status:** shipped
 
 ```kotlin
 sealed interface CacheResourceKey {
@@ -35,10 +35,10 @@ sequenceDiagram
     Repo->>Store: write schedule or promote atomically
 ```
 
-- [ ] Cached schedule renders before network success when valid data exists.
-- [ ] No cached schedule plus failed refresh renders the existing full-section error path.
-- [ ] Stale or forced refresh preserves visible schedule content and updates sync status.
-- [ ] Valid newer `/current` schedule promotes active season and prunes old season-scoped snapshots atomically.
-- [ ] Invalid or failed candidate schedule leaves the existing active season readable.
+- [x] Cached schedule renders before network success when valid data exists.
+- [x] No cached schedule plus failed refresh renders the existing full-section error path.
+- [x] Stale or forced refresh preserves visible schedule content and updates sync status.
+- [x] Valid newer `/current` schedule promotes active season and prunes old season-scoped snapshots atomically.
+- [x] Invalid or failed candidate schedule leaves the existing active season readable.
 
 Related: [spec](../../../specs/offline-data-cache.md), [ADR 0017](../../../decisions/0017-offline-refresh-coordination.md), [wayfinder ticket 01](../../../wayfinder/offline-data-cache/tickets/01-cache-contract-and-inventory.md).

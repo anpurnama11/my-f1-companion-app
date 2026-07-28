@@ -6,20 +6,29 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.anpurnama.f1_app.core.Outcome
+import com.anpurnama.f1_app.core.cache.CachedResource
+import com.anpurnama.f1_app.core.cache.RefreshReason
+import com.anpurnama.f1_app.core.cache.RefreshResult
+import com.anpurnama.f1_app.core.ui.ContentSyncStatus
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.core.ui.toSection
 import com.anpurnama.f1_app.f1.GetRoundPodiumUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import com.anpurnama.f1_app.f1.RoundPodium
+import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
 import com.anpurnama.f1_app.f1.model.Season
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 
 /**
  * Holds independently-failing season and per-round podium state. Refresh reloads rows here
@@ -31,7 +40,10 @@ class ScheduleViewModel(
         year: Int,
         round: Int,
         forceRefresh: Boolean,
-    ) -> Outcome<RoundPodium>
+    ) -> Outcome<RoundPodium>,
+    private val observeCachedSeason: Flow<CachedResource<Season>?>? = null,
+    private val refreshCachedSeason: (suspend (RefreshReason) -> RefreshResult)? = null,
+    private val nowEpochMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : ViewModel() {
 
     sealed interface UiState {
@@ -70,9 +82,17 @@ class ScheduleViewModel(
         )
 
     private fun warmUp() {
+        observeCachedSeason
+            ?.onEachCachedSeason()
         viewModelScope.launch {
             loadSeason(forceRefresh = false)
         }
+    }
+
+    private fun Flow<CachedResource<Season>?>.onEachCachedSeason() {
+        onEach { cached ->
+            if (cached != null) applySeasonSection(cached.toSection(nowEpochMs()), loadPodiums = true, forceRefresh = false)
+        }.launchIn(viewModelScope)
     }
 
     /** Forces the season and every past podium to reload. */
@@ -95,8 +115,39 @@ class ScheduleViewModel(
     }
 
     private suspend fun loadSeason(forceRefresh: Boolean) {
+        val refresh = refreshCachedSeason
+        if (observeCachedSeason != null && refresh != null) {
+            if (seasonState.value is SectionUiState.Content) {
+                seasonState.value = (seasonState.value as SectionUiState.Content<Season>).copy(sync = ContentSyncStatus.Refreshing)
+            } else {
+                seasonState.value = SectionUiState.Loading
+            }
+            val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)
+            if (result is RefreshResult.Success && seasonState.value is SectionUiState.Content) {
+                seasonState.value = (seasonState.value as SectionUiState.Content<Season>).copy(sync = ContentSyncStatus.Fresh)
+            }
+            if (result is RefreshResult.Failure) {
+                val current = seasonState.value
+                if (current is SectionUiState.Content) {
+                    seasonState.value = current.copy(sync = ContentSyncStatus.RefreshFailed(result.message))
+                } else {
+                    seasonState.value = SectionUiState.Error(result.message)
+                    yearState.value = 0
+                    podiumsState.value = emptyMap()
+                }
+            }
+            return
+        }
         seasonState.value = SectionUiState.Loading
         val section = getSeason(forceRefresh).toSection()
+        applySeasonSection(section, loadPodiums = true, forceRefresh = forceRefresh)
+    }
+
+    private fun applySeasonSection(
+        section: SectionUiState<Season>,
+        loadPodiums: Boolean,
+        forceRefresh: Boolean,
+    ) {
         seasonState.value = section
         when (section) {
             is SectionUiState.Content -> {
@@ -107,8 +158,10 @@ class ScheduleViewModel(
                 podiumsState.value = if (pastRounds.isEmpty()) emptyMap()
                     else pastRounds.associate { it.round to SectionUiState.Loading }
 
-                pastRounds.forEach { race ->
-                    viewModelScope.launch { loadPodium(year = season.year, round = race.round, forceRefresh = forceRefresh) }
+                if (loadPodiums) {
+                    pastRounds.forEach { race ->
+                        viewModelScope.launch { loadPodium(year = season.year, round = race.round, forceRefresh = forceRefresh) }
+                    }
                 }
             }
             is SectionUiState.Error -> {
@@ -132,11 +185,14 @@ class ScheduleViewModel(
 fun scheduleViewModelFactory(
     getSeason: GetSeasonUseCase,
     getRoundPodium: GetRoundPodiumUseCase,
+    seasonScheduleCacheRepository: SeasonScheduleCacheRepository? = null,
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         ScheduleViewModel(
             getSeason = getSeason::invoke,
             getRoundPodium = getRoundPodium::invoke,
+            observeCachedSeason = seasonScheduleCacheRepository?.observeCurrentSeason(),
+            refreshCachedSeason = seasonScheduleCacheRepository?.let { repo -> repo::refreshCurrentSeason },
         )
     }
 }

@@ -6,11 +6,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.anpurnama.f1_app.core.Outcome
+import com.anpurnama.f1_app.core.cache.CachedResource
+import com.anpurnama.f1_app.core.cache.RefreshReason
+import com.anpurnama.f1_app.core.cache.RefreshResult
+import com.anpurnama.f1_app.core.ui.ContentSyncStatus
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.core.ui.toSection
 import com.anpurnama.f1_app.f1.GetRoundQualifyingUseCase
 import com.anpurnama.f1_app.f1.GetRoundResultsUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
+import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
 import com.anpurnama.f1_app.f1.model.Race
 import com.anpurnama.f1_app.f1.model.RoundQualifying
 import com.anpurnama.f1_app.f1.model.RoundResults
@@ -19,10 +24,14 @@ import com.anpurnama.f1_app.f1.model.Season
 import com.anpurnama.f1_app.f1.model.roundMode
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -46,6 +55,8 @@ class RoundViewModel(
     private val getRoundResults: suspend (Int, Int, Boolean) -> Outcome<RoundResults>,
     private val getRoundQualifying: suspend (Int, Int, Boolean) -> Outcome<RoundQualifying>,
     private val getSeason: (suspend (Int, Boolean) -> Outcome<Season>)? = null,
+    private val observeCachedSeason: Flow<CachedResource<Season>?>? = null,
+    private val refreshCachedSeason: (suspend (RefreshReason) -> RefreshResult)? = null,
     private val now: () -> Instant = { Clock.System.now() },
 ) : ViewModel() {
 
@@ -99,6 +110,11 @@ class RoundViewModel(
      * so a failure on one never blanks the other.
      */
     private fun warmUp() {
+        observeCachedSeason
+            ?.onEach { cached ->
+                if (cached != null && cached.data.year == year) seasonState.value = cached.toSection(now().toEpochMilliseconds())
+            }
+            ?.launchIn(viewModelScope)
         viewModelScope.launch { loadResults(forceRefresh = false) }
         viewModelScope.launch { loadQualifying(forceRefresh = false) }
         if (getSeason != null) viewModelScope.launch { loadSeason(forceRefresh = false) }
@@ -125,10 +141,47 @@ class RoundViewModel(
     }
 
     private suspend fun loadSeason(forceRefresh: Boolean) {
+        val refresh = refreshCachedSeason
+        val cached = observeCachedSeason?.first()
+        if (refresh != null && cached?.data?.year == year) {
+            seasonState.value = cached.toSection(now().toEpochMilliseconds())
+            if (seasonState.value is SectionUiState.Content) {
+                seasonState.value = (seasonState.value as SectionUiState.Content<Season>).copy(sync = ContentSyncStatus.Refreshing)
+            } else {
+                seasonState.value = SectionUiState.Loading
+            }
+            val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)
+            if (result is RefreshResult.Success) {
+                val refreshed = observeCachedSeason.first()
+                if (refreshed?.data?.year == year) {
+                    seasonState.value = refreshed.toSection(now().toEpochMilliseconds())
+                } else {
+                    loadYearSpecificSeason(forceRefresh)
+                }
+            }
+            if (result is RefreshResult.Failure) {
+                val current = seasonState.value
+                seasonState.value = if (current is SectionUiState.Content) {
+                    current.copy(sync = ContentSyncStatus.RefreshFailed(result.message))
+                } else {
+                    SectionUiState.Error(result.message)
+                }
+            }
+            return
+        }
+        loadYearSpecificSeason(forceRefresh)
+    }
+
+    private suspend fun loadYearSpecificSeason(forceRefresh: Boolean) {
         val useCase = getSeason ?: return
-        seasonState.value = SectionUiState.Loading
+        val existing = seasonState.value
+        if (existing !is SectionUiState.Content) seasonState.value = SectionUiState.Loading
         val outcome = useCase(year, forceRefresh)
-        seasonState.value = outcome.toSection()
+        seasonState.value = when {
+            outcome is Outcome.Failure && existing is SectionUiState.Content ->
+                existing.copy(sync = ContentSyncStatus.RefreshFailed(outcome.errorMessage))
+            else -> outcome.toSection()
+        }
     }
 }
 
@@ -144,6 +197,7 @@ fun roundViewModelFactory(
     getRoundResults: GetRoundResultsUseCase,
     getRoundQualifying: GetRoundQualifyingUseCase,
     getSeason: GetSeasonUseCase? = null,
+    seasonScheduleCacheRepository: SeasonScheduleCacheRepository? = null,
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         RoundViewModel(
@@ -152,6 +206,8 @@ fun roundViewModelFactory(
             getRoundResults = getRoundResults::invoke,
             getRoundQualifying = getRoundQualifying::invoke,
             getSeason = getSeason?.let { { requestedYear, forceRefresh -> it(requestedYear, forceRefresh) } },
+            observeCachedSeason = seasonScheduleCacheRepository?.observeCurrentSeason(),
+            refreshCachedSeason = seasonScheduleCacheRepository?.let { repo -> repo::refreshCurrentSeason },
         )
     }
 }

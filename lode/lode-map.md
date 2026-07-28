@@ -54,7 +54,7 @@ lode/
     offline-data-cache/tickets/
       01-expand-cache-aware-section-state.md       # shipped — SectionUiState.Content(data, sync) foundation
       02-add-snapshot-store-and-resource-contracts.md  # shipped — CacheState snapshots + resource keys + store tests
-      03-cache-current-season-schedule-end-to-end.md   # ready — cached schedule + schedule-gated promotion/pruning
+      03-cache-current-season-schedule-end-to-end.md   # shipped — cached schedule + schedule-gated promotion/pruning
       04-cache-standings-and-catalogs-end-to-end.md    # ready — cached standings/catalogs for Leaderboard/My Team/Homepage
       05-cache-next-race-session-end-to-end.md         # ready — cached next race/session; widget cache remains separate
       06-cache-session-results-and-race-enrichments.md # ready — cached session results, podium derivation, pitstops

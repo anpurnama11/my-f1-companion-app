@@ -308,6 +308,7 @@ private fun rememberRoundViewModel(year: Int, round: Int): RoundViewModel {
             getRoundResults = wiring.getRoundResults,
             getRoundQualifying = wiring.getRoundQualifying,
             getSeason = wiring.getSeason,
+            seasonScheduleCacheRepository = wiring.seasonScheduleCacheRepository,
         ),
     )
 }

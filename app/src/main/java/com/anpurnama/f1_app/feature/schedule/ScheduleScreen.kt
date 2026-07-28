@@ -440,6 +440,7 @@ private fun rememberScheduleViewModel(): ScheduleViewModel {
         factory = scheduleViewModelFactory(
             getSeason = wiring.getSeason,
             getRoundPodium = wiring.getRoundPodium,
+            seasonScheduleCacheRepository = wiring.seasonScheduleCacheRepository,
         )
     )
 }

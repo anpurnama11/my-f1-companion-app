@@ -2,6 +2,47 @@
 
 F1app's offline structured-data cache is a single-season, typed resource snapshot store backed by a Proto DataStore-style `CacheState.snapshots` map. The store foundation is built in `core/cache`: `CacheState`, `ResourceSnapshot`, `RefreshAttemptStatus`, `CacheStateSerializer`, and `SnapshotStore` provide durable JSON serialization, corruption-handler recovery, atomic snapshot writes, per-key observation with stable equality, failed-attempt metadata updates, and active-season promotion gated to the canonical `season:<year>:schedule` / `season.schedule` snapshot with season-scoped pruning. F1 resource contracts live in `f1/cache/CacheResourceKeys` as stable string keys for current-season schedule, next race/session, standings, catalogs, session results, pitstops, circuit metadata, circuit most-wins, and Wikipedia summaries. The UI reads durable structured API data from typed resource snapshots; Room `cached_resource` snapshot rows are a measured fallback only if payload volume, stale scans, write contention, or future indexed local queries prove the map substrate wrong. The cache is not a fully normalized F1 domain database unless screens need local joins, sorting, or filtering over fields inside payloads. Network refreshes validate payloads and write through the store, while Ktor `HttpCache` remains only a transport optimization. Season rollover is schedule-gated: only a valid f1api.dev `/current` schedule can promote a new active season. The store enforces the schedule resource contract (`season:<year>:schedule`, `season.schedule`) before that atomic promotion prunes old season-scoped standings, results, and catalogs immediately. Non-season resources such as circuit metadata, circuit most-wins, and Wikipedia summaries may remain because their keys are not tied to the active season.
 
+The current-season schedule is cached end to end through
+`SeasonScheduleCacheRepository`. Homepage and Schedule observe
+`CachedResource<Season>` from the snapshot store and call
+`refreshCurrentSeason(StaleOpen|PullToRefresh)` for network attempts. Round
+detail observes the same cache only when the cached season matches the route
+`year`; it gates from the observed snapshot value, not from mutable UI state, so
+a delayed DataStore emission can still render cached content before network. It
+also rereads the observed snapshot after a successful `/current` refresh; if
+rollover promoted a different active season, the route falls back to
+`getSeason(year)` instead of marking the old route-year content fresh.
+Non-current `RoundDetail(year, round)` keeps using `getSeason(year)` so the
+year-specific schedule contract remains intact. Refresh returns status only:
+valid `/current` payloads serialize the `SeasonResponseDto`, map to `Season` for
+validation, write the snapshot, and promote/prune in one store transaction;
+failed or invalid refreshes preserve the last good season and record
+`RefreshAttemptStatus.Failed`. ViewModels map cached snapshots through the shared
+`CachedResource<T>.toSection(nowEpochMs)` helper so cached schedule content stays
+visible as `Stale`, `Refreshing`, or `RefreshFailed` instead of becoming a
+full-section error.
+
+```kotlin
+val cached = seasonScheduleCacheRepository.observeCurrentSeason()
+seasonScheduleCacheRepository.refreshCurrentSeason(RefreshReason.PullToRefresh)
+// UI renders SectionUiState.Content(cached.data, ContentSyncStatus.RefreshFailed("offline"))
+// when refresh fails after a usable snapshot exists.
+```
+
+```mermaid
+sequenceDiagram
+    participant VM as Homepage/Schedule/Round VM
+    participant Repo as SeasonScheduleCacheRepository
+    participant API as f1api.dev /current
+    participant Store as SnapshotStore
+    VM->>Store: observe active season schedule snapshot
+    VM->>Repo: refreshCurrentSeason(reason)
+    Repo->>API: getCurrent(forceRefresh for pull)
+    API-->>Repo: valid schedule or failure
+    Repo->>Store: promoteActiveSeason or record failed attempt
+    Store-->>VM: cached Season + sync metadata
+```
+
 
 Refresh coordination has two shapes over the same store. Foreground screen refresh is
 per-resource: a screen observes and refreshes only the snapshots it renders. Fixed

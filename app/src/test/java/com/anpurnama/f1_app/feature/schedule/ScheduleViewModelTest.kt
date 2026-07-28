@@ -1,14 +1,22 @@
 package com.anpurnama.f1_app.feature.schedule
 
 import com.anpurnama.f1_app.core.Outcome
+import com.anpurnama.f1_app.core.cache.CachedResource
+import com.anpurnama.f1_app.core.cache.RefreshAttemptStatus
+import com.anpurnama.f1_app.core.cache.RefreshReason
+import com.anpurnama.f1_app.core.cache.RefreshResult
+import com.anpurnama.f1_app.core.cache.ResourceSnapshot
+import com.anpurnama.f1_app.core.ui.ContentSyncStatus
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.f1.RoundPodium
+import com.anpurnama.f1_app.f1.cache.CacheResourceKeys
 import com.anpurnama.f1_app.f1.model.Circuit
 import com.anpurnama.f1_app.f1.model.Race
 import com.anpurnama.f1_app.f1.model.RoundResult
 import com.anpurnama.f1_app.f1.model.Season
 import com.anpurnama.f1_app.test.MainCoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -225,6 +233,34 @@ class ScheduleViewModelTest {
     }
 
     @Test
+    fun `cached season stays visible when refresh fails`() = runTest {
+        val cachedSeason = MutableStateFlow<CachedResource<Season>?>(cachedSeason(SEASON))
+        val refreshReasons = mutableListOf<RefreshReason>()
+        val vm = ScheduleViewModel(
+            getSeason = { Outcome.Failure("network should not be the source") },
+            getRoundPodium = { _, round, _ -> Outcome.Success(podium(SEASON.races.first { it.round == round })) },
+            observeCachedSeason = cachedSeason,
+            refreshCachedSeason = { reason ->
+                refreshReasons += reason
+                cachedSeason.value = cachedSeason(SEASON, RefreshAttemptStatus.Failed("offline"))
+                RefreshResult.Failure("offline")
+            },
+            nowEpochMs = { 150L },
+        )
+
+        startCollecting(vm)
+        vm.refresh()
+        testScheduler.advanceUntilIdle()
+        val state = vm.uiState.value as ScheduleViewModel.UiState.Sections
+
+        assertTrue(state.season is SectionUiState.Content)
+        val season = state.season as SectionUiState.Content
+        assertEquals(2026, season.data.year)
+        assertEquals(ContentSyncStatus.RefreshFailed("offline"), season.sync)
+        assertEquals(RefreshReason.PullToRefresh, refreshReasons.last())
+    }
+
+    @Test
     fun `refresh re-fires loadPodium for every past round and resolves to Content`() = runTest {
         // A same-key effect does not restart after refresh, so the ViewModel owns these reloads.
         val podiumCalls = mutableListOf<Int>()
@@ -277,6 +313,27 @@ class ScheduleViewModelTest {
             (state.podiums[1] as SectionUiState.Content).data.topThree[0].driverId == "verstappen")
         assertTrue("perez",
             (state.podiums[2] as SectionUiState.Content).data.topThree[0].driverId == "perez")
+    }
+
+    private fun cachedSeason(
+        season: Season,
+        attemptStatus: RefreshAttemptStatus? = RefreshAttemptStatus.Succeeded,
+    ): CachedResource<Season> {
+        val key = CacheResourceKeys.currentSeasonSchedule(season.year)
+        return CachedResource(
+            data = season,
+            snapshot = ResourceSnapshot(
+                key = key.value,
+                season = season.year,
+                payloadKind = key.payloadKind,
+                payloadVersion = 1,
+                payloadJson = "{}",
+                fetchedAtEpochMs = 100L,
+                staleAfterEpochMs = 200L,
+                lastAttemptEpochMs = 120L,
+                lastAttemptStatus = attemptStatus,
+            ),
+        )
     }
 
 }
