@@ -9,7 +9,7 @@ ticket: 07
 ## Context
 
 The Countdown widget's worker gate decides whether to fetch on a 15-min tick. The
-wayfinder 07 spec says the gate uses the cached race window `[FP1_start, race_start + 3h]`:
+GitHub issue #37 says the gate uses the cached race window `[FP1_start, race_start + 3h]`:
 fetch every tick inside the window, fall through to a 60-min cache-age gate outside it.
 
 The literal interpretation requires `FP1_start` in the cache. The full session schedule
@@ -58,7 +58,7 @@ the new season's first race when `/current/next` returns a real value again.
 
 ## Reference
 
-- `lode/plans/f1app-build/tickets/07-countdown-widget.md` — the ticket
-- `lode/wayfinder/f1app/tickets/07-countdown-widget-specifics.md` — the spec
+- `https://github.com/anpurnama11/my-f1-companion-app/issues/14` — the ticket
+- `https://github.com/anpurnama11/my-f1-companion-app/issues/37` — the spec
 - `app/src/main/java/com/anpurnama/f1_app/widget/countdown/CountdownWorker.kt` — `shouldFetch` + `PRE_RACE_WINDOW_MS`
 - `app/src/test/java/com/anpurnama/f1_app/widget/countdown/CountdownWorkerGateTest.kt` — pins the gate behavior

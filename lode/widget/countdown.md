@@ -153,7 +153,7 @@ and the Glance widget — one DataStore, one source of truth, file under
 ## Cross-references
 
 - [../architecture/architecture.md](../architecture/architecture.md) — DI (`Wiring`), Ktor `HttpClient`.
-- [../wayfinder/f1app/tickets/07-countdown-widget-specifics.md](../wayfinder/f1app/tickets/07-countdown-widget-specifics.md) — adaptive cadence, sizing, states.
+- [https://github.com/anpurnama11/my-f1-companion-app/issues/37](https://github.com/anpurnama11/my-f1-companion-app/issues/37) — adaptive cadence, sizing, states.
 - [../practices.md](../practices.md) — init-less ViewModel (same `onStart` pattern), test assertions.
 
 ## Files

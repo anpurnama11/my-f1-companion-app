@@ -45,7 +45,7 @@ they port to a future KMP `:shared`.
 - **News + collaborator content screens** (BoxBoxClub, F1StatsGuru,
   FormulaAddict, FormulaAerodynamics, FormulaDataAnalysis, FormulaNeon,
   FormulaPlanet, TrackLimits) — served via Firebase Remote Config, no free
-  API. **RSS news** (free, public feeds) is parked to v2 per wayfinder
+  API. **RSS news** (free, public feeds) is parked to v2 per GitHub
   ticket 25; the news tab replaces the My Team tab when un-parked.
 - **Firebase Remote Config** as a data source — only the dropped screens /
   feeders used it.
@@ -78,7 +78,7 @@ they port to a future KMP `:shared`.
 
 ### One open question (fog, deliberately not fake-locked)
 
-These are in-scope decisions that the wayfinder map flagged as **not yet
+These are in-scope decisions that historical planning flagged as **not yet
 specifiable** — sharpening either prematurely into the spec would manufacture
 a decision that has no basis yet. Both affect build sequencing.
 
@@ -87,7 +87,7 @@ a decision that has no basis yet. Both affect build sequencing.
    follow-up. It interacts with the favorites picker (now closed — favorites
    are in v1) and the release pipeline (closed — signed APK is the output).
    The build implementer should treat this as the first cut-line question
-   when picking what to build first; a follow-up wayfinder ticket is the right
+   when picking what to build first; a follow-up GitHub issue is the right
    place to lock it once concrete screens exist to slice against.
 ### Resolved cross-cutting choice
 

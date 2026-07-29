@@ -12,8 +12,8 @@ they have no free JSON source. The all-time "Grands Prix" count
 is race-only (sprint rounds filtered) to match the screenshot and
 the casual F1 fan mental model.
 
-Detail: [`../wayfinder/f1app/driver-team-detail.md`](../wayfinder/f1app/driver-team-detail.md) +
-[`../wayfinder/f1app/driver-team-detail-api-wrangling.md`](../wayfinder/f1app/driver-team-detail-api-wrangling.md).
+Detail: [current data contract](../data-sources/f1db-detail-data.md) and
+[historical API probes](https://github.com/anpurnama11/my-f1-companion-app/issues/56).
 Resolution: ticket 26 + follow-up tickets 27/28/29.
 
 ## Source split

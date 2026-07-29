@@ -6,7 +6,7 @@ lode-cross-refs:
   - ../terminology.md
   - ../practices.md
   - ../offline-data-cache/summary.md
-  - ../wayfinder/offline-data-cache/map.md
+  - https://github.com/anpurnama11/my-f1-companion-app/issues/7
   - ../decisions/0017-offline-refresh-coordination.md
   - ../decisions/0018-cache-status-on-section-content.md
   - ../decisions/0019-offline-cache-uses-datastore-snapshots.md

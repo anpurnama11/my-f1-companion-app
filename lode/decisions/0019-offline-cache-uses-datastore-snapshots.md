@@ -30,4 +30,4 @@ flowchart LR
     Store -. tripwire .-> Room[Room cached_resource fallback]
 ```
 
-Related: [offline cache summary](../offline-data-cache/summary.md), [storage substrate checkpoint](../wayfinder/offline-data-cache/tickets/07-storage-substrate-checkpoint.md).
+Related: [offline cache summary](../offline-data-cache/summary.md), [storage substrate checkpoint](https://github.com/anpurnama11/my-f1-companion-app/issues/66).

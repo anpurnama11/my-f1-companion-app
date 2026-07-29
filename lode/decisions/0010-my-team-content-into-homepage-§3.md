@@ -21,7 +21,7 @@ session" without an app open; the app exists to back the widget and
 answer "what happened." For this audience, the My Team tab is an
 over-built settings surface for a configuration the user performs
 rarely. The prototype in
-`lode/wayfinder/f1app/my-team-on-homepage.md` explored three variants
+[GitHub issue #54](https://github.com/anpurnama11/my-f1-companion-app/issues/54) explored three variants
 for folding My Team into Homepage §3.
 
 ## Decision
@@ -130,7 +130,7 @@ Concretely, the 4th tab is gone:
   one `Button` from the homepage and replaces it with three
   rows — net lighter, not heavier.
 - `lode/my-team/summary.md` is marked superseded and points to
-  this ADR + the wayfinder + build tickets.
+  this ADR + the GitHub decision and build issues.
 - `lode/summary.md` may want a one-line note that the app is
   3-tab, not 4-tab. This is a follow-up, not in scope for this
   ADR.
@@ -140,11 +140,11 @@ Concretely, the 4th tab is gone:
 
 ## Cross-references
 
-- Research: `lode/wayfinder/f1app/my-team-on-homepage.md` — the
+- Research: [GitHub issue #54](https://github.com/anpurnama11/my-f1-companion-app/issues/54) — the
   prototype, the three variants, the A-vs-C frame insight.
-- Wayfinder ticket: `lode/wayfinder/f1app/tickets/24-favorites-on-homepage.md`
+- Wayfinder ticket: `https://github.com/anpurnama11/my-f1-companion-app/issues/54`
   — the closed planning decision.
-- Build ticket: `lode/plans/f1app-build/tickets/11-favorites-on-homepage.md`
+- Build ticket: `https://github.com/anpurnama11/my-f1-companion-app/issues/18`
   — the actual code work, status `ready`.
 - Related ADRs: ADR 0008 (bleed-to-top — what C would fight),
   ADR 0004 (multi-backstack — still applies to 3 tabs).

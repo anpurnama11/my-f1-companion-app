@@ -1,8 +1,8 @@
 # News — RSS feed tab (parked to v2)
 
-The News tab is the app's 4th top-level tab. It renders a merged, deduped list of F1 news articles from 3 RSS sources (Autosport, The Race, FIA), sorted by `publishedAt` desc. Tapping an article opens it in Chrome Custom Tabs. Status: `[PARKED]` — the design is locked but the build is deferred to v2 per wayfinder ticket 25.
+The News tab is the app's 4th top-level tab. It renders a merged, deduped list of F1 news articles from 3 RSS sources (Autosport, The Race, FIA), sorted by `publishedAt` desc. Tapping an article opens it in Chrome Custom Tabs. Status: `[PARKED]` — the design is locked but the build is deferred to v2 per GitHub issue #55.
 
-When un-parked, the News tab **replaces the My Team tab** in the nav. My Team content moves to Homepage §3 per wayfinder ticket 24 / plans ticket 11. The tab shape stays at 4 (Homepage, Schedule, Leaderboard, News).
+When un-parked, the News tab **replaces the My Team tab** in the nav. My Team content moves to Homepage §3 per GitHub issues #54 and #18. The tab shape stays at 4 (Homepage, Schedule, Leaderboard, News).
 
 ## File layout
 
@@ -56,7 +56,7 @@ app/src/main/res/drawable/ic_news_outline.xml  (new)
 **Deleted:**
 - `Route.MyTeam` (NavKey)
 - `ic_myteam_outline.xml` (drawable, after `TopLevelDestination.MyTeam` is removed)
-- `feature/myteam/MyTeamScreen.kt` + `MyTeamViewModel.kt` + tests (per plans ticket 11; the picker content moves to `feature/homepage/FavoritesPicker.kt`)
+- `feature/myteam/MyTeamScreen.kt` + `MyTeamViewModel.kt` + tests (per GitHub issue #18; the picker content moves to `feature/homepage/FavoritesPicker.kt`)
 
 **Unchanged:**
 - `HttpClientFactory.kt` — no Ktor XML plugin; the use case goes through `bodyAsText()` + top-level `XML { ignoreUnknownKeys = true }`.
@@ -123,13 +123,13 @@ flowchart TD
 
 ## v2 enhancements (parking list)
 
-Recorded in wayfinder ticket 25. The 11 items cover: per-source result list for debug, `<pubDate>` fallback, Atom feed support, `<guid>`-based dedup, recency-precedence dedup, kind-precedence dedup, typed `SourceKey`/`SourceKind` in the model, `Map<String, RssSource>` for `byKey` at scale, remote config for source list, app-level DataStore cache, "Showing X of Y sources" UI hint.
+Recorded in GitHub issue #55. The 11 items cover: per-source result list for debug, `<pubDate>` fallback, Atom feed support, `<guid>`-based dedup, recency-precedence dedup, kind-precedence dedup, typed `SourceKey`/`SourceKind` in the model, `Map<String, RssSource>` for `byKey` at scale, remote config for source list, app-level DataStore cache, "Showing X of Y sources" UI hint.
 
 ## Cross-references
 
-- `../wayfinder/f1app/tickets/25-news-rss.md` — the parking ticket
-- `../wayfinder/f1app/tickets/24-favorites-on-homepage.md` — My Team tab removal decision
-- `../plans/f1app-build/tickets/11-favorites-on-homepage.md` — plans ticket for the My Team removal
+- `https://github.com/anpurnama11/my-f1-companion-app/issues/55` — the parking ticket
+- `https://github.com/anpurnama11/my-f1-companion-app/issues/54` — My Team tab removal decision
+- `https://github.com/anpurnama11/my-f1-companion-app/issues/18` — implementation issue for the My Team removal
 - `../specs/f1app.md` §Out of Scope (line 622) — news + collaborator content screens are out of v1
 - `../practices.md` — domain-purity invariant, init-less VM, `Lazily` convention
 - `../architecture/architecture.md` — single `:app`, manual `Wiring` DI, use case pattern

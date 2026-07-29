@@ -38,27 +38,27 @@ Domain + project language. One term, one tight definition, rejected synonyms.
 
 **Round** — a numbered race in a season (`RoundDetail(year, round)` route). Avoid: race (ambiguous with the race session), GP (informal).
 
-**CircuitDetail** — `Route.CircuitDetail(circuitId: String)`; circuit detail screen with two independently-failing sections (metadata + most-wins). See: [specs/screens.md](screens.md) §Round detail + Session result.
+**CircuitDetail** — `Route.CircuitDetail(circuitId: String)`; circuit detail screen with two independently-failing sections (metadata + most-wins). See: [specs/screens.md](specs/screens.md) §Round detail + Session result.
 
-**RoundDetail** — `Route.RoundDetail(year, round)`; the round detail screen. Two modes: upcoming (circuit stats + weekend schedule) and past (circuit stats + results tab + per-session rows). See: [specs/screens.md](screens.md) §Round detail + Session result.
+**RoundDetail** — `Route.RoundDetail(year, round)`; the round detail screen. Two modes: upcoming (circuit stats + weekend schedule) and past (circuit stats + results tab + per-session rows). See: [specs/screens.md](specs/screens.md) §Round detail + Session result.
 
-**SessionResult** — `Route.SessionResult(year, round, session)`; full result list for one session. Race results include podium header, Fastest Lap, and Fastest Pitstop standout cards. See: [specs/screens.md](screens.md) §Round detail + Session result.
+**SessionResult** — `Route.SessionResult(year, round, session)`; full result list for one session. Race results include podium header, Fastest Lap, and Fastest Pitstop standout cards. See: [specs/screens.md](specs/screens.md) §Round detail + Session result.
 
-**SessionType** — enum of session types across GPs: `FP1`, `FP2`, `FP3`, `SprintQuali`, `Sprint`, `Quali`, `Race`. A single GP uses exactly five sessions. Aliases: Quali = Qualifying = Race Qualification; SprintQuali = Sprint Qualifying = SQuali. See: [specs/data-layer.md](data-layer.md).
+**SessionType** — enum of session types across GPs: `FP1`, `FP2`, `FP3`, `SprintQuali`, `Sprint`, `Quali`, `Race`. A single GP uses exactly five sessions. Aliases: Quali = Qualifying = Race Qualification; SprintQuali = Sprint Qualifying = SQuali. See: [specs/data-layer.md](specs/data-layer.md).
 
-**SessionTime** — a single session of a race weekend with `label`, `shortLabel`, and `start: Instant` (UTC). Drives the Homepage §1 countdown card. See: [specs/data-layer.md](data-layer.md).
+**SessionTime** — a single session of a race weekend with `label`, `shortLabel`, and `start: Instant` (UTC). Drives the Homepage §1 countdown card. See: [specs/data-layer.md](specs/data-layer.md).
 
-**WeekendSchedule** — the full list of weekend sessions, sorted ascending by `start`. Exposes `nextUpcoming(now): SessionTime?`. See: [specs/data-layer.md](data-layer.md).
+**WeekendSchedule** — the full list of weekend sessions, sorted ascending by `start`. Exposes `nextUpcoming(now): SessionTime?`. See: [specs/data-layer.md](specs/data-layer.md).
 
-**RaceSchedule** — per-session date+time block carried on `Race` from f1api.dev `/current`. Distinct from `WeekendSchedule` (Instant-based model). See: [specs/data-layer.md](data-layer.md).
+**RaceSchedule** — per-session date+time block carried on `Race` from f1api.dev `/current`. Distinct from `WeekendSchedule` (Instant-based model). See: [specs/data-layer.md](specs/data-layer.md).
 
-**SessionSlot** — raw `date: String?, time: String?` pair from f1api.dev's `SessionDto`. Distinct from `SessionTime` (typed Instant-based). See: [specs/data-layer.md](data-layer.md).
+**SessionSlot** — raw `date: String?, time: String?` pair from f1api.dev's `SessionDto`. Distinct from `SessionTime` (typed Instant-based). See: [specs/data-layer.md](specs/data-layer.md).
 
-**RoundPodium** — Schedule > Past list's per-row podium. Composes `GetRoundResultsUseCase` and slices `[0..2]`; no extra network call. See: [specs/screens.md](screens.md).
+**RoundPodium** — Schedule > Past list's per-row podium. Composes `GetRoundResultsUseCase` and slices `[0..2]`; no extra network call. See: [specs/screens.md](specs/screens.md).
 
-**Season aggregates** — computed client-side in `GetSeasonUseCase`: `completedGp`, `totalKm` (circuitLength digits divided by 1000), `totalLaps`, `progressPercent`. See: [specs/data-layer.md](data-layer.md).
+**Season aggregates** — computed client-side in `GetSeasonUseCase`: `completedGp`, `totalKm` (circuitLength digits divided by 1000), `totalLaps`, `progressPercent`. See: [specs/data-layer.md](specs/data-layer.md).
 
-**Deep link** — `f1app://round/{year}/{round}`; the only deep link in scope. Countdown widget builds a `PendingIntent` over `Intent.ACTION_VIEW`. `launchMode="singleTop"` reuses the foreground activity. See: [specs/screens.md](screens.md).
+**Deep link** — `f1app://round/{year}/{round}`; the only deep link in scope. Countdown widget builds a `PendingIntent` over `Intent.ACTION_VIEW`. `launchMode="singleTop"` reuses the foreground activity. See: [specs/screens.md](specs/screens.md).
 
 **NavShell** — `core/navigation/NavShell.kt`; the 4-tab `Scaffold` + `NavigationBar` + `NavDisplay` host. Navigation 3 multi-backstack: each tab owns a persistent `NavBackStack`; switching tabs does not destroy ViewModels. See: [core/navigation.md](core/navigation.md).
 

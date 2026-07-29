@@ -55,7 +55,7 @@ F1DB artwork; top speed is absent from v1;
 `f1/` has zero `android.*` imports (future KMP `:shared` extraction stays a
 move, not a rewrite).
 
-Explicitly out of v1 scope (per `lode/wayfinder/f1app/map.md`): Highlights
+Explicitly out of v1 scope (per `https://github.com/anpurnama11/my-f1-companion-app/issues/6`): Highlights
 tab, Driver of the Day, Firebase-backed content, collaborator colors,
 pit-wall status set, mclaren/nina/formula2 palettes.
 

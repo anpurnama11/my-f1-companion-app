@@ -116,7 +116,7 @@ adaptive gate is tested in `CountdownWorkerGateTest.kt` (10 tests, including the
 - [../practices.md](../practices.md) — init-less ViewModel, function-ref use cases.
 - [../design-system/theme.md](../design-system/theme.md) — theme tokens Compose
   UI tests would assert (rung 5).
-- [../wayfinder/f1app/tickets/14-testing-scope.md](../wayfinder/f1app/tickets/14-testing-scope.md)
+- [https://github.com/anpurnama11/my-f1-companion-app/issues/44](https://github.com/anpurnama11/my-f1-companion-app/issues/44)
   — grilling ticket, closed by this decision.
-- [../wayfinder/f1app/tickets/15-release-signing-r8.md](../wayfinder/f1app/tickets/15-release-signing-r8.md)
+- [https://github.com/anpurnama11/my-f1-companion-app/issues/45](https://github.com/anpurnama11/my-f1-companion-app/issues/45)
   — closed; supplies the R8-on release build rung 6 needs.

@@ -4,7 +4,7 @@ title: OpenF1 join uses schedule.qualy.date, not schedule.race.date
 type: correction
 status: accepted
 date: 2027-01-15
-supersedes: wayfinder/f1app/tickets/11-research-openf1-join-all-time-top-speed.md
+supersedes: https://github.com/anpurnama11/my-f1-companion-app/issues/41
 ---
 
 # OpenF1 join: `qualyDate` not `raceDate`
@@ -64,13 +64,13 @@ date match is one field, already on hand, and unique per
 - The 1-entry `F1API_TO_OPENF1_COUNTRY` fallback (Silverstone
   "Great Britain" → "United Kingdom") still applies — orthogonal
   concern.
-- This correction is captured in `lode/wayfinder/f1app/tickets/11-...md`
+- This correction is captured in [GitHub issue #41](https://github.com/anpurnama11/my-f1-companion-app/issues/41)
   (closed_by line) and in the `GetCircuitTopSpeedUseCase` doc comment.
 
 ## Cross-references
 
-- [../wayfinder/f1app/tickets/11-research-openf1-join-all-time-top-speed.md](../wayfinder/f1app/tickets/11-research-openf1-join-all-time-top-speed.md) — the research whose conclusion this corrects.
-- [../wayfinder/f1app/top-speed.md](../wayfinder/f1app/top-speed.md) — the broader top-speed decision (which still stands).
-- [../plans/f1app-build/tickets/02-homepage-section-1-and-section-3.md](../plans/f1app-build/tickets/02-homepage-section-1-and-section-3.md) — the ticket that surfaced the bug.
+- [https://github.com/anpurnama11/my-f1-companion-app/issues/41](https://github.com/anpurnama11/my-f1-companion-app/issues/41) — the research whose conclusion this corrects.
+- [Top-speed research history](https://github.com/anpurnama11/my-f1-companion-app/issues/38) — the broader research, later superseded for v1.
+- [https://github.com/anpurnama11/my-f1-companion-app/issues/9](https://github.com/anpurnama11/my-f1-companion-app/issues/9) — the ticket that surfaced the bug.
 - `f1/GetCircuitTopSpeedUseCase.kt` — implementation.
 - `f1/model/NextRace.kt` — the `qualyDate` field.

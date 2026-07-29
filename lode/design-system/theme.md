@@ -47,7 +47,7 @@ surfaces in the in-scope screens and Countdown widget:
 ### Out-of-scope palettes (deliberately NOT transcribed)
 
 - **Collaborator colors** (8) — only the dropped Firebase-backed content
-  screens consumed them ([map](../wayfinder/f1app/map.md) "Out of scope").
+  screens consumed them ([map](https://github.com/anpurnama11/my-f1-companion-app/issues/6) "Out of scope").
 - **Pirelli tyre compounds** — no shipped surface consumes tyre pills.
 - **Pit-wall status set** — redundant with core `secondary`/`error` and out of
   scope for the 4 in-app screens / Countdown widget.
@@ -97,4 +97,4 @@ doesn't provide. The scaffold's `bodyLarge` override was deleted as dead code.
 ## Related
 - [architecture/architecture.md](../architecture/architecture.md) — module/DI/layers.
 - [practices.md](../practices.md) — "F1 palettes as `object`s, no app logic in theme files."
-- [wayfinder/f1app/tickets/02-design-system-theme.md](../wayfinder/f1app/tickets/02-design-system-theme.md) — the closed ticket.
+- [Theme decision history](https://github.com/anpurnama11/my-f1-companion-app/issues/32) — the closed GitHub issue.

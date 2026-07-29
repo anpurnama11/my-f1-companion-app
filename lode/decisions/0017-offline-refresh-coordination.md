@@ -68,4 +68,4 @@ the same key.
 ## References
 
 - [../offline-data-cache/summary.md](../offline-data-cache/summary.md)
-- [../wayfinder/offline-data-cache/tickets/03-repository-refresh-and-rollover.md](../wayfinder/offline-data-cache/tickets/03-repository-refresh-and-rollover.md)
+- [https://github.com/anpurnama11/my-f1-companion-app/issues/62](https://github.com/anpurnama11/my-f1-companion-app/issues/62)

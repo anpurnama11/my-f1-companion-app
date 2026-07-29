@@ -3,7 +3,7 @@
 **Status: accepted**
 
 The "Compare" card on the redesigned `DriverDetail` screen
-(wayfinder ticket 29 / build ticket 14) shows the driver compared
+(GitHub issues #59 and #21) shows the driver compared
 against their **teammate** — the other driver on the same
 constructor. Rejected: "vs another driver" (would require a driver
 picker/selection flow, which is the dropped Driver Comparison
@@ -84,10 +84,10 @@ ambiguous teammate degrades the card, not the screen.
 
 ## Cross-references
 
-- [Wayfinder ticket 29](../wayfinder/f1app/tickets/29-driver-team-detail-ui-rewrite.md) —
+- [Wayfinder ticket 29](https://github.com/anpurnama11/my-f1-companion-app/issues/59) —
   planning ticket; closed in the resolution that produced build
   ticket 14 and this ADR.
-- [Build ticket 14](../plans/f1app-build/tickets/14-driver-team-detail-ui-rewrite.md) —
+- [Build ticket 14](https://github.com/anpurnama11/my-f1-companion-app/issues/21) —
   implementation contract; the use case join that resolves the
   teammate row lands here.
 - [ADR 0012](0012-gap-f-detail-page-data-sources.md) — the data

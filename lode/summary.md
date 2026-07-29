@@ -15,7 +15,7 @@ The circuit block links to `CircuitDetail` (shipped in ticket 06 as
 two independently-failing sections: f1api.dev metadata + jolpica
 most-wins aggregation). Four bottom tabs
 (Homepage, Schedule, Leaderboard, My Team); Leaderboard has Drivers and
-Constructors sub-tabs and drills into Driver and Constructor detail pages, while My Team manages two favorite drivers and one favorite constructor through a standings-backed bottom-sheet picker. **v1 destination is 3 tabs** — My Team is being folded into Homepage §3 per wayfinder ticket 24 / plans ticket 11, and the news tab takes the freed slot when RSS news un-parks (wayfinder ticket 25).
+Constructors sub-tabs and drills into Driver and Constructor detail pages, while My Team manages two favorite drivers and one favorite constructor through a standings-backed bottom-sheet picker. **v1 destination is 3 tabs** — My Team is being folded into Homepage §3 per GitHub issues #54 and #18, and the news tab takes the freed slot when RSS news un-parks (GitHub issue #55).
 Driver IDs are unique across the two
 slots, enforced atomically in `FavoritesCache`; the shared cache updates
 Homepage §3 reactively.
@@ -56,5 +56,9 @@ do not blank the last good payload; the Countdown widget cache remains separate.
 `NavBackStack` — switching tabs no longer destroys ViewModels.
 `rememberSaveableStateHolderNavEntryDecorator` + `rememberViewModelStoreNavEntryDecorator`
 scope state per-entry. Exit-through-home: Homepage is the start route.
+
+GitHub Issues is the canonical work tracker. The Lode contains current durable
+knowledge only; local implementation-ticket and Wayfinder tracker trees are not
+used.
 
 > See [lode-map.md](lode-map.md) for the full index.

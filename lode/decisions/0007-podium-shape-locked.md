@@ -71,8 +71,8 @@ The locked color rule across the app is:
 
 ## Cross-references
 
-- `lode/wayfinder/f1app/past-list.md` — the locked visual treatment.
-- `lode/wayfinder/f1app/tickets/19-q2-podium-shape-locked.md` — the
+- [Past-list research history](https://github.com/anpurnama11/my-f1-companion-app/issues/40) — the locked visual treatment.
+- `https://github.com/anpurnama11/my-f1-companion-app/issues/49` — the
   ticket that locks this decision.
 - `lode/tmp/f1app-critique-2027-01-15.md` — the critique document, Q2
   entry.

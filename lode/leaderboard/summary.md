@@ -107,8 +107,8 @@ are shipped as data-layer-only — the catalogs and the
 the use cases. The use case join change + model field additions
 (`DriverDetail` / `TeamDetail` gain the new fields) + the two-tab
 UI rewrite land in
-[build ticket 14](../plans/f1app-build/tickets/14-driver-team-detail-ui-rewrite.md)
-(UI rewrite, wayfinder ticket 29). Compare card is driver-only and
+[build ticket 14](https://github.com/anpurnama11/my-f1-companion-app/issues/21)
+(UI rewrite, GitHub issue #59). Compare card is driver-only and
 shows "vs teammate" per [ADR 0013](../decisions/0013-compare-card-vs-teammate.md);
 the four sub-decisions inside ticket 29 (Compare shape, tab
 interaction, About placement, error states) are all locked. When
@@ -116,8 +116,8 @@ build 14 ships, this section becomes the description of the running
 code and the upstream mermaid above is the source of truth.
 
 Related: [`../decisions/0012-gap-f-detail-page-data-sources.md`](../decisions/0012-gap-f-detail-page-data-sources.md),
-[`../wayfinder/f1app/driver-team-detail.md`](../wayfinder/f1app/driver-team-detail.md),
-[`../wayfinder/f1app/tickets/26-research-gap-f-detail-redesign.md`](../wayfinder/f1app/tickets/26-research-gap-f-detail-redesign.md).
+[detail-page data contract](../data-sources/f1db-detail-data.md),
+[`https://github.com/anpurnama11/my-f1-companion-app/issues/56`](https://github.com/anpurnama11/my-f1-companion-app/issues/56).
 
 Related: [`core/navigation.md`](../core/navigation.md),
 [`summary.md`](../summary.md), and

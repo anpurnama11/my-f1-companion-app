@@ -164,8 +164,8 @@ Two `DataStore<Preferences>` wrappers in `Wiring`, both using one atomic
 - `data object Schedule : NavKey`
 - `data object Leaderboard : NavKey`
 - (No 4th `MyTeam` `data object` — the My Team tab is being removed per
-  wayfinder ticket 24 / plans ticket 11. The 3 tabs above are the v1
-  destination. When the news feature un-parks per wayfinder ticket 25,
+  GitHub issues #54 and #18. The 3 tabs above are the v1
+  destination. When the news feature un-parks per GitHub issue #55,
   `Route.News` takes the freed slot.)
 - `data class DriverDetail(val driverId: String) : NavKey` — wired from
   Leaderboard driver rows and DriverDetail team links.

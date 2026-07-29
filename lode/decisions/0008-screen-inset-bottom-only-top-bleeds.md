@@ -93,9 +93,9 @@ the entire page down.
 
 ## Cross-references
 
-- `lode/wayfinder/f1app/tickets/21-edge-to-edge-insets-bug.md` — the
+- `https://github.com/anpurnama11/my-f1-companion-app/issues/51` — the
   ticket that captures this decision.
-- `lode/wayfinder/f1app/homepage.md` — §1 hero bleed-to-top design.
+- [Homepage design history](https://github.com/anpurnama11/my-f1-companion-app/issues/47) — §1 hero bleed-to-top design.
 - `lode/core/navigation.md` — `NavShell`'s `Scaffold` structure; the
   screens' inset contract.
 - `edge-to-edge` skill (Step 3) — the PREFERRED pattern we deliberately

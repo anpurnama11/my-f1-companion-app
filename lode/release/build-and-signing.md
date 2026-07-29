@@ -1,7 +1,7 @@
 # Release build, signing & R8
 
 > **STATUS: BUILT** — release buildType flips on R8 + signing; produces a
-> sideload-able APK. Decided in ticket 15 ([wayfinder](../wayfinder/f1app/tickets/15-release-signing-r8.md)).
+> sideload-able APK. Decided in ticket 15 ([GitHub issue](https://github.com/anpurnama11/my-f1-companion-app/issues/45)).
 
 The Scaffold ships release-ready. Sideload target only (personal device) — no
 Play Console / AAB / `bundletool` in scope.
@@ -139,7 +139,7 @@ builds ship pre-compiled hotpaths. Tracked alongside rung 6 in
 
 ## Cross-references
 
-- [../wayfinder/f1app/tickets/15-release-signing-r8.md](../wayfinder/f1app/tickets/15-release-signing-r8.md)
+- [https://github.com/anpurnama11/my-f1-companion-app/issues/45](https://github.com/anpurnama11/my-f1-companion-app/issues/45)
   — the grilling/task ticket, closed.
 - [../practices.md](../practices.md) — release-build ADR (signing + R8 DSL).
 - [../testing/scope.md](../testing/scope.md) — rung 6 macrobenchmark, now

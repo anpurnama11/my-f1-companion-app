@@ -3,8 +3,8 @@
 > **Superseded 2026-07-25.** The My Team tab is removed in v1 polish.
 > Favorites management moves to Homepage §3 per
 > [ADR 0010](../decisions/0010-my-team-content-into-homepage-§3.md) +
-> [wayfinder ticket 24](../wayfinder/f1app/tickets/24-favorites-on-homepage.md) +
-> [build ticket 11](../plans/f1app-build/tickets/11-favorites-on-homepage.md).
+> [GitHub issue #54](https://github.com/anpurnama11/my-f1-companion-app/issues/54) +
+> [build ticket 11](https://github.com/anpurnama11/my-f1-companion-app/issues/18).
 > This file is kept as the record of what the in-tab My Team management
 > looked like before it was folded into §3. The `FavoritesCache` storage
 > layer (`FavoritesCache.kt`) is unchanged; only the surface that exposes
@@ -64,5 +64,5 @@ cross-slot writes can both observe the old snapshot. Persistent invariants must
 be checked inside the serialized `DataStore.edit` transaction.
 
 Related: [terminology](../terminology.md), [project practices](../practices.md),
-[favorites decision](../wayfinder/f1app/tickets/12-design-favorites-picker-ux-storage.md),
-and [build ticket](../plans/f1app-build/tickets/05-my-team-tab-and-favorites-picker.md).
+[favorites decision](https://github.com/anpurnama11/my-f1-companion-app/issues/42),
+and [build ticket](https://github.com/anpurnama11/my-f1-companion-app/issues/12).

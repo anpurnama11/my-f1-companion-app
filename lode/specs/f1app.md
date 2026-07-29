@@ -14,7 +14,7 @@ lode-cross-refs:
   - ../design-system/theme.md
   - ../release/build-and-signing.md
   - ../testing/scope.md
-  - ../wayfinder/f1app/map.md
+  - https://github.com/anpurnama11/my-f1-companion-app/issues/6
 ---
 
 ## Problem Statement

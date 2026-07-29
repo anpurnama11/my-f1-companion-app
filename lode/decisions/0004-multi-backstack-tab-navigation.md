@@ -71,8 +71,8 @@ also alive**. The data-layer `SharingStarted` choice controls this:
   (`HomepageViewModel`, `ScheduleViewModel`, `RoundViewModel`) use
   `Lazily` for their `stateIn`. Safe because the data layer is
   server-cached — see
-  [lode/practices.md §"`SharingStarted` policy"](practices.md) and
-  the [terminology.md "Init-less ViewModel" entry](terminology.md).
+  [lode/practices.md §"`SharingStarted` policy"](../practices.md) and
+  the [terminology.md "Init-less ViewModel" entry](../terminology.md).
   Regression coverage in
   `ScheduleViewModelBackFromDetailTest` and
   `RoundViewModelResubscribeAfterTimeoutTest`.

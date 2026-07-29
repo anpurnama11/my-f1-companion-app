@@ -10,4 +10,4 @@ remaining runtime APIs do not provide an equivalent measurement; a future
 build-time FastF1 import is acceptable but not an Android runtime dependency.
 This keeps the app offline-capable for artwork and avoids replacing OpenF1 with
 another mandatory runtime image service. See
-[`openf1-removal.md`](../wayfinder/f1app/openf1-removal.md).
+[OpenF1 removal implementation history](https://github.com/anpurnama11/my-f1-companion-app/issues/17).

@@ -10,7 +10,7 @@ The `Route.Schedule` tab is a **tab switcher at the top of the screen** (Materia
 - **No countdown anywhere on Schedule.** Countdown is a Homepage §1 / widget surface; the Schedule tab is a reference (what's coming / what happened), not a live timer.
 - **Pull-to-refresh** on either tab re-fetches the season + every past podium with `forceRefresh = true` (NO_CACHE). Tab state is preserved across the refresh.
 
-Cross-ref: `lode/plans/f1app-build/tickets/03-schedule-tab-and-round-detail.md` (the build record + revision 1 block).
+Cross-ref: `https://github.com/anpurnama11/my-f1-companion-app/issues/10` (the build record + revision 1 block).
 
 ### Deep link (custom scheme, widget → RoundDetail)
 
@@ -73,7 +73,7 @@ the car-number bridge), because f1api.dev provides none of these. See ADR
 
 - Top-level nav is **3 tabs**: Homepage, Schedule, Leaderboard. The
   previous 4th tab (My Team) is being folded into Homepage §3 per
-  wayfinder ticket 24 / plans ticket 11; the 3-tab shape is the v1
+  GitHub issues #54 and #18; the 3-tab shape is the v1
   destination.
 - Homepage §3 is the favorites management surface (variant A per ticket
   24): one combined three-row card for Driver 1, Driver 2, and
