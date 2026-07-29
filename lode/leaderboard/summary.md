@@ -55,8 +55,7 @@ LeaderboardViewModel(
 ## Invariants and lessons
 
 - Joins use `driverId`/`teamId`, never display-name matching.
-- ViewModels are init-less: first collection starts the load; refresh is the
-  only forced re-fetch path and sends `Cache-Control: no-cache`.
+- ViewModels follow the init-less pattern ([practices.md](../practices.md) §SharingStarted policy).
 - Driver and constructor leaderboard sections fail independently.
 - Standings source is Jolpica (MRData envelope), not f1api.dev. DTOs use
   the Jolpica `@SerialName`-annotated PascalCase keys (see

@@ -59,19 +59,9 @@ only against a potentially stale ViewModel snapshot. See
 
 > Detail: [architecture/architecture.md](architecture/architecture.md).
 
-## Domain-purity invariant (hard)
+## Domain-purity invariant
 
-`f1/` — domain models, DTOs, repository interface, use cases, and the Ktor `HttpClient`
-API extensions — **must contain zero `android.*` imports**. Platform concerns
-(`Context`, `android.util.Log`, dispatchers) get injected as interfaces from `core/`.
-
-This is the hedge for a future Kotlin Multiplatform port. When KMP is greenlit, `f1/`
-moves into a new `:shared` KMP module's `commonMain` and becomes the shared code for a
-SwiftUI iOS target. Without the invariant, that's a refactor; with it, it's a `git mv`
-+ a module declaration.
-
-Ponytail: don't pre-split into `:shared` now. The invariant handles the port; the
-module extraction is deferred until KMP is actually greenlit (planned, not started).
+See: [architecture/architecture.md](architecture/architecture.md) §Domain-purity invariant.
 
 ## Package layout (foundation slice created; composition root still pending)
 
@@ -202,7 +192,6 @@ com.anpurnama.f1_app/
   `StateFlow` value; no re-fire. Safe when the data layer is cheap on
   hot cache (10-min f1api.dev, 1-hr jolpica — see
   [terminology.md §"Init-less ViewModel"](terminology.md)
-  + [wayfinder/f1app/tickets/03-data-layer-and-refresh.md](wayfinder/f1app/tickets/03-data-layer-and-refresh.md)
   §Caching). Reserve `WhileSubscribed` for genuinely expensive or
   user-scoped streams. Never `Eagerly` for screen VMs — it bypasses
   the first-subscriber gate and can fire on background-tab construction.

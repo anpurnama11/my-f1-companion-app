@@ -27,10 +27,7 @@ flowchart LR
     Cache --> Home["HomepageViewModel §3"]
 ```
 
-`MyTeamViewModel` is init-less: its `StateFlow` starts on the first collector
-with `SharingStarted.Lazily`. Favorites remain reactive for the ViewModel's
-lifetime; driver and constructor standings load independently and retry with
-`forceRefresh = true`.
+`MyTeamViewModel` follows the init-less pattern ([practices.md](../practices.md) §SharingStarted policy). Favorites remain reactive for the ViewModel's lifetime; standings load independently and retry with `forceRefresh = true`.
 
 ```kotlin
 MyTeamViewModel(
