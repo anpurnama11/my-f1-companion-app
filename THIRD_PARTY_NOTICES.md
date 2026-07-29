@@ -45,3 +45,14 @@ To reproduce the same response shape, fetch directly:
 curl -H "User-Agent: F1app/1.0 (https://github.com/anpurnama/F1app)" \
   "https://en.wikipedia.org/api/rest_v1/page/summary/Andrea_Kimi_Antonelli"
 ```
+
+## Formula 1 media and marks
+
+Driver, team, and car imagery displayed at runtime is loaded from public
+Formula 1 Cloudinary media paths. That media is owned by its respective rights
+holders and is not distributed under this repository's MIT License.
+
+The screenshots in `docs/images/` may display driver names, team names, event
+names, circuit outlines, and externally loaded imagery. Formula 1, F1, team
+and event names, logos, and related marks belong to their respective owners.
+Their appearance identifies app functionality and does not imply endorsement.
