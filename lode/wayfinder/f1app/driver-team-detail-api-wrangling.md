@@ -1,3 +1,6 @@
+> **Historical research — archived.** Current decisions live in
+> [`decisions/`](../../decisions/) and build specs live in [`plans/`](../../plans/).
+
 # Driver & Team detail — API wrangling detail
 
 Companion to [driver-team-detail.md](driver-team-detail.md). Per-source

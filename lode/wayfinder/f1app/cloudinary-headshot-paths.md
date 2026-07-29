@@ -1,3 +1,6 @@
+> **Historical research — archived.** Current decisions live in
+> [`decisions/`](../../decisions/) and build specs live in [`plans/`](../../plans/).
+
 # Driver headshots on Cloudinary formula1.com — `driverRef` shape (research output)
 
 Research output for ticket 13 / build ticket 08 (parked headshot

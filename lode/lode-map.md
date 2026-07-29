@@ -9,10 +9,10 @@ lode/
   practices.md                       # patterns, conventions, invariants
   lode-map.md                        # this file
   architecture/
-    architecture.md                  # module, DI, layers, tech choices (ticket 01) [BUILT]
+    architecture.md                  # module, DI, layers, tech choices (ticket 01)
     id-namespaces.md                 # two id namespaces (Ergast canonical + Jolpica alpha opaque) + the car-number translator (step 6)
   core/
-    navigation.md                    # Navigation 3 4-tab shell shape (ticket 01) [BUILT]
+    navigation.md                    # Navigation 3 4-tab shell shape (ticket 01)
     network.md                       # Ktor HttpClient factory + F1Api extensions
   design-system/
     theme.md                         # dark-only M3 theme + Circuits/Shapes/Spacing (ticket 02)
@@ -24,9 +24,14 @@ lode/
   news/
     summary.md                       # parked — RSS news tab design (post-v1; replaces My Team per ticket 25)
   offline-data-cache/
-    summary.md                       # Proto DataStore current-season typed resource snapshot cache + single-season retention
+    summary.md                       # Proto DataStore current-season typed resource snapshot cache + repositories
+    refresh-coordination.md          # foreground per-resource refresh + WorkManager bundle sync + worker result policy
   specs/
-    f1app.md                         # full F1app design contract + current build status
+    f1app.md                         # problem + solution + user stories
+    data-layer.md                    # architecture, data sources, API client, caching, navigation, schedule
+    screens.md                       # screen contracts: deep links, round detail, favorites, countdown, enrichments
+    build.md                         # design system, package layout, release, signing, build floor
+    testing.md                       # testing decisions, out-of-scope, further notes
     offline-data-cache.md            # spec — durable current-season structured-data cache
   testing/
     scope.md                         # testing scope + libs + placement + KMP portability rule (ticket 14)
@@ -81,7 +86,7 @@ lode/
   session-results/
     qualifying-segment-tabs.md     # Quali/SprintQuali SessionResult renders Q1/Q2/Q3 tabs derived from q1/q2/q3 rows
   widget/
-    countdown.md                   # CountdownWidget, CountdownWorker, NextRaceCache [BUILT ticket 07]
+    countdown.md                   # CountdownWidget, CountdownWorker, NextRaceCache
   tooling/
     pi-usage.md                    # pi session token/cost aggregation and provider→model report
   wayfinder/

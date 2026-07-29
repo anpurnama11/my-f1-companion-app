@@ -1,3 +1,6 @@
+> **Historical research — archived.** Current decisions live in
+> [`decisions/`](../../decisions/) and build specs live in [`plans/`](../../plans/).
+
 # Driver & Team detail — data sources for the new detail pages (GAP-F)
 
 Research output for the DriverDetail/TeamDetail redesign (currently a
