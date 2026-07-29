@@ -1,0 +1,213 @@
+package com.anpurnama.f1_app.core.cache
+
+import android.content.Context
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ListenableWorker
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequest
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkerParameters
+import com.anpurnama.f1_app.F1App
+import com.anpurnama.f1_app.f1.cache.CurrentSeasonResourcesCacheRepository
+import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
+import com.anpurnama.f1_app.f1.cache.SessionResultsCacheRepository
+import kotlinx.datetime.Clock
+import java.util.concurrent.TimeUnit
+
+/**
+ * Periodic WorkManager job that warms the current-season offline cache
+ * once every 12 hours. Runs the same per-resource refresh methods the
+ * foreground screens use, so the worker inherits:
+ *
+ * - per-resource single-flight (foreground + worker coalesce),
+ * - per-resource TTL gates (the worker does not bypass stale decisions),
+ * - per-resource failure isolation (one bad endpoint never aborts the
+ *   bundle; successful writes stand, failed resources record attempt
+ *   metadata only).
+ *
+ * The schedule refresh runs first because `/current` is the only atomic
+ * active-season promotion authority (ADR 0017). If it fails, the
+ * existing active season (if any) is reused for the resource bundles —
+ * a transient schedule failure does not strand the worker.
+ *
+ * Worker result policy:
+ * - `Result.success()` for any partial success (the bundle worked at
+ *   least once), so the next 12h tick — not a retry — advances.
+ * - `Result.retry()` only when **no** resource succeeded AND a refresh
+ *   was attempted (e.g. total infrastructure failure: store I/O
+ *   failure before any resource attempt, or a network/server outage
+ *   that prevents every resource from reaching its normal per-resource
+ *   failure boundary). WorkManager's exponential backoff then defers
+ *   the retry.
+ *
+ * Resource selection is the repositories' `refreshCurrentSeasonBundle`
+ * methods; this worker is orchestration only.
+ */
+class CacheSyncWorker(
+    appContext: Context,
+    workerParams: WorkerParameters,
+) : CoroutineWorker(appContext, workerParams) {
+
+    override suspend fun doWork(): Result {
+        val app = applicationContext as? F1App
+            ?: return Result.success()  // defensive: never crash the worker
+        val wiring = app.wiring
+
+        // 1. Atomic active-season promotion (or refresh of the existing one).
+        //    The schedule entry is included in the aggregate so a failed
+        //    schedule refresh on a first-run / pre-promotion device is
+        //    surfaced as a total failure (worker retries) rather than
+        //    silently treated as off-season — the bundles return empty
+        //    when no active season is set, which the worker would
+        //    otherwise mis-classify as "nothing to attempt this tick".
+        //    A failed schedule on a device with an existing active
+        //    season does not strand the worker: the bundles still
+        //    operate against the existing active season and the
+        //    schedule failure is recorded as attempt metadata only.
+        val schedule = BundleRefreshResult(
+            listOf(
+                BundleRefreshResult.Entry(
+                    key = "season-schedule",
+                    result = runCatching {
+                        wiring.seasonScheduleCacheRepository.refreshCurrentSeason(RefreshReason.Periodic)
+                    }.getOrElse { e ->
+                        RefreshResult.Failure(e.message ?: "Schedule refresh error")
+                    },
+                ),
+            ),
+        )
+
+        val now = Clock.System.now()
+
+        // 2. Best-effort bundle of next race + standings + catalogs.
+        val resources = runCatching {
+            wiring.currentSeasonResourcesCacheRepository.refreshCurrentSeasonBundle()
+        }.getOrElse { e ->
+            BundleRefreshResult(
+                listOf(
+                    BundleRefreshResult.Entry(
+                        key = "current-season-resources-bundle",
+                        result = RefreshResult.Failure(e.message ?: "Bundle refresh error"),
+                    ),
+                ),
+            )
+        }
+
+        // 3. Best-effort bundle of plausibly-complete session results + pitstops.
+        val sessions = runCatching {
+            wiring.sessionResultsCacheRepository.refreshCurrentSeasonBundle(now)
+        }.getOrElse { e ->
+            BundleRefreshResult(
+                listOf(
+                    BundleRefreshResult.Entry(
+                        key = "current-season-sessions-bundle",
+                        result = RefreshResult.Failure(e.message ?: "Bundle refresh error"),
+                    ),
+                ),
+            )
+        }
+
+        return decideWorkerResult(concat(schedule, resources, sessions))
+    }
+
+    /** Concatenate [BundleRefreshResult]s without allocating a new list when empty. */
+    private fun concat(
+        a: BundleRefreshResult,
+        b: BundleRefreshResult,
+        c: BundleRefreshResult,
+    ): BundleRefreshResult {
+        val all = buildList {
+            if (a.entries.isNotEmpty()) addAll(a.entries)
+            if (b.entries.isNotEmpty()) addAll(b.entries)
+            if (c.entries.isNotEmpty()) addAll(c.entries)
+        }
+        return if (all.isEmpty()) BundleRefreshResult.Empty else BundleRefreshResult(all)
+    }
+
+    companion object {
+        const val UNIQUE_PERIODIC_NAME: String = "current-season-cache-sync"
+
+        // 12h tick per the wayfinder 05 decision and ADR 0017.
+        const val INTERVAL_HOURS: Long = 12L
+
+        // Exponential backoff starting at 30s per the wayfinder 05 spec.
+        const val BACKOFF_DELAY_SECONDS: Long = 30L
+
+        /**
+         * Build the periodic request. Exposed for tests so the
+         * interval, network constraint, and backoff can be asserted
+         * without spinning up a `WorkManager` test harness. The actual
+         * [enqueuePeriodic] is the production seam called from
+         * [com.anpurnama.f1_app.F1App.onCreate].
+         */
+        fun buildPeriodicRequest(
+            networkType: NetworkType = NetworkType.CONNECTED,
+        ): PeriodicWorkRequest =
+            PeriodicWorkRequestBuilder<CacheSyncWorker>(
+                repeatInterval = INTERVAL_HOURS,
+                repeatIntervalTimeUnit = TimeUnit.HOURS,
+            )
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(networkType)
+                        .build()
+                )
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    backoffDelay = BACKOFF_DELAY_SECONDS,
+                    timeUnit = TimeUnit.SECONDS,
+                )
+                .build()
+
+        /**
+         * Enqueue the unique periodic job. [ExistingPeriodicWorkPolicy.KEEP]
+         * is intentional for a stable v1 policy: it guarantees that a
+         * later interval/constraint change does not silently mutate
+         * already-enqueued work. Future changes must use [ExistingPeriodicWorkPolicy.UPDATE]
+         * or a versioned unique work name.
+         */
+        fun enqueuePeriodic(context: Context) {
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                UNIQUE_PERIODIC_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                buildPeriodicRequest(),
+            )
+        }
+    }
+}
+
+/**
+ * Pure decision: given a [BundleRefreshResult] aggregate from one
+ * worker tick, return the [ListenableWorker.Result] WorkManager
+ * should record.
+ *
+ * The three-way split is deliberate:
+ * - **Empty** (off-season / no active season / no cached schedule /
+ *   no plausibly-complete sessions): `Result.success()`. Nothing was
+ *   attempted, so there is nothing to retry; the next 12h tick
+ *   re-evaluates against fresh state. A "no active season" or "no
+ *   schedule" entry is **not** recorded as a failure — that would
+ *   loop WorkManager's backoff forever during the off-season and
+ *   during the schedule-promotion gap.
+ * - **At least one resource succeeded**: `Result.success()`. Partial
+ *   or full success; the next 12h tick advances.
+ * - **At least one resource was attempted and all failed**:
+ *   `Result.retry()`. Transient infrastructure failure; WorkManager's
+ *   exponential backoff defers the next attempt. Includes the
+ *   "schedule refresh failed on a pre-promotion device" case, where
+ *   the bundles returned empty (no active season yet) and the
+ *   schedule entry is the only failed attempt.
+ *
+ * Exposed at the file level (not on the worker companion) so the
+ * JVM unit tests can exercise the decision matrix without a
+ * `WorkManager` test harness.
+ */
+internal fun decideWorkerResult(aggregate: BundleRefreshResult): ListenableWorker.Result = when {
+    aggregate.isEmpty -> ListenableWorker.Result.success()
+    aggregate.isTotalFailure() -> ListenableWorker.Result.retry()
+    else -> ListenableWorker.Result.success()
+}

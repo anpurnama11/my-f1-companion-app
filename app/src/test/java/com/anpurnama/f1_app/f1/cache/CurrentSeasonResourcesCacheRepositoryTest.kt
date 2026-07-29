@@ -205,6 +205,218 @@ class CurrentSeasonResourcesCacheRepositoryTest {
         scope.cancel()
     }
 
+    // ── Bundle refresh (CacheSyncWorker tick) ─────────────────────────
+
+    @Test
+    fun `bundle refresh writes next race, standings, and catalog snapshots in one call`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026))
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client { jsonOk("""{ "season": 2026 }""") },
+            clock = FixedClock(1_000),
+        )
+
+        val result = repo.refreshCurrentSeasonBundle()
+
+        assertEquals(5, result.entries.size)
+        assertEquals(5, result.succeeded)
+        assertEquals(0, result.failed)
+        assertEquals(false, result.isTotalFailure())
+        val snapshots = store.state.first().snapshots
+        assertTrue(CacheResourceKeys.nextRaceSession(2026).value in snapshots)
+        assertTrue(CacheResourceKeys.driverStandings(2026).value in snapshots)
+        assertTrue(CacheResourceKeys.constructorStandings(2026).value in snapshots)
+        assertTrue(CacheResourceKeys.driverCatalog(2026).value in snapshots)
+        assertTrue(CacheResourceKeys.constructorCatalog(2026).value in snapshots)
+        scope.cancel()
+    }
+
+    @Test
+    fun `bundle refresh preserves successful writes when a single resource fails`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026))
+        var call = 0
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client {
+                call++
+                when (call) {
+                    // Make the third call (constructor standings) fail.
+                    3 -> respondError(HttpStatusCode.ServiceUnavailable)
+                    else -> jsonOk("""{ "season": 2026 }""")
+                }
+            },
+            clock = FixedClock(1_000),
+        )
+
+        val result = repo.refreshCurrentSeasonBundle()
+
+        // 4 succeeded, 1 failed — partial failure.
+        assertEquals(5, result.entries.size)
+        assertEquals(4, result.succeeded)
+        assertEquals(1, result.failed)
+        assertEquals(false, result.isTotalFailure())
+        val snapshots = store.state.first().snapshots
+        // The 4 successful resources wrote their snapshots.
+        assertTrue(CacheResourceKeys.nextRaceSession(2026).value in snapshots)
+        assertTrue(CacheResourceKeys.driverStandings(2026).value in snapshots)
+        assertTrue(CacheResourceKeys.driverCatalog(2026).value in snapshots)
+        assertTrue(CacheResourceKeys.constructorCatalog(2026).value in snapshots)
+        // The failing one did NOT write.
+        assertTrue(CacheResourceKeys.constructorStandings(2026).value !in snapshots)
+        scope.cancel()
+    }
+
+    @Test
+    fun `bundle refresh reports a total failure when every resource fails`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026))
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client { respondError(HttpStatusCode.ServiceUnavailable) },
+            clock = FixedClock(1_000),
+        )
+
+        val result = repo.refreshCurrentSeasonBundle()
+
+        assertEquals(5, result.entries.size)
+        assertEquals(0, result.succeeded)
+        assertEquals(5, result.failed)
+        assertEquals(true, result.isTotalFailure())
+        // The pre-existing schedule snapshot survives; the five bundle
+        // resources did not write any new snapshots.
+        val snapshots = store.state.first().snapshots
+        assertEquals(1, snapshots.size)
+        assertTrue(CacheResourceKeys.currentSeasonSchedule(2026).value in snapshots)
+        assertTrue(CacheResourceKeys.nextRaceSession(2026).value !in snapshots)
+        assertTrue(CacheResourceKeys.driverStandings(2026).value !in snapshots)
+        assertTrue(CacheResourceKeys.constructorStandings(2026).value !in snapshots)
+        assertTrue(CacheResourceKeys.driverCatalog(2026).value !in snapshots)
+        assertTrue(CacheResourceKeys.constructorCatalog(2026).value !in snapshots)
+        scope.cancel()
+    }
+
+    @Test
+    fun `bundle refresh returns empty when there is no active season`() = runTest {
+        val (store, scope) = newStore()
+        // No active season promotion. Off-season / pre-promotion is a
+        // legitimate state, not a failure — the bundle reports nothing
+        // to attempt so the worker does not enter backoff retry.
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client { jsonOk("""{ "season": 2026 }""") },
+            clock = FixedClock(1_000),
+        )
+
+        val result = repo.refreshCurrentSeasonBundle()
+
+        assertTrue(result.isEmpty)
+        assertEquals(false, result.isTotalFailure())
+        // The five resource keys were never written.
+        assertEquals(0, store.state.first().snapshots.size)
+        scope.cancel()
+    }
+
+    // ── TTL gate: Periodic must respect the freshness window ──────────────
+
+    @Test
+    fun `Periodic refresh on a fresh snapshot skips the network call`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026))
+        val now = 1_000L
+        val twelveHoursMs = 12L * 60L * 60L * 1000L
+        // Pre-write a FRESH driver standings snapshot. fetchedAt = now,
+        // staleAfter = now + 12h — well outside the test clock.
+        store.writeSnapshot(
+            ResourceSnapshot(
+                key = CacheResourceKeys.driverStandings(2026).value,
+                season = 2026,
+                payloadKind = CacheResourceKeys.driverStandings(2026).payloadKind,
+                payloadVersion = 1,
+                payloadJson = """{ "MRData": { "StandingsTable": { "StandingsLists": [] } } }""",
+                fetchedAtEpochMs = now,
+                staleAfterEpochMs = now + twelveHoursMs,
+            ),
+        )
+        var calls = 0
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client { calls++; jsonOk(driverStandingsBody()) },
+            clock = FixedClock(now),
+        )
+
+        // Periodic on a fresh snapshot: the TTL gate must skip the
+        // network call. PullToRefresh is the only reason that bypasses.
+        val result = repo.refreshDriverStandings(RefreshReason.Periodic)
+
+        assertEquals(RefreshResult.Success, result)
+        assertEquals("Periodic must not refresh a fresh snapshot", 0, calls)
+        scope.cancel()
+    }
+
+    @Test
+    fun `Periodic refresh on a stale snapshot does hit the network`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026))
+        val now = 1_000L
+        // Pre-write a STALE driver standings snapshot.
+        store.writeSnapshot(
+            ResourceSnapshot(
+                key = CacheResourceKeys.driverStandings(2026).value,
+                season = 2026,
+                payloadKind = CacheResourceKeys.driverStandings(2026).payloadKind,
+                payloadVersion = 1,
+                payloadJson = """{ "MRData": { "StandingsTable": { "StandingsLists": [] } } }""",
+                fetchedAtEpochMs = 0L,
+                staleAfterEpochMs = 500L, // < now
+            ),
+        )
+        var calls = 0
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client { calls++; jsonOk(driverStandingsBody()) },
+            clock = FixedClock(now),
+        )
+
+        val result = repo.refreshDriverStandings(RefreshReason.Periodic)
+
+        assertEquals(RefreshResult.Success, result)
+        assertEquals(1, calls)
+        scope.cancel()
+    }
+
+    @Test
+    fun `PullToRefresh always bypasses the TTL gate even on a fresh snapshot`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026))
+        val now = 1_000L
+        val twelveHoursMs = 12L * 60L * 60L * 1000L
+        store.writeSnapshot(
+            ResourceSnapshot(
+                key = CacheResourceKeys.driverStandings(2026).value,
+                season = 2026,
+                payloadKind = CacheResourceKeys.driverStandings(2026).payloadKind,
+                payloadVersion = 1,
+                payloadJson = """{ "MRData": { "StandingsTable": { "StandingsLists": [] } } }""",
+                fetchedAtEpochMs = now,
+                staleAfterEpochMs = now + twelveHoursMs,
+            ),
+        )
+        var calls = 0
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client { calls++; jsonOk(driverStandingsBody()) },
+            clock = FixedClock(now),
+        )
+
+        val result = repo.refreshDriverStandings(RefreshReason.PullToRefresh)
+
+        assertEquals(RefreshResult.Success, result)
+        assertEquals("PullToRefresh must always bypass the TTL gate", 1, calls)
+        scope.cancel()
+    }
+
     private fun scheduleSnapshot(season: Int) = ResourceSnapshot(
         key = CacheResourceKeys.currentSeasonSchedule(season).value,
         season = season,

@@ -46,7 +46,12 @@ class SeasonScheduleCacheRepository(
         .distinctUntilChanged()
 
     suspend fun refreshCurrentSeason(reason: RefreshReason): RefreshResult {
-        if (reason is RefreshReason.StaleOpen && currentCachedSeason()?.isStale(clock.now().toEpochMilliseconds()) == false) {
+        // PullToRefresh is the only reason that bypasses the TTL gate
+        // (stale-open and the 12h worker both honor the cache's
+        // staleAfterEpochMs decision). The schedule is the only atomic
+        // active-season promotion authority, so the worker also uses
+        // this gate — a fresh schedule is a fresh schedule.
+        if (reason !is RefreshReason.PullToRefresh && currentCachedSeason()?.isStale(clock.now().toEpochMilliseconds()) == false) {
             return RefreshResult.Success
         }
         val existing = mutex.withLock {

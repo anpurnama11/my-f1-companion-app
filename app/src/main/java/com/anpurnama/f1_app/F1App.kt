@@ -5,6 +5,7 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.ktor3.KtorNetworkFetcherFactory
+import com.anpurnama.f1_app.core.cache.CacheSyncWorker
 import com.anpurnama.f1_app.core.di.Wiring
 import com.anpurnama.f1_app.widget.countdown.CountdownWorker
 
@@ -34,6 +35,7 @@ class F1App : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         wiring = Wiring(this)
         CountdownWorker.enqueuePeriodic(this)
+        CacheSyncWorker.enqueuePeriodic(this)
     }
 
     /**

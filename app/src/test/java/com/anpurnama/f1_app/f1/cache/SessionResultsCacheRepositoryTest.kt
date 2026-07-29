@@ -462,6 +462,159 @@ class SessionResultsCacheRepositoryTest {
         scope.cancel()
     }
 
+    // ── Bundle refresh (CacheSyncWorker tick) ─────────────────────────
+
+    @Test
+    fun `bundle refresh only fetches plausibly-complete sessions in the bounded window`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, gateScheduleSnapshot(2026))
+        // Now is well after the race + 4h buffer, so all sessions in
+        // the schedule's day-1 are plausibly complete.
+        val now = Instant.parse("2026-03-03T00:00:00Z") // 9h after race start
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { jsonOk(raceResultsBody()) },
+            clock = FixedClock(now.toEpochMilliseconds()),
+        )
+
+        val result = repo.refreshCurrentSeasonBundle(now)
+
+        // The gate schedule is a sprint weekend (FP1, SQ, SR, Quali,
+        // Race) — FP2/FP3 are not in the sprint session list. Plus
+        // 1 pitstop for Race = 6 candidate keys.
+        val expectedSessions = listOf(
+            SessionType.FP1, SessionType.SprintQuali, SessionType.Sprint,
+            SessionType.Quali, SessionType.Race,
+        )
+        assertEquals(expectedSessions.size + 1, result.entries.size)
+        // Race + Quali hit the Jolpica standard endpoints, which the
+        // race-results body satisfies. FP1 / SQ / SR hit the alpha
+        // path (needs `getJolpicaAlphaRoundId` first) and will fail
+        // with a parsed `null` roundId. The race pitstop also fails
+        // because the mock returns the race body, not the pitstop
+        // envelope. Failures are recorded per-key; the test is
+        // asserting that ALL sessions in the window were attempted,
+        // not that every attempt succeeded.
+        assertEquals(expectedSessions.size + 1, result.succeeded + result.failed)
+        val snapshots = store.state.first().snapshots
+        // The Race + Quali snapshots wrote through.
+        assertTrue(CacheResourceKeys.sessionResults(2026, 1, SessionType.Race).value in snapshots)
+        assertTrue(CacheResourceKeys.sessionResults(2026, 1, SessionType.Quali).value in snapshots)
+        scope.cancel()
+    }
+
+    @Test
+    fun `bundle refresh skips future sessions even when they fall inside the window`() = runTest {
+        val (store, scope) = newStore()
+        // Schedule with a Race in the future (1h after now).
+        val futureSchedule = ResourceSnapshot(
+            key = CacheResourceKeys.currentSeasonSchedule(2026).value,
+            season = 2026,
+            payloadKind = CacheResourceKeys.currentSeasonSchedule(2026).payloadKind,
+            payloadVersion = 1,
+            payloadJson = """
+                {
+                  "season": 2026,
+                  "races": [{
+                    "round": 1,
+                    "raceName": "Bahrain GP",
+                    "circuit": { "circuitId": "bahrain", "circuitName": "Bahrain", "circuitLength": "5412km" },
+                    "schedule": {
+                      "race": { "date": "2026-03-02", "time": "16:00:00Z" }
+                    }
+                  }]
+                }
+            """.trimIndent(),
+            fetchedAtEpochMs = 1L,
+            staleAfterEpochMs = 2L,
+        )
+        store.promoteActiveSeason(2026, futureSchedule)
+        // Now is 2026-03-02T15:00:00Z — race is 1h in the future.
+        val now = Instant.parse("2026-03-02T15:00:00Z")
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { jsonOk(raceResultsBody()) },
+            clock = FixedClock(now.toEpochMilliseconds()),
+        )
+
+        val result = repo.refreshCurrentSeasonBundle(now)
+
+        // The race is inside the +48h window BUT not plausibly complete
+        // (now < start + 4h buffer), so the eligibility filter
+        // excludes it. No entry is added at all — the bundle does not
+        // record a "Session not yet complete" failure for a session
+        // the gate never even considered (the per-resource
+        // [refreshSessionResult] gate is the one that surfaces that
+        // message for foreground callers; the bundle excludes early).
+        assertEquals(0, result.entries.size)
+        assertTrue(result.isEmpty)
+        assertEquals(false, result.isTotalFailure())
+        // No snapshot is written for a future session.
+        val cached = repo.observeSessionResult(2026, 1, SessionType.Race).first()
+        assertNull("No snapshot should exist for a future session", cached)
+        scope.cancel()
+    }
+
+    @Test
+    fun `bundle refresh returns empty when no sessions are plausibly complete`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, gateScheduleSnapshot(2026))
+        // Now is 30 days before the schedule's race — outside the
+        // ±48h window AND none of the sessions are plausibly complete.
+        val now = Instant.parse("2026-01-31T15:00:00Z")
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { jsonOk(raceResultsBody()) },
+            clock = FixedClock(now.toEpochMilliseconds()),
+        )
+
+        val result = repo.refreshCurrentSeasonBundle(now)
+
+        assertEquals(0, result.entries.size)
+        assertTrue(result.isEmpty)
+        assertEquals(false, result.isTotalFailure())
+        // No new snapshots.
+        assertEquals(1, store.state.first().snapshots.size) // only the schedule
+        scope.cancel()
+    }
+
+    @Test
+    fun `bundle refresh returns empty when no active season is set`() = runTest {
+        val (store, scope) = newStore()
+        val now = Instant.parse("2026-03-02T20:00:00Z")
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { jsonOk(raceResultsBody()) },
+            clock = FixedClock(now.toEpochMilliseconds()),
+        )
+
+        val result = repo.refreshCurrentSeasonBundle(now)
+
+        // Off-season / pre-promotion is a legitimate state, not a
+        // failure — the bundle reports nothing to attempt so the
+        // worker does not enter backoff retry.
+        assertTrue(result.isEmpty)
+        assertEquals(false, result.isTotalFailure())
+        scope.cancel()
+    }
+
+    @Test
+    fun `bundle refresh returns empty when cached schedule is missing`() = runTest {
+        val (store, scope) = newStore()
+        // No active season → no schedule to walk.
+        val now = Instant.parse("2026-03-02T20:00:00Z")
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { jsonOk(raceResultsBody()) },
+            clock = FixedClock(now.toEpochMilliseconds()),
+        )
+
+        val result = repo.refreshCurrentSeasonBundle(now)
+
+        assertTrue(result.isEmpty)
+        scope.cancel()
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     /** Schedule snapshot with all session types defined for gate tests. */

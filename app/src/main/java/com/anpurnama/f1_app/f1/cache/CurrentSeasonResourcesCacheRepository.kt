@@ -1,5 +1,6 @@
 package com.anpurnama.f1_app.f1.cache
 
+import com.anpurnama.f1_app.core.cache.BundleRefreshResult
 import com.anpurnama.f1_app.core.cache.CacheResourceKey
 import com.anpurnama.f1_app.core.cache.CachedResource
 import com.anpurnama.f1_app.core.cache.RefreshAttemptStatus
@@ -111,6 +112,41 @@ class CurrentSeasonResourcesCacheRepository(
         validate = { dto, activeSeason -> dto.season == activeSeason || (dto.season == 0 && dto.teams.isEmpty()) },
     )
 
+    /**
+     * Best-effort bundle refresh of every current-season resource this
+     * repository owns (next race, driver + constructor standings, driver +
+     * team catalogs). Each per-resource refresh uses the same
+     * single-flight gate as a foreground call, so overlapping
+     * foreground + worker refreshes coalesce. Per-resource failures are
+     * caught and recorded in the returned [BundleRefreshResult] — one
+     * bad endpoint never aborts the rest of the bundle.
+     *
+     * Used by `CacheSyncWorker` on its 12-hour tick. Foreground screens
+     * keep using the per-resource [refreshNextRace] / [refreshDriverStandings]
+     * / etc. methods directly so the bundle never blocks a screen open.
+     */
+    suspend fun refreshCurrentSeasonBundle(): BundleRefreshResult {
+        // Resolve the active season up front. No active season is a
+        // legitimate off-season / pre-promotion state, not a
+        // failure — return an empty bundle so the worker treats it
+        // as "nothing to attempt this tick" (success) rather than
+        // triggering exponential-backoff retry.
+        val activeSeason = activeSeason() ?: return BundleRefreshResult.Empty
+        val resources: List<Pair<String, suspend (RefreshReason) -> RefreshResult>> = listOf(
+            CacheResourceKeys.nextRaceSession(activeSeason).value to ::refreshNextRace,
+            CacheResourceKeys.driverStandings(activeSeason).value to ::refreshDriverStandings,
+            CacheResourceKeys.constructorStandings(activeSeason).value to ::refreshConstructorStandings,
+            CacheResourceKeys.driverCatalog(activeSeason).value to ::refreshDriverCatalog,
+            CacheResourceKeys.constructorCatalog(activeSeason).value to ::refreshTeamCatalog,
+        )
+        val entries = resources.map { (key, refresh) ->
+            val result = runCatching { refresh(RefreshReason.Periodic) }
+                .getOrElse { e -> RefreshResult.Failure(e.message ?: "Bundle refresh error") }
+            BundleRefreshResult.Entry(key = key, result = result)
+        }
+        return BundleRefreshResult(entries)
+    }
+
     private fun <Dto, Domain> observeActiveSeason(
         keyForSeason: (Int) -> CacheResourceKey,
         serializer: KSerializer<Dto>,
@@ -135,7 +171,7 @@ class CurrentSeasonResourcesCacheRepository(
             activeSeason()
         } ?: return RefreshResult.Failure("No active season cache")
         val key = keyForSeason(activeSeason)
-        if (reason is RefreshReason.StaleOpen && currentSnapshot(key)?.isStale(clock.now().toEpochMilliseconds()) == false) {
+        if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(clock.now().toEpochMilliseconds()) == false) {
             return RefreshResult.Success
         }
         val existing = mutex.withLock {

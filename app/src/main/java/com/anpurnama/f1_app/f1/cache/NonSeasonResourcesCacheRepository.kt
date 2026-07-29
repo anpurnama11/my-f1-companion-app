@@ -73,7 +73,7 @@ class NonSeasonResourcesCacheRepository(
         reason: RefreshReason,
     ): RefreshResult {
         val key = CacheResourceKeys.circuitMetadata(f1apiCircuitId)
-        if (reason is RefreshReason.StaleOpen && currentSnapshot(key)?.isStale(
+        if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(
                 clock.now().toEpochMilliseconds()
             ) == false
         ) {
@@ -114,7 +114,7 @@ class NonSeasonResourcesCacheRepository(
         reason: RefreshReason,
     ): RefreshResult {
         val key = CacheResourceKeys.circuitMostWins(f1apiCircuitId)
-        if (reason is RefreshReason.StaleOpen && currentSnapshot(key)?.isStale(
+        if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(
                 clock.now().toEpochMilliseconds()
             ) == false
         ) {
@@ -152,7 +152,7 @@ class NonSeasonResourcesCacheRepository(
         reason: RefreshReason,
     ): RefreshResult {
         val key = CacheResourceKeys.wikipediaSummary(pageTitle)
-        if (reason is RefreshReason.StaleOpen && currentSnapshot(key)?.isStale(
+        if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(
                 clock.now().toEpochMilliseconds()
             ) == false
         ) {

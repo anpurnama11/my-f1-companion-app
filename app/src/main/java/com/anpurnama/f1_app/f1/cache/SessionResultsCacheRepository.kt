@@ -1,5 +1,6 @@
 package com.anpurnama.f1_app.f1.cache
 
+import com.anpurnama.f1_app.core.cache.BundleRefreshResult
 import com.anpurnama.f1_app.core.cache.CacheResourceKey
 import com.anpurnama.f1_app.core.cache.CachedResource
 import com.anpurnama.f1_app.core.cache.RefreshAttemptStatus
@@ -20,10 +21,13 @@ import com.anpurnama.f1_app.f1.data.getJolpicaPitStops
 import com.anpurnama.f1_app.f1.data.getJolpicaQualifying
 import com.anpurnama.f1_app.f1.data.getJolpicaRaceResults
 import com.anpurnama.f1_app.f1.model.FastestPitstop
+import com.anpurnama.f1_app.f1.model.Season
 import com.anpurnama.f1_app.f1.model.SessionResult
 import com.anpurnama.f1_app.f1.model.SessionType
+import com.anpurnama.f1_app.f1.model.toInstantOrNull
 import com.anpurnama.f1_app.f1.toRoundQualifying
 import com.anpurnama.f1_app.f1.toRoundResults
+import com.anpurnama.f1_app.f1.toSeason
 import com.anpurnama.f1_app.f1.toSessionResult
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.ClientRequestException
@@ -40,6 +44,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -123,7 +128,7 @@ class SessionResultsCacheRepository(
                 if (active == null) "No active season" else "Not the active season"
             )
         }
-        if (reason is RefreshReason.StaleOpen && currentSnapshot(key)?.isStale(
+        if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(
                 clock.now().toEpochMilliseconds()
             ) == false
         ) {
@@ -167,7 +172,7 @@ class SessionResultsCacheRepository(
                 if (active == null) "No active season" else "Not the active season"
             )
         }
-        if (reason is RefreshReason.StaleOpen && currentSnapshot(key)?.isStale(
+        if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(
                 clock.now().toEpochMilliseconds()
             ) == false
         ) {
@@ -177,6 +182,126 @@ class SessionResultsCacheRepository(
             runPitstopRefresh(season, round, key, reason)
         }
     }
+
+    // ── Bundle refresh (periodic worker) ──────────────────────────────
+
+    /**
+     * Best-effort current-season bundle refresh for session results and
+     * race enrichments. Walks the cached schedule (read from the
+     * snapshot store) and refreshes only the sessions whose scheduled
+     * start falls within [BundleWindowBefore] / [BundleWindowAfter] of
+     * [now] AND that the plausibly-complete gate considers complete.
+     *
+     * Pitstops are refreshed for completed Race sessions in the same
+     * window; they are enrichment, not result, but a per-round key fits
+     * the same bundle.
+     *
+     * Per-resource failures are caught and recorded in the returned
+     * [BundleRefreshResult] — the gate's "Session not yet complete" is
+     * a normal `RefreshResult.Failure` and is **not** an exception, so
+     * a future session surfaces as a `failed` entry, not a missing one.
+     *
+     * Used by `CacheSyncWorker` on its 12-hour tick. The per-resource
+     * single-flight gate still applies, so an overlapping foreground
+     * refresh joins the worker's in-flight call rather than starting a
+     * duplicate.
+     */
+    suspend fun refreshCurrentSeasonBundle(now: Instant): BundleRefreshResult {
+        // No active season OR no cached schedule is a legitimate
+        // off-season / pre-promotion state, not a failure — return
+        // an empty bundle so the worker treats it as "nothing to
+        // attempt this tick" (success) rather than triggering
+        // exponential-backoff retry. The next 12h tick re-evaluates.
+        val activeSeason = store.state.first().activeSeason ?: return BundleRefreshResult.Empty
+        val schedule = readCachedSchedule(activeSeason) ?: return BundleRefreshResult.Empty
+        val candidates = eligibleBundleCandidates(now, schedule)
+        if (candidates.isEmpty()) {
+            return BundleRefreshResult.Empty
+        }
+        val entries = candidates.map { candidate ->
+            val key = CacheResourceKeys.sessionResults(activeSeason, candidate.round, candidate.session).value
+            val result = runCatching {
+                refreshSessionResult(
+                    season = activeSeason,
+                    round = candidate.round,
+                    session = candidate.session,
+                    reason = RefreshReason.Periodic,
+                )
+            }.getOrElse { e -> RefreshResult.Failure(e.message ?: "Bundle refresh error") }
+            BundleRefreshResult.Entry(key = key, result = result)
+        } + candidates.filter { it.session == SessionType.Race }.map { candidate ->
+            val key = CacheResourceKeys.pitstops(activeSeason, candidate.round).value
+            val result = runCatching {
+                refreshPitstops(
+                    season = activeSeason,
+                    round = candidate.round,
+                    reason = RefreshReason.Periodic,
+                )
+            }.getOrElse { e -> RefreshResult.Failure(e.message ?: "Bundle refresh error") }
+            BundleRefreshResult.Entry(key = key, result = result)
+        }
+        return BundleRefreshResult(entries)
+    }
+
+    /**
+     * Read the cached schedule snapshot and map it to the domain
+     * [Season]. Returns `null` if the snapshot is missing or the
+     * payload fails to deserialize — the caller should treat that as
+     * "no schedule, no eligible sessions" rather than aborting the
+     * bundle.
+     */
+    private suspend fun readCachedSchedule(season: Int): Season? {
+        val snapshot = store.state.first()
+            .snapshots[CacheResourceKeys.currentSeasonSchedule(season).value]
+            ?: return null
+        return try {
+            json.decodeFromString(SeasonResponseDto.serializer(), snapshot.payloadJson).toSeason()
+        } catch (_: SerializationException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
+    /**
+     * Filter the cached season's [ScheduledSession] list to the
+     * sessions eligible for a periodic bundle refresh. The window
+     * bounds (now ± [BundleWindowBefore] / [BundleWindowAfter]) are a
+     * coarse discovery hint; the per-session plausibly-complete gate
+     * is the authoritative filter, so a future session inside
+     * +48h is still excluded.
+     */
+    private fun eligibleBundleCandidates(
+        now: Instant,
+        season: Season,
+    ): List<BundleCandidate> {
+        val nowMs = now.toEpochMilliseconds()
+        val beforeMs = nowMs - BundleWindowBefore.inWholeMilliseconds
+        val afterMs = nowMs + BundleWindowAfter.inWholeMilliseconds
+        return season.races
+            .flatMap { race ->
+                race.schedule?.activeSessions().orEmpty().mapNotNull { session ->
+                    val sessionMs = session.slot.toInstantOrNull()?.toEpochMilliseconds()
+                        ?: return@mapNotNull null
+                    if (sessionMs < beforeMs || sessionMs > afterMs) return@mapNotNull null
+                    BundleCandidate(round = race.round, session = session.type, sessionMs = sessionMs)
+                }
+            }
+            .filter { candidate ->
+                // Authoritative filter: the repository's existing
+                // plausibly-complete gate (start + per-session buffer).
+                // Inline the buffer math so the bundle does not need to
+                // re-walk the schedule once per session through the
+                // store; the gate value matches [completionBufferMs].
+                nowMs >= candidate.sessionMs + candidate.session.completionBufferMs()
+            }
+    }
+
+    private data class BundleCandidate(
+        val round: Int,
+        val session: SessionType,
+        val sessionMs: Long,
+    )
 
     // ── Internal: session result refresh ──────────────────────────────
 
@@ -447,6 +572,12 @@ class SessionResultsCacheRepository(
     companion object {
         const val PayloadVersion = 1
         private const val TwelveHoursMs = 12L * 60L * 60L * 1000L
+        // Bundle window: per the wayfinder 05 decision, only consider
+        // session resources whose scheduled start is within ±48h of now.
+        // The plausibly-complete gate then re-filters on per-session
+        // buffer; the window is a discovery hint, not the gate.
+        private val BundleWindowBefore: kotlin.time.Duration = kotlin.time.Duration.parse("48h")
+        private val BundleWindowAfter: kotlin.time.Duration = kotlin.time.Duration.parse("48h")
         private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true; coerceInputValues = true }
     }
 }
