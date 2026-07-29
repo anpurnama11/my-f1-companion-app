@@ -52,7 +52,7 @@ time; elapsed result times remain raw durations.
 - [x] `GetPracticeResultUseCase`, sprint use cases, `GetSessionResultUseCase`, and `GetFastestPitstopUseCase`
 - [x] Hybrid race-result source and authoritative DNF/DNS/grid/PL handling (revision 3)
 
-Spec cross-ref: `lode/specs/f1app.md` (Use cases table, Schedule contract, envelope diffs, **Schedule surface shape**), `lode/wayfinder/f1app/past-list.md`.
+Spec cross-ref: `lode/specs/data-layer.md` (Use cases table, Schedule contract, envelope diffs, **Schedule surface shape**), `lode/wayfinder/f1app/past-list.md`.
 
 ## Revision 1 — tab switcher (replaces the v1 single-list shape)
 

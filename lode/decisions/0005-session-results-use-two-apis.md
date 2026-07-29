@@ -141,4 +141,4 @@ Championship standings moved to Jolpica in
 - [0006-race-results-hybrid-source.md](0006-race-results-hybrid-source.md) —
   superseded. Retained for the point-in-time record of the hybrid merge.
 - [../summary.md](../summary.md), [../terminology.md](../terminology.md),
-  [../specs/f1app.md](../specs/f1app.md) — consume this decision.
+  [../specs/data-layer.md](../specs/data-layer.md) — consume this decision.
