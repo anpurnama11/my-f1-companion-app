@@ -1,6 +1,6 @@
 # Offline data cache
 
-F1app's offline structured-data cache is a single-season, typed resource snapshot store backed by a Proto DataStore-style `CacheState.snapshots` map. The store foundation is built in `core/cache`: `CacheState`, `ResourceSnapshot`, `RefreshAttemptStatus`, `CacheStateSerializer`, and `SnapshotStore` provide durable JSON serialization, corruption-handler recovery, atomic snapshot writes, per-key observation with stable equality, failed-attempt metadata updates, and active-season promotion gated to the canonical `season:<year>:schedule` / `season.schedule` snapshot with season-scoped pruning. F1 resource contracts live in `f1/cache/CacheResourceKeys` as stable string keys for current-season schedule, next race/session, standings, catalogs, session results, pitstops, circuit metadata, circuit most-wins, and Wikipedia summaries. The UI reads durable structured API data from typed resource snapshots; Room `cached_resource` snapshot rows are a measured fallback only if payload volume, stale scans, write contention, or future indexed local queries prove the map substrate wrong. The cache is not a fully normalized F1 domain database unless screens need local joins, sorting, or filtering over fields inside payloads. Network refreshes validate payloads and write through the store, while Ktor `HttpCache` remains only a transport optimization. Season rollover is schedule-gated: only a valid f1api.dev `/current` schedule can promote a new active season. The store enforces the schedule resource contract (`season:<year>:schedule`, `season.schedule`) before that atomic promotion prunes old season-scoped standings, results, and catalogs immediately. Non-season resources such as circuit metadata, circuit most-wins, and Wikipedia summaries may remain because their keys are not tied to the active season.
+F1app's offline structured-data cache is a single-season, typed resource snapshot store backed by a Proto DataStore-style `CacheState.snapshots` map. The store foundation is built in `core/cache`: `CacheState`, `ResourceSnapshot`, `RefreshAttemptStatus`, `BundleRefreshResult`, `CacheStateSerializer`, and `SnapshotStore` provide durable JSON serialization, corruption-handler recovery, atomic snapshot writes, per-key observation with stable equality, failed-attempt metadata updates, a generic per-resource bundle aggregate (`BundleRefreshResult` with `isTotalFailure()` for worker retry decisions), and active-season promotion gated to the canonical `season:<year>:schedule` / `season.schedule` snapshot with season-scoped pruning. F1 resource contracts live in `f1/cache/CacheResourceKeys` as stable string keys for current-season schedule, next race/session, standings, catalogs, session results, pitstops, circuit metadata, circuit most-wins, and Wikipedia summaries. The UI reads durable structured API data from typed resource snapshots; Room `cached_resource` snapshot rows are a measured fallback only if payload volume, stale scans, write contention, or future indexed local queries prove the map substrate wrong. The cache is not a fully normalized F1 domain database unless screens need local joins, sorting, or filtering over fields inside payloads. Network refreshes validate payloads and write through the store, while Ktor `HttpCache` remains only a transport optimization. Season rollover is schedule-gated: only a valid f1api.dev `/current` schedule can promote a new active season. The store enforces the schedule resource contract (`season:<year>:schedule`, `season.schedule`) before that atomic promotion prunes old season-scoped standings, results, and catalogs immediately. Non-season resources such as circuit metadata, circuit most-wins, and Wikipedia summaries may remain because their keys are not tied to the active season.
 
 The current-season schedule is cached end to end through
 `SeasonScheduleCacheRepository`. Homepage and Schedule observe
@@ -110,14 +110,106 @@ without pruning. TTL is 24h (vs 12h for season-scoped resources).
 Refresh coordination has two shapes over the same store. Foreground screen refresh is
 per-resource: a screen observes and refreshes only the snapshots it renders. Fixed
 periodic WorkManager refresh is a best-effort current-season bundle on one
-12-hour `NetworkType.CONNECTED` unique periodic job: it considers current-season
-structured data needed to open supported app surfaces warm (schedule as discovery
-and rollover guard, next session, standings, catalogs, and session
-result/enrichment keys in the `now - 48h` through `now + 48h` schedule window),
-but normal per-resource TTL gates decide whether network calls run. Success and
-failure remain resource-scoped; partial failures record attempt metadata and
-never roll back successful writes or delete old payloads. Foreground and worker
-refreshes share per-resource single-flight gates.
+12-hour `NetworkType.CONNECTED` unique periodic job (`CacheSyncWorker`,
+`UNIQUE_PERIODIC_NAME = "current-season-cache-sync"`,
+`ExistingPeriodicWorkPolicy.KEEP`, `BackoffPolicy.EXPONENTIAL` with 30s initial
+delay). The schedule refresh runs first because `/current` is the only atomic
+active-season promotion authority; the resource and session-result bundles
+follow. Bundle selection considers current-season structured data needed to open
+supported app surfaces warm (schedule as discovery and rollover guard, next
+session, standings, catalogs, and session result/enrichment keys in the
+`now - 48h` through `now + 48h` schedule window), but normal per-resource TTL
+gates decide whether network calls run. **Both `StaleOpen` and `Periodic`
+honor the per-resource TTL gate**; only `PullToRefresh` bypasses it. The
+worker therefore does not redundantly network-refresh a foreground-loaded
+resource that is still within its TTL window — the 12h tick only hits the
+network for stale (or missing) snapshots, plus any force-refresh the user
+initiates. The session bundle's eligibility filter
+is a coarse ±48h discovery hint; the per-session plausibly-complete gate
+(start + per-session buffer) is the authoritative filter, so a future session
+inside the window is still excluded. Success and failure remain resource-scoped;
+partial failures record attempt metadata and never roll back successful writes
+or delete old payloads. Foreground and worker refreshes share per-resource
+single-flight gates.
+
+Worker result policy (the retry decision is a deliberate three-way split, not
+a binary on failure):
+- **Empty bundle** (off-season, no active season, no cached schedule, no
+  plausibly-complete sessions in window) → `Result.success()`. Nothing was
+  attempted, so there is nothing to retry. The next 12h tick re-evaluates
+  against fresh state. A "no active season" or "no schedule" entry is
+  **not** recorded as a failure — that would loop WorkManager's backoff
+  forever during the off-season and during the schedule-promotion gap.
+- **At least one resource succeeded** → `Result.success()`. Partial or
+  full success; the next 12h tick advances.
+- **At least one resource was attempted and all failed** →
+  `Result.retry()`. Transient infrastructure failure; WorkManager's
+  exponential backoff defers the next attempt.
+
+```kotlin
+// core/cache/CacheSyncWorker.kt — platform worker, NOT in f1/.
+// f1/ stays free of android.* imports; the worker reaches f1/
+// repositories through F1App.wiring, mirroring the
+// widget/countdown/CountdownWorker.kt pattern.
+
+class CacheSyncWorker(...) : CoroutineWorker(...) {
+    override suspend fun doWork(): Result {
+        val wiring = (applicationContext as F1App).wiring
+        // 1. Atomic active-season promotion (schedule = rollover guard).
+        //    The schedule entry is included in the aggregate so a
+        //    failed schedule on a pre-promotion device is not
+        //    mis-classified as off-season.
+        val schedule = BundleRefreshResult(listOf(
+            BundleRefreshResult.Entry("season-schedule",
+                runCatching {
+                    wiring.seasonScheduleCacheRepository.refreshCurrentSeason(RefreshReason.Periodic)
+                }.getOrElse { RefreshResult.Failure(it.message ?: "Schedule refresh error") }),
+        ))
+        val now = Clock.System.now()
+        // 2. Next race + standings + catalogs bundle.
+        val resources = runCatching {
+            wiring.currentSeasonResourcesCacheRepository.refreshCurrentSeasonBundle()
+        }.getOrElse { /* wrap as BundleRefreshResult.Failure */ }
+        // 3. Plausibly-complete session result + pitstop bundle.
+        val sessions = runCatching {
+            wiring.sessionResultsCacheRepository.refreshCurrentSeasonBundle(now)
+        }.getOrElse { /* wrap as BundleRefreshResult.Failure */ }
+        return decideWorkerResult(schedule + resources + sessions)
+    }
+}
+
+// Pure decision extracted for testability (no WorkManager harness needed).
+internal fun decideWorkerResult(aggregate: BundleRefreshResult): ListenableWorker.Result = when {
+    aggregate.isEmpty -> Result.success()                  // off-season re-eval
+    aggregate.isTotalFailure() -> Result.retry()           // transient infra failure
+    else -> Result.success()                               // partial or full success
+}
+
+fun CurrentSeasonResourcesCacheRepository.refreshCurrentSeasonBundle(): BundleRefreshResult {
+    val season = activeSeason() ?: return BundleRefreshResult.Empty
+    // Refreshes next race, driver + constructor standings, driver + team catalogs.
+    // Per-resource failures are caught; the bundle records them and continues.
+    // The per-resource TTL gate is respected: RefreshReason.Periodic
+    // skips fresh foreground-loaded snapshots.
+}
+
+fun SessionResultsCacheRepository.refreshCurrentSeasonBundle(now: Instant): BundleRefreshResult {
+    val activeSeason = store.state.first().activeSeason ?: return BundleRefreshResult.Empty
+    val schedule = readCachedSchedule(activeSeason) ?: return BundleRefreshResult.Empty
+    val candidates = eligibleBundleCandidates(now, schedule)  // ±48h AND plausibly-complete
+    // Refreshes each session + Race pitstops. Per-resource failures are caught.
+    // The per-resource TTL gate is respected: RefreshReason.Periodic
+    // skips fresh foreground-loaded snapshots.
+}
+
+data class BundleRefreshResult(val entries: List<Entry>) {
+    val succeeded: Int get() = entries.count { it.result is RefreshResult.Success }
+    val failed: Int get() = entries.count { it.result is RefreshResult.Failure }
+    fun isTotalFailure(): Boolean = entries.isNotEmpty() && succeeded == 0
+    data class Entry(val key: String, val result: RefreshResult)
+    companion object { val Empty: BundleRefreshResult = BundleRefreshResult(emptyList()) }
+}
+```
 
 ```kotlin
 data class CacheState(
@@ -240,6 +332,8 @@ flowchart TD
 - Foreground refresh is per-resource; background periodic refresh is a best-effort current-season bundle.
 - The periodic worker cadence is fixed at 12 hours; race-weekend intelligence belongs in resource selection, not dynamic WorkManager rescheduling.
 - The periodic worker uses `NetworkType.CONNECTED`, WorkManager exponential backoff for total/transient bundle failure, and startup `enqueueUniquePeriodicWork(..., KEEP, ...)`; future interval/constraint changes need `UPDATE` or a versioned work name.
+- The 12h worker respects the per-resource TTL gate (`RefreshReason.Periodic` does not bypass `staleAfterEpochMs`); only `PullToRefresh` bypasses it. A fresh foreground-loaded resource is not redundantly network-refreshed by the worker.
+- The schedule refresh is included in the worker's aggregate so a failed schedule on a pre-promotion device (no active season yet) is not silently mis-classified as off-season; that scenario retries, it does not enter the empty-bundle success path.
 - Bundle refresh is orchestration only: every payload keeps its own resource key, metadata, validation, and failure boundary.
 - Bundle scope is current-season structured data for supported surfaces, not historical archives or remote images; session result endpoints are only refreshed once plausibly complete.
 - Foreground and worker refreshes coalesce through a per-resource single-flight gate.

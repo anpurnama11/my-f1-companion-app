@@ -59,7 +59,7 @@ lode/
       05-cache-next-race-session-end-to-end.md         # shipped — cached next race/session; widget cache remains separate
       06-cache-session-results-and-race-enrichments.md # built — SessionResultsCacheRepository + cache-aware SessionResultViewModel and ScheduleViewModel podiums; historical fallback; 13 tests
       07-cache-non-season-detail-resources.md          # built — NonSeasonResourcesCacheRepository + cache-aware CircuitViewModel; non-season survival; 9 tests; Wikipedia forceRefresh support
-      08-wire-fixed-periodic-cache-sync.md             # ready — 12h WorkManager bundle through shared coordinator
+      08-wire-fixed-periodic-cache-sync.md             # built — CacheSyncWorker (12h KEEP, CONNECTED, EXPONENTIAL 30s); BundleRefreshResult; per-repo refreshCurrentSeasonBundle(); 20 new tests; three-way worker result decision (empty / partial / total failure)
       09-offline-cache-validation-and-rollout-hardening.md  # ready — JVM/manual validation gate
     f1app-build/tickets/
       01-foundation-and-homepage-section-2.md   # shipped — Foundation + Homepage §2 (pins UX family)
