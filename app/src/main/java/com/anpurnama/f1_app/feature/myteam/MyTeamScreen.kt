@@ -419,12 +419,5 @@ private fun constructorName(id: String?, constructors: List<ConstructorStanding>
 @Composable
 private fun rememberMyTeamViewModel(): MyTeamViewModel {
     val wiring = (LocalContext.current.applicationContext as F1App).wiring
-    return viewModel(
-        factory = myTeamViewModelFactory(
-            getDriversStandings = wiring.getDriversStandings,
-            getConstructorsStandings = wiring.getConstructorsStandings,
-            favoritesCache = wiring.favoritesCache,
-            currentSeasonResourcesCacheRepository = wiring.currentSeasonResourcesCacheRepository,
-        ),
-    )
+    return viewModel(factory = wiring.myTeamViewModelFactory())
 }

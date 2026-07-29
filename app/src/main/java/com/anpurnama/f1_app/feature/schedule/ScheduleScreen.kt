@@ -436,12 +436,5 @@ private fun formatRaceDate(race: Race): String? {
 @Composable
 private fun rememberScheduleViewModel(): ScheduleViewModel {
     val wiring = (LocalContext.current.applicationContext as F1App).wiring
-    return viewModel(
-        factory = scheduleViewModelFactory(
-            getSeason = wiring.getSeason,
-            getRoundPodium = wiring.getRoundPodium,
-            seasonScheduleCacheRepository = wiring.seasonScheduleCacheRepository,
-            sessionResultsCacheRepository = wiring.sessionResultsCacheRepository,
-        )
-    )
+    return viewModel(factory = wiring.scheduleViewModelFactory())
 }

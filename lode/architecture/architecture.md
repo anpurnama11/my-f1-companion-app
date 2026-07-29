@@ -55,9 +55,11 @@ flowchart TD
   A KMP `:shared` module extraction is *planned* (not started); deferred until KMP is
   greenlit. The domain-purity invariant makes that a move, not a refactor.
 - **DI:** manual `Wiring(context)` on a custom `Application`, exposed as `app.wiring`.
-  ViewModels via `viewModelFactory { initializer { ... } }`. The widget shares the same
-  instance → one service locator, one pattern, no second registry. Manual `Wiring`
-  only.
+  Low-level use cases/cache repositories are private to `Wiring`; screens request
+  feature-level factory methods such as `wiring.homepageViewModelFactory()` instead
+  of assembling factories from individual fields. ViewModels still receive narrow
+  function refs/Flows, never `Wiring`. The widget shares the same instance → one
+  service locator, one pattern, no second registry. Manual `Wiring` only.
 - **Architecture:** MVVM. `ViewModel` + sealed `UiState` + `StateFlow`. State derived
   via `combine` of small atoms + `stateIn(WhileSubscribed(5_000))`. **Init-less**:
   first load fires from `Flow.onStart { load() }`, not `init {}`. Re-fires on resume.

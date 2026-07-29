@@ -44,13 +44,13 @@ class CountdownWorker(
             return Result.success()
         }
 
-        return when (val outcome = wiring.getNextRace(forceRefresh = true)) {
+        return when (val outcome = wiring.loadNextRaceForCountdown(forceRefresh = true)) {
             is Outcome.Success -> {
                 val nextRace = outcome.data
                 if (nextRace == null) {
                     cache.writeOffSeason(lastSyncedMillis = now)
                 } else {
-                    val season = when (val seasonOutcome = wiring.getSeason(forceRefresh = true)) {
+                    val season = when (val seasonOutcome = wiring.loadSeasonForCountdown(forceRefresh = true)) {
                         is Outcome.Success -> seasonOutcome.data
                         is Outcome.Failure, Outcome.Loading -> null
                     }

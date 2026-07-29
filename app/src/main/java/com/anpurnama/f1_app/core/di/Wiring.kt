@@ -4,6 +4,19 @@ import android.content.Context
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.lifecycle.ViewModelProvider
+import com.anpurnama.f1_app.core.cache.BundleRefreshResult
+import com.anpurnama.f1_app.core.cache.RefreshReason
+import com.anpurnama.f1_app.core.cache.RefreshResult
+import com.anpurnama.f1_app.feature.circuit.circuitViewModelFactory as circuitFactory
+import com.anpurnama.f1_app.feature.driver.driverViewModelFactory as driverFactory
+import com.anpurnama.f1_app.feature.homepage.homepageViewModelFactory as homepageFactory
+import com.anpurnama.f1_app.feature.leaderboard.leaderboardViewModelFactory as leaderboardFactory
+import com.anpurnama.f1_app.feature.myteam.myTeamViewModelFactory as myTeamFactory
+import com.anpurnama.f1_app.feature.round.roundViewModelFactory as roundFactory
+import com.anpurnama.f1_app.feature.schedule.scheduleViewModelFactory as scheduleFactory
+import com.anpurnama.f1_app.feature.sessionresult.sessionResultViewModelFactory as sessionResultFactory
+import com.anpurnama.f1_app.feature.team.teamViewModelFactory as teamFactory
 import com.anpurnama.f1_app.core.cache.CacheState
 import com.anpurnama.f1_app.core.cache.CacheStateSchemaMigration
 import com.anpurnama.f1_app.core.cache.CacheStateSerializer
@@ -32,6 +45,7 @@ import com.anpurnama.f1_app.f1.cache.NonSeasonResourcesCacheRepository
 import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
 import com.anpurnama.f1_app.f1.cache.SessionResultsCacheRepository
 import io.ktor.client.HttpClient
+import kotlinx.datetime.Instant
 import java.io.File
 
 /**
@@ -49,32 +63,32 @@ class Wiring(context: Context) {
 
     private val appContext: Context = context.applicationContext
 
-    val httpClient: HttpClient = HttpClientFactory.create(appContext)
+    internal val httpClient: HttpClient = HttpClientFactory.create(appContext)
 
-    val getSeason: GetSeasonUseCase = GetSeasonUseCase(httpClient)
-    val getNextRace: GetNextRaceUseCase = GetNextRaceUseCase(httpClient)
-    val getDriversStandings: GetDriversStandingsUseCase = GetDriversStandingsUseCase(httpClient)
-    val getConstructorsStandings: GetConstructorsStandingsUseCase = GetConstructorsStandingsUseCase(httpClient)
-    val getDriverDetail: GetDriverDetailUseCase = GetDriverDetailUseCase(httpClient)
-    val getTeamDetail: GetTeamDetailUseCase = GetTeamDetailUseCase(httpClient)
-    val getRoundResults: GetRoundResultsUseCase = GetRoundResultsUseCase(httpClient)
-    val getRoundQualifying: GetRoundQualifyingUseCase = GetRoundQualifyingUseCase(httpClient)
-    val getRoundPodium: GetRoundPodiumUseCase = GetRoundPodiumUseCase(getRoundResults)
-    val getPracticeResult: GetPracticeResultUseCase = GetPracticeResultUseCase(httpClient)
-    val getSprintResult: GetSprintResultUseCase = GetSprintResultUseCase(httpClient)
-    val getSprintQualifyingResult: GetSprintQualifyingResultUseCase = GetSprintQualifyingResultUseCase(httpClient)
-    val getSessionResult: GetSessionResultUseCase = GetSessionResultUseCase(
+    private val getSeasonUseCase: GetSeasonUseCase = GetSeasonUseCase(httpClient)
+    private val getNextRaceUseCase: GetNextRaceUseCase = GetNextRaceUseCase(httpClient)
+    private val getDriversStandings: GetDriversStandingsUseCase = GetDriversStandingsUseCase(httpClient)
+    private val getConstructorsStandings: GetConstructorsStandingsUseCase = GetConstructorsStandingsUseCase(httpClient)
+    private val getDriverDetail: GetDriverDetailUseCase = GetDriverDetailUseCase(httpClient)
+    private val getTeamDetail: GetTeamDetailUseCase = GetTeamDetailUseCase(httpClient)
+    private val getRoundResults: GetRoundResultsUseCase = GetRoundResultsUseCase(httpClient)
+    private val getRoundQualifying: GetRoundQualifyingUseCase = GetRoundQualifyingUseCase(httpClient)
+    private val getRoundPodium: GetRoundPodiumUseCase = GetRoundPodiumUseCase(getRoundResults)
+    private val getPracticeResult: GetPracticeResultUseCase = GetPracticeResultUseCase(httpClient)
+    private val getSprintResult: GetSprintResultUseCase = GetSprintResultUseCase(httpClient)
+    private val getSprintQualifyingResult: GetSprintQualifyingResultUseCase = GetSprintQualifyingResultUseCase(httpClient)
+    private val getSessionResult: GetSessionResultUseCase = GetSessionResultUseCase(
         getRoundResults = getRoundResults,
         getRoundQualifying = getRoundQualifying,
         getPractice = getPracticeResult,
         getSprint = getSprintResult,
         getSprintQualifying = getSprintQualifyingResult,
     )
-    val getFastestPitstop: GetFastestPitstopUseCase = GetFastestPitstopUseCase(httpClient)
-    val getCircuit: GetCircuitUseCase = GetCircuitUseCase(httpClient)
-    val getCircuitMostWins: GetCircuitMostWinsUseCase = GetCircuitMostWinsUseCase(httpClient)
+    private val getFastestPitstop: GetFastestPitstopUseCase = GetFastestPitstopUseCase(httpClient)
+    private val getCircuit: GetCircuitUseCase = GetCircuitUseCase(httpClient)
+    private val getCircuitMostWins: GetCircuitMostWinsUseCase = GetCircuitMostWinsUseCase(httpClient)
 
-    val snapshotStore: SnapshotStore = SnapshotStore(
+    private val snapshotStore: SnapshotStore = SnapshotStore(
         DataStoreFactory.create(
             serializer = CacheStateSerializer,
             corruptionHandler = ReplaceFileCorruptionHandler { CacheState.Default },
@@ -87,28 +101,28 @@ class Wiring(context: Context) {
         )
     )
 
-    val seasonScheduleCacheRepository: SeasonScheduleCacheRepository = SeasonScheduleCacheRepository(
+    private val seasonScheduleCacheRepository: SeasonScheduleCacheRepository = SeasonScheduleCacheRepository(
         store = snapshotStore,
         client = httpClient,
     )
 
-    val currentSeasonResourcesCacheRepository: CurrentSeasonResourcesCacheRepository = CurrentSeasonResourcesCacheRepository(
+    private val currentSeasonResourcesCacheRepository: CurrentSeasonResourcesCacheRepository = CurrentSeasonResourcesCacheRepository(
         store = snapshotStore,
         client = httpClient,
         refreshScheduleIfMissing = seasonScheduleCacheRepository::refreshCurrentSeason,
     )
 
-    val sessionResultsCacheRepository: SessionResultsCacheRepository = SessionResultsCacheRepository(
+    private val sessionResultsCacheRepository: SessionResultsCacheRepository = SessionResultsCacheRepository(
         store = snapshotStore,
         client = httpClient,
     )
 
-    val nonSeasonResourcesCacheRepository: NonSeasonResourcesCacheRepository = NonSeasonResourcesCacheRepository(
+    private val nonSeasonResourcesCacheRepository: NonSeasonResourcesCacheRepository = NonSeasonResourcesCacheRepository(
         store = snapshotStore,
         client = httpClient,
     )
 
-    val favoritesCache: FavoritesCache = FavoritesCache(
+    private val favoritesCache: FavoritesCache = FavoritesCache(
         PreferenceDataStoreFactory.create {
             File(File(appContext.filesDir, "datastore"), "favorites.preferences_pb").apply {
                 parentFile?.mkdirs()
@@ -121,11 +135,118 @@ class Wiring(context: Context) {
      * instance is held by the application, the worker, and the
      * Glance widget — one DataStore, one source of truth.
      */
-    val nextRaceCache: NextRaceCache = NextRaceCache(
+    internal val nextRaceCache: NextRaceCache = NextRaceCache(
         PreferenceDataStoreFactory.create {
             File(File(appContext.filesDir, "datastore"), "next_race.preferences_pb").apply {
                 parentFile?.mkdirs()
             }
         }
     )
+
+
+    fun homepageViewModelFactory(): ViewModelProvider.Factory = homepageFactory(
+        getSeason = getSeasonUseCase,
+        getNextRace = getNextRaceUseCase,
+        getDriversStandings = getDriversStandings,
+        getConstructorsStandings = getConstructorsStandings,
+        favoritesCache = favoritesCache,
+        seasonScheduleCacheRepository = seasonScheduleCacheRepository,
+        currentSeasonResourcesCacheRepository = currentSeasonResourcesCacheRepository,
+    )
+
+    fun scheduleViewModelFactory(): ViewModelProvider.Factory = scheduleFactory(
+        getSeason = getSeasonUseCase,
+        getRoundPodium = getRoundPodium,
+        seasonScheduleCacheRepository = seasonScheduleCacheRepository,
+        sessionResultsCacheRepository = sessionResultsCacheRepository,
+    )
+
+    fun leaderboardViewModelFactory(): ViewModelProvider.Factory = leaderboardFactory(
+        getDriversStandings = getDriversStandings,
+        getConstructorsStandings = getConstructorsStandings,
+        currentSeasonResourcesCacheRepository = currentSeasonResourcesCacheRepository,
+    )
+
+    fun myTeamViewModelFactory(): ViewModelProvider.Factory = myTeamFactory(
+        getDriversStandings = getDriversStandings,
+        getConstructorsStandings = getConstructorsStandings,
+        favoritesCache = favoritesCache,
+        currentSeasonResourcesCacheRepository = currentSeasonResourcesCacheRepository,
+    )
+
+    fun roundViewModelFactory(year: Int, round: Int): ViewModelProvider.Factory = roundFactory(
+        year = year,
+        round = round,
+        getRoundResults = getRoundResults,
+        getRoundQualifying = getRoundQualifying,
+        getSeason = getSeasonUseCase,
+        seasonScheduleCacheRepository = seasonScheduleCacheRepository,
+    )
+
+    fun sessionResultViewModelFactory(
+        year: Int,
+        round: Int,
+        session: com.anpurnama.f1_app.f1.model.SessionType,
+    ): ViewModelProvider.Factory = sessionResultFactory(
+        year = year,
+        round = round,
+        session = session,
+        getSessionResult = getSessionResult,
+        getFastestPitstop = getFastestPitstop,
+        sessionResultsCacheRepository = sessionResultsCacheRepository,
+    )
+
+    fun circuitViewModelFactory(circuitId: String): ViewModelProvider.Factory = circuitFactory(
+        circuitId = circuitId,
+        getCircuit = getCircuit,
+        getCircuitMostWins = getCircuitMostWins,
+        nonSeasonResourcesCacheRepository = nonSeasonResourcesCacheRepository,
+    )
+
+    fun driverViewModelFactory(driverId: String): ViewModelProvider.Factory = driverFactory(
+        driverId = driverId,
+        getDriverDetail = getDriverDetail,
+    )
+
+    fun teamViewModelFactory(teamId: String): ViewModelProvider.Factory = teamFactory(
+        teamId = teamId,
+        getTeamDetail = getTeamDetail,
+    )
+
+    internal suspend fun loadNextRaceForCountdown(forceRefresh: Boolean) = getNextRaceUseCase.invoke(forceRefresh)
+
+    internal suspend fun loadSeasonForCountdown(forceRefresh: Boolean) = getSeasonUseCase.invoke(forceRefresh)
+
+    internal suspend fun refreshCurrentSeasonScheduleForPeriodic(): RefreshResult = runCatching {
+        seasonScheduleCacheRepository.refreshCurrentSeason(RefreshReason.Periodic)
+    }.getOrElse { e ->
+        RefreshResult.Failure(e.message ?: "Schedule refresh error")
+    }
+
+    internal suspend fun refreshCurrentSeasonResourcesBundleForPeriodicSync(): BundleRefreshResult = runCatching {
+        currentSeasonResourcesCacheRepository.refreshCurrentSeasonBundle()
+    }.getOrElse { e ->
+        BundleRefreshResult(
+            listOf(
+                BundleRefreshResult.Entry(
+                    key = "current-season-resources-bundle",
+                    result = RefreshResult.Failure(e.message ?: "Bundle refresh error"),
+                ),
+            ),
+        )
+    }
+
+    internal suspend fun refreshCurrentSeasonSessionsBundleForPeriodicSync(now: Instant): BundleRefreshResult = runCatching {
+        sessionResultsCacheRepository.refreshCurrentSeasonBundle(now)
+    }.getOrElse { e ->
+        BundleRefreshResult(
+            listOf(
+                BundleRefreshResult.Entry(
+                    key = "current-season-sessions-bundle",
+                    result = RefreshResult.Failure(e.message ?: "Bundle refresh error"),
+                ),
+            ),
+        )
+    }
+
 }

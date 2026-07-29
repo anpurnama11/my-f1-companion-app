@@ -748,15 +748,5 @@ private fun Section3Favorites(
 @Composable
 private fun rememberHomepageViewModel(): HomepageViewModel {
     val wiring = (LocalContext.current.applicationContext as F1App).wiring
-    return viewModel(
-        factory = homepageViewModelFactory(
-            getSeason = wiring.getSeason,
-            getNextRace = wiring.getNextRace,
-            getDriversStandings = wiring.getDriversStandings,
-            getConstructorsStandings = wiring.getConstructorsStandings,
-            favoritesCache = wiring.favoritesCache,
-            seasonScheduleCacheRepository = wiring.seasonScheduleCacheRepository,
-            currentSeasonResourcesCacheRepository = wiring.currentSeasonResourcesCacheRepository,
-        )
-    )
+    return viewModel(factory = wiring.homepageViewModelFactory())
 }

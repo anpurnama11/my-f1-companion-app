@@ -163,5 +163,5 @@ private fun StandingSnapshot(detail: DriverDetail) {
 @Composable
 private fun rememberDriverViewModel(driverId: String): DriverViewModel {
     val wiring = (LocalContext.current.applicationContext as F1App).wiring
-    return viewModel(factory = driverViewModelFactory(driverId, wiring.getDriverDetail))
+    return viewModel(factory = wiring.driverViewModelFactory(driverId))
 }

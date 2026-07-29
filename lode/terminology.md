@@ -6,7 +6,7 @@ Domain + project language. One term, one tight definition, rejected synonyms.
 
 **PokeDV** — `PokemonDataViewer`, the developer's prior project; architecture reference for F1app (single module, manual Wiring DI, sealed Outcome, MVVM init-less, Navigation 3).
 
-**Wiring** — manual service-locator class held by the `Application`; exposes use cases and the Ktor `HttpClient` to ViewModels and the widget through one instance. Avoid: DI container, injector.
+**Wiring** — manual service-locator class held by the `Application`; owns private use cases/caches and exposes feature-level ViewModel factories plus narrow app/widget seams through one instance. Avoid: DI container, injector.
 
 **Outcome\<T\>** — sealed data-layer result type returned by use cases: `Success(data)`, `Failure(errorMessage)`, `Loading`. Lives at `core/Outcome.kt`. Stops at the VM boundary; composables never import it (ADR 0002). See: [practices.md](practices.md) §Outcome boundary.
 

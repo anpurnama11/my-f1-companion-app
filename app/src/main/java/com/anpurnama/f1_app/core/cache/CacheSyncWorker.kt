@@ -12,9 +12,6 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.anpurnama.f1_app.F1App
-import com.anpurnama.f1_app.f1.cache.CurrentSeasonResourcesCacheRepository
-import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
-import com.anpurnama.f1_app.f1.cache.SessionResultsCacheRepository
 import kotlinx.datetime.Clock
 import java.util.concurrent.TimeUnit
 
@@ -72,11 +69,7 @@ class CacheSyncWorker(
             listOf(
                 BundleRefreshResult.Entry(
                     key = "season-schedule",
-                    result = runCatching {
-                        wiring.seasonScheduleCacheRepository.refreshCurrentSeason(RefreshReason.Periodic)
-                    }.getOrElse { e ->
-                        RefreshResult.Failure(e.message ?: "Schedule refresh error")
-                    },
+                    result = wiring.refreshCurrentSeasonScheduleForPeriodic(),
                 ),
             ),
         )
@@ -84,32 +77,10 @@ class CacheSyncWorker(
         val now = Clock.System.now()
 
         // 2. Best-effort bundle of next race + standings + catalogs.
-        val resources = runCatching {
-            wiring.currentSeasonResourcesCacheRepository.refreshCurrentSeasonBundle()
-        }.getOrElse { e ->
-            BundleRefreshResult(
-                listOf(
-                    BundleRefreshResult.Entry(
-                        key = "current-season-resources-bundle",
-                        result = RefreshResult.Failure(e.message ?: "Bundle refresh error"),
-                    ),
-                ),
-            )
-        }
+        val resources = wiring.refreshCurrentSeasonResourcesBundleForPeriodicSync()
 
         // 3. Best-effort bundle of plausibly-complete session results + pitstops.
-        val sessions = runCatching {
-            wiring.sessionResultsCacheRepository.refreshCurrentSeasonBundle(now)
-        }.getOrElse { e ->
-            BundleRefreshResult(
-                listOf(
-                    BundleRefreshResult.Entry(
-                        key = "current-season-sessions-bundle",
-                        result = RefreshResult.Failure(e.message ?: "Bundle refresh error"),
-                    ),
-                ),
-            )
-        }
+        val sessions = wiring.refreshCurrentSeasonSessionsBundleForPeriodicSync(now)
 
         return decideWorkerResult(concat(schedule, resources, sessions))
     }

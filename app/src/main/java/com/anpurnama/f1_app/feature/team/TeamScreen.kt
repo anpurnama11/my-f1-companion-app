@@ -109,5 +109,5 @@ private fun TeamContent(detail: TeamDetail) {
 @Composable
 private fun rememberTeamViewModel(teamId: String): TeamViewModel {
     val wiring = (LocalContext.current.applicationContext as F1App).wiring
-    return viewModel(factory = teamViewModelFactory(teamId, wiring.getTeamDetail))
+    return viewModel(factory = wiring.teamViewModelFactory(teamId))
 }

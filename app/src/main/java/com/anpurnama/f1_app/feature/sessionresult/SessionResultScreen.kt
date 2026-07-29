@@ -233,15 +233,5 @@ private fun PracticeRow(result: PracticeResult) {
 @Composable
 private fun rememberSessionResultViewModel(year: Int, round: Int, session: SessionType): SessionResultViewModel {
     val wiring = (LocalContext.current.applicationContext as F1App).wiring
-    // Use the cache-aware factory when the cache repository is wired.
-    return viewModel(
-        factory = sessionResultViewModelFactory(
-            year = year,
-            round = round,
-            session = session,
-            getSessionResult = wiring.getSessionResult,
-            getFastestPitstop = wiring.getFastestPitstop,
-            sessionResultsCacheRepository = wiring.sessionResultsCacheRepository,
-        ),
-    )
+    return viewModel(factory = wiring.sessionResultViewModelFactory(year, round, session))
 }

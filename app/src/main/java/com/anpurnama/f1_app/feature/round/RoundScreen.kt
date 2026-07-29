@@ -301,14 +301,5 @@ private fun formatLength(raw: String): String = raw.filter(Char::isDigit).toIntO
 @Composable
 private fun rememberRoundViewModel(year: Int, round: Int): RoundViewModel {
     val wiring = (LocalContext.current.applicationContext as F1App).wiring
-    return viewModel(
-        factory = roundViewModelFactory(
-            year = year,
-            round = round,
-            getRoundResults = wiring.getRoundResults,
-            getRoundQualifying = wiring.getRoundQualifying,
-            getSeason = wiring.getSeason,
-            seasonScheduleCacheRepository = wiring.seasonScheduleCacheRepository,
-        ),
-    )
+    return viewModel(factory = wiring.roundViewModelFactory(year, round))
 }
