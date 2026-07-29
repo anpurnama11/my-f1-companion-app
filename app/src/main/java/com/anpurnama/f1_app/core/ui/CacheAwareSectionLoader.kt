@@ -7,17 +7,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 suspend fun <T> MutableStateFlow<SectionUiState<T>>.refreshCachedSection(
     forceRefresh: Boolean,
     refresh: suspend (RefreshReason) -> RefreshResult,
-) {
+): RefreshResult {
     val current = value
     value = if (current is SectionUiState.Content) {
         current.copy(sync = ContentSyncStatus.Refreshing)
     } else {
         SectionUiState.Loading
     }
-    when (val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)) {
-        RefreshResult.Success -> if (value is SectionUiState.Content) {
-            @Suppress("UNCHECKED_CAST")
-            value = (value as SectionUiState.Content<T>).copy(sync = ContentSyncStatus.Fresh)
+    return when (val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)) {
+        RefreshResult.Success -> {
+            if (value is SectionUiState.Content) {
+                @Suppress("UNCHECKED_CAST")
+                value = (value as SectionUiState.Content<T>).copy(sync = ContentSyncStatus.Fresh)
+            }
+            RefreshResult.Success
         }
         is RefreshResult.Failure -> {
             val after = value
@@ -26,6 +29,7 @@ suspend fun <T> MutableStateFlow<SectionUiState<T>>.refreshCachedSection(
             } else {
                 SectionUiState.Error(result.message)
             }
+            result
         }
     }
 }

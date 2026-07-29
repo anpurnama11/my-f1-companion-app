@@ -81,6 +81,32 @@ sequenceDiagram
 ```
 
 
+Session results and race enrichments are cached through
+`SessionResultsCacheRepository`. It observes and refreshes per-session results
+(Race, Quali, Sprint, Sprint Quali, FP1/FP2/FP3) and per-round pitstops via raw
+API DTOs (JolpicaRaceResultsResponseDto, JolpicaQualifyingResponseDto,
+JolpicaAlphaResultsResponseDto, JolpicaPitStopsResponseDto), mapped to domain on
+read. Alpha-sourced cached sessions (FP/Sprint/Sprint Quali) rebuild their
+car-number translator from the cached current-driver catalog so driver/team ids
+match the online path; if the catalog is absent or malformed, rows degrade to
+the alpha opaque ids instead of failing. Session refreshes are gated by a
+plausibly-complete check that reads the cached schedule snapshot: the network call is skipped when the session start +
+per-session buffer (Race 4h, Quali 2h, Sprint 2h, SQuali 1.5h, FP 1.5h) is in
+the future. If no cached result exists for a gated future session, the refresh
+returns `RefreshResult.Failure("Session not yet complete")` so screens render a
+non-loading unavailable/error row and do not bypass the gate through direct network
+fallbacks. Missing or malformed schedule data always allows the fetch. Empty
+pitstop payloads cache as null FastestPitstop (empty enrichment is valid).
+Single-flight per-resource key includes (season, round, session).
+
+Non-season detail resources (circuit metadata, circuit most-wins, Wikipedia
+summaries) are cached through `NonSeasonResourcesCacheRepository`. Circuit
+metadata stores CircuitDetailResponseDto and maps to CircuitDetail; circuit
+most-wins stores CircuitWinnersResponseDto and aggregates to CircuitMostWins;
+Wikipedia summaries store the @Serializable WikipediaSummary domain model
+directly. All have `season = null` keys, surviving active-season promotion
+without pruning. TTL is 24h (vs 12h for season-scoped resources).
+
 Refresh coordination has two shapes over the same store. Foreground screen refresh is
 per-resource: a screen observes and refreshes only the snapshots it renders. Fixed
 periodic WorkManager refresh is a best-effort current-season bundle on one

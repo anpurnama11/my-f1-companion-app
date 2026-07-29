@@ -6,19 +6,27 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.anpurnama.f1_app.core.Outcome
+import com.anpurnama.f1_app.core.cache.CachedResource
+import com.anpurnama.f1_app.core.cache.RefreshReason
+import com.anpurnama.f1_app.core.cache.RefreshResult
 import com.anpurnama.f1_app.core.ui.SectionUiState
+import com.anpurnama.f1_app.core.ui.refreshCachedSection
 import com.anpurnama.f1_app.core.ui.toSection
 import com.anpurnama.f1_app.f1.GetCircuitMostWinsUseCase
 import com.anpurnama.f1_app.f1.GetCircuitUseCase
 import com.anpurnama.f1_app.f1.model.CircuitDetail
 import com.anpurnama.f1_app.f1.model.CircuitMostWins
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 
 /**
  * Circuit detail ViewModel — drives two independently-failing sections:
@@ -28,23 +36,26 @@ import kotlinx.coroutines.launch
  *  - **mostWins**: jolpica `/circuits/{id}/results/1.json` aggregated to
  *    the all-time most-winning driver and team at this circuit.
  *
- * **Init-less:** first subscription triggers [warmUp]; the cold stream
- * is `stateIn(Lazily)` so the first load fires once and subsequent
- * subscribers read the hot `StateFlow` without re-firing. Re-fire is
- * via [refresh] (pull-to-refresh) only.
+ * When cache observers are provided ([observeCachedMetadata],
+ * [observeCachedMostWins]), the ViewModel subscribes to durable snapshots
+ * and renders cached data as [SectionUiState.Content] with sync status.
+ * Pull-to-refresh calls the corresponding [refreshCached*] function and
+ * preserves cached content through stale/refreshing/failed states.
+ * Without cache, it falls back to the direct network use cases (init-less
+ * [Outcome] → [SectionUiState] mapping).
  *
- * **Section independence:** each call writes to its own
- * [MutableStateFlow]; a failure on one never blanks the other. The
- * design's two stats can degrade independently — e.g. f1api.dev down
- * still shows "all-time most wins" via jolpica, and vice versa.
- *
- * `circuitId` is a constructor param forwarded to both use cases on
- * every fire; it does not change for the ViewModel's lifetime.
+ * **Section independence:** each section has its own [MutableStateFlow];
+ * a failure on one never blanks the other.
  */
 class CircuitViewModel(
     val circuitId: String,
     private val getCircuit: suspend (String, Boolean) -> Outcome<CircuitDetail>,
     private val getCircuitMostWins: suspend (String, Boolean) -> Outcome<CircuitMostWins>,
+    private val observeCachedMetadata: Flow<CachedResource<CircuitDetail>?>? = null,
+    private val refreshCachedMetadata: (suspend (RefreshReason) -> RefreshResult)? = null,
+    private val observeCachedMostWins: Flow<CachedResource<CircuitMostWins>?>? = null,
+    private val refreshCachedMostWins: (suspend (RefreshReason) -> RefreshResult)? = null,
+    private val nowEpochMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : ViewModel() {
 
     sealed interface UiState {
@@ -70,35 +81,67 @@ class CircuitViewModel(
             ),
         )
 
-    /** First-load warm-up: fires both use cases in parallel. */
     private fun warmUp() {
-        viewModelScope.launch { loadMetadata(forceRefresh = false) }
-        viewModelScope.launch { loadMostWins(forceRefresh = false) }
+        observeCachedMetadata
+            ?.onEach { cached ->
+                if (cached != null) {
+                    metadataState.value = cached.toSection(nowEpochMs())
+                }
+            }
+            ?.launchIn(viewModelScope)
+        observeCachedMostWins
+            ?.onEach { cached ->
+                if (cached != null) {
+                    mostWinsState.value = cached.toSection(nowEpochMs())
+                }
+            }
+            ?.launchIn(viewModelScope)
+        viewModelScope.launch { loadMetadata(false) }
+        viewModelScope.launch { loadMostWins(false) }
     }
 
-    /** Public pull-to-refresh: re-fires both with `forceRefresh = true` (NO_CACHE). */
     fun refresh() {
-        viewModelScope.launch { loadMetadata(forceRefresh = true) }
-        viewModelScope.launch { loadMostWins(forceRefresh = true) }
+        viewModelScope.launch { loadMetadata(true) }
+        viewModelScope.launch { loadMostWins(true) }
     }
 
     private suspend fun loadMetadata(forceRefresh: Boolean) {
+        val refresh = refreshCachedMetadata
+        if (observeCachedMetadata != null && refresh != null) {
+            val result = metadataState.refreshCachedSection(forceRefresh, refresh)
+            // Fall through to direct network only when the cache explicitly
+            // indicates it cannot serve this resource (not the active season).
+            // A generic refresh failure must keep the error state.
+            when (result) {
+                is RefreshResult.Success -> return
+                is RefreshResult.Failure -> if (result.message != "Not the active season" &&
+                    result.message != "No active season"
+                ) return
+            }
+        }
         metadataState.value = SectionUiState.Loading
         metadataState.value = getCircuit(circuitId, forceRefresh).toSection()
     }
 
     private suspend fun loadMostWins(forceRefresh: Boolean) {
+        val refresh = refreshCachedMostWins
+        if (observeCachedMostWins != null && refresh != null) {
+            val result = mostWinsState.refreshCachedSection(forceRefresh, refresh)
+            // Fall through to direct network only when the cache explicitly
+            // indicates it cannot serve this resource (not the active season).
+            // A generic refresh failure must keep the error state.
+            when (result) {
+                is RefreshResult.Success -> return
+                is RefreshResult.Failure -> if (result.message != "Not the active season" &&
+                    result.message != "No active season"
+                ) return
+            }
+        }
         mostWinsState.value = SectionUiState.Loading
         mostWinsState.value = getCircuitMostWins(circuitId, forceRefresh).toSection()
     }
 }
 
-/**
- * `viewModelFactory` builder. Mirrors the Driver/Team pattern — the
- * factory captures the use case instance refs; the VM takes
- * `suspend (String, Boolean) -> Outcome<…>` lambdas so it never sees
- * the `Wiring` types.
- */
 fun circuitViewModelFactory(
     circuitId: String,
     getCircuit: GetCircuitUseCase,
@@ -109,6 +152,29 @@ fun circuitViewModelFactory(
             circuitId = circuitId,
             getCircuit = getCircuit::invoke,
             getCircuitMostWins = getCircuitMostWins::invoke,
+        )
+    }
+}
+
+fun circuitViewModelFactory(
+    circuitId: String,
+    getCircuit: GetCircuitUseCase,
+    getCircuitMostWins: GetCircuitMostWinsUseCase,
+    nonSeasonResourcesCacheRepository: com.anpurnama.f1_app.f1.cache.NonSeasonResourcesCacheRepository,
+): ViewModelProvider.Factory = viewModelFactory {
+    initializer {
+        CircuitViewModel(
+            circuitId = circuitId,
+            getCircuit = getCircuit::invoke,
+            getCircuitMostWins = getCircuitMostWins::invoke,
+            observeCachedMetadata = nonSeasonResourcesCacheRepository.observeCircuitMetadata(circuitId),
+            refreshCachedMetadata = { reason ->
+                nonSeasonResourcesCacheRepository.refreshCircuitMetadata(circuitId, reason)
+            },
+            observeCachedMostWins = nonSeasonResourcesCacheRepository.observeCircuitMostWins(circuitId),
+            refreshCachedMostWins = { reason ->
+                nonSeasonResourcesCacheRepository.refreshCircuitMostWins(circuitId, reason)
+            },
         )
     }
 }

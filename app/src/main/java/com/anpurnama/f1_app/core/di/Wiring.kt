@@ -28,7 +28,9 @@ import com.anpurnama.f1_app.f1.GetSprintResultUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import com.anpurnama.f1_app.f1.GetTeamDetailUseCase
 import com.anpurnama.f1_app.f1.cache.CurrentSeasonResourcesCacheRepository
+import com.anpurnama.f1_app.f1.cache.NonSeasonResourcesCacheRepository
 import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
+import com.anpurnama.f1_app.f1.cache.SessionResultsCacheRepository
 import io.ktor.client.HttpClient
 import java.io.File
 
@@ -94,6 +96,16 @@ class Wiring(context: Context) {
         store = snapshotStore,
         client = httpClient,
         refreshScheduleIfMissing = seasonScheduleCacheRepository::refreshCurrentSeason,
+    )
+
+    val sessionResultsCacheRepository: SessionResultsCacheRepository = SessionResultsCacheRepository(
+        store = snapshotStore,
+        client = httpClient,
+    )
+
+    val nonSeasonResourcesCacheRepository: NonSeasonResourcesCacheRepository = NonSeasonResourcesCacheRepository(
+        store = snapshotStore,
+        client = httpClient,
     )
 
     val favoritesCache: FavoritesCache = FavoritesCache(

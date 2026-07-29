@@ -1,6 +1,12 @@
 package com.anpurnama.f1_app.feature.circuit
 
 import com.anpurnama.f1_app.core.Outcome
+import com.anpurnama.f1_app.core.cache.CachedResource
+import com.anpurnama.f1_app.core.cache.RefreshAttemptStatus
+import com.anpurnama.f1_app.core.cache.RefreshReason
+import com.anpurnama.f1_app.core.cache.RefreshResult
+import com.anpurnama.f1_app.core.cache.ResourceSnapshot
+import com.anpurnama.f1_app.core.ui.ContentSyncStatus
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.f1.model.CircuitDetail
 import com.anpurnama.f1_app.f1.model.CircuitMostWins
@@ -9,6 +15,8 @@ import com.anpurnama.f1_app.f1.model.MostWinningDriver
 import com.anpurnama.f1_app.f1.model.MostWinningTeam
 import com.anpurnama.f1_app.test.MainCoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -52,6 +60,21 @@ class CircuitViewModelTest {
             wins = 7,
         ),
         totalRaces = 22,
+    )
+
+    private fun snapshot(
+        payloadKind: String,
+        staleAfter: Long = Long.MAX_VALUE,
+    ) = ResourceSnapshot(
+        key = "fake:$payloadKind",
+        season = null,
+        payloadKind = payloadKind,
+        payloadVersion = 1,
+        payloadJson = "{}",
+        fetchedAtEpochMs = 1L,
+        staleAfterEpochMs = staleAfter,
+        lastAttemptEpochMs = 1L,
+        lastAttemptStatus = RefreshAttemptStatus.Succeeded,
     )
 
     private fun fakeVm(
@@ -119,6 +142,65 @@ class CircuitViewModelTest {
         assertTrue(loaded.metadata is SectionUiState.Content)
         assertTrue(loaded.mostWins is SectionUiState.Error)
         assertEquals("circuit not in jolpica namespace", (loaded.mostWins as SectionUiState.Error).message)
+    }
+
+    @Test
+    fun `cache observer seeds Content from snapshot on warmUp`() = runTest {
+        val cachedFlow = MutableStateFlow<CachedResource<CircuitDetail>?>(null)
+        val vm = CircuitViewModel(
+            circuitId = "bahrain",
+            getCircuit = { _, _ -> Outcome.Failure("should not be called") },
+            getCircuitMostWins = { _, _ -> Outcome.Failure("should not be called") },
+            observeCachedMetadata = cachedFlow,
+            refreshCachedMetadata = { RefreshResult.Success },
+            observeCachedMostWins = null,
+            refreshCachedMostWins = null,
+        )
+        // Seed cached data before warmUp reads the flow
+        cachedFlow.value = CachedResource(METADATA, snapshot("circuit.metadata"))
+
+        vm.uiState.take(2).toList()
+        testScheduler.advanceUntilIdle()
+
+        val loaded = vm.uiState.value as CircuitViewModel.UiState.Sections
+        assertTrue(loaded.metadata is SectionUiState.Content)
+        assertEquals("Bahrain International Circuit",
+            (loaded.metadata as SectionUiState.Content).data.name)
+        // No cached mostWins → falls through to network use case which returns Failure
+        assertTrue(loaded.mostWins is SectionUiState.Error)
+    }
+
+    @Test
+    fun `cache refresh failure preserves cached content with RefreshFailed sync`() = runTest {
+        val cachedFlow = MutableStateFlow<CachedResource<CircuitDetail>?>(null)
+        var refreshResultValue: RefreshResult = RefreshResult.Success
+        var refreshReason: RefreshReason = RefreshReason.StaleOpen
+        val vm = CircuitViewModel(
+            circuitId = "bahrain",
+            getCircuit = { _, _ -> Outcome.Failure("fallback should not be called") },
+            getCircuitMostWins = { _, _ -> Outcome.Success(WINS) },
+            observeCachedMetadata = cachedFlow,
+            refreshCachedMetadata = { reason ->
+                refreshReason = reason
+                refreshResultValue
+            },
+            observeCachedMostWins = null,
+            refreshCachedMostWins = null,
+        )
+        cachedFlow.value = CachedResource(METADATA, snapshot("circuit.metadata", staleAfter = 1L))
+        vm.uiState.take(2).toList()
+        testScheduler.advanceUntilIdle()
+
+        // Now trigger a stale-refresh that fails
+        refreshResultValue = RefreshResult.Failure("offline")
+        vm.refresh()
+        testScheduler.advanceUntilIdle()
+
+        val loaded = vm.uiState.value as CircuitViewModel.UiState.Sections
+        val metaContent = loaded.metadata as? SectionUiState.Content ?: throw AssertionError("expected Content")
+        assertEquals(ContentSyncStatus.RefreshFailed("offline"), metaContent.sync)
+        assertEquals("Bahrain International Circuit", metaContent.data.name)
+        assertEquals(RefreshReason.PullToRefresh, refreshReason)
     }
 
     @Test

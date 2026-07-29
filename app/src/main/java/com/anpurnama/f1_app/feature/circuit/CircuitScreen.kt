@@ -316,11 +316,13 @@ private fun MostWinsRow(
 @Composable
 private fun rememberCircuitViewModel(circuitId: String): CircuitViewModel {
     val wiring = (LocalContext.current.applicationContext as F1App).wiring
+    // Use the cache-aware factory when the cache repository is wired.
     return viewModel(
         factory = circuitViewModelFactory(
             circuitId = circuitId,
             getCircuit = wiring.getCircuit,
             getCircuitMostWins = wiring.getCircuitMostWins,
+            nonSeasonResourcesCacheRepository = wiring.nonSeasonResourcesCacheRepository,
         ),
     )
 }

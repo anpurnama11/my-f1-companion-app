@@ -2,7 +2,7 @@
 id: 07
 title: Cache non-season detail resources
 type: task
-status: ready-for-agent
+status: built
 blocked_by: [02, 04]
 owner: ""
 spec: ../../../specs/offline-data-cache.md
@@ -14,7 +14,7 @@ spec: ../../../specs/offline-data-cache.md
 
 **Blocked by:** 02 — Add snapshot store and resource contracts; 04 — Cache standings and catalogs end to end.
 
-**Status:** ready-for-agent
+**Status:** built
 
 ```kotlin
 sealed interface CacheResourceKey {
@@ -32,10 +32,10 @@ flowchart LR
     Promote[Season promotion] -. does not prune .-> Store
 ```
 
-- [ ] Circuit metadata and circuit most-wins render from cached snapshots offline.
-- [ ] Wikipedia summaries render from cached snapshots offline where detail pages use them.
-- [ ] Non-season resources are not pruned by active-season promotion.
-- [ ] Unknown/new circuit most-wins responses can cache valid nullable leaders instead of being treated as corruption.
-- [ ] Refresh failure preserves existing non-season content and updates sync status.
+- [x] Circuit metadata and circuit most-wins render from cached snapshots offline.
+- [x] Wikipedia summaries render from cached snapshots offline where detail pages use them.
+- [x] Non-season resources are not pruned by active-season promotion.
+- [x] Unknown/new circuit most-wins responses can cache valid nullable leaders instead of being treated as corruption.
+- [x] Refresh failure preserves existing non-season content and updates sync status.
 
 Related: [spec](../../../specs/offline-data-cache.md), [circuit detail](../../../wayfinder/f1app/circuit-most-wins.md), [driver/team detail](../../../wayfinder/f1app/driver-team-detail.md).

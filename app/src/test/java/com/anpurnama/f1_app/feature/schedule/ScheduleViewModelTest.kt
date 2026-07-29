@@ -15,24 +15,56 @@ import com.anpurnama.f1_app.f1.model.Race
 import com.anpurnama.f1_app.f1.model.RoundResult
 import com.anpurnama.f1_app.f1.model.Season
 import com.anpurnama.f1_app.test.MainCoroutineRule
+import androidx.datastore.core.DataStoreFactory
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import com.anpurnama.f1_app.core.cache.CacheState
+import com.anpurnama.f1_app.core.cache.CacheStateSerializer
+import com.anpurnama.f1_app.core.cache.SnapshotStore
+import com.anpurnama.f1_app.f1.cache.SessionResultsCacheRepository
+import com.anpurnama.f1_app.f1.data.JOLPICA_BASE
+import com.anpurnama.f1_app.f1.model.SessionType
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScheduleViewModelTest {
 
     @get:Rule
     val mainRule = MainCoroutineRule()
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
 
     private val BAHRAIN = Race(
         round = 1, name = "Bahrain GP",
@@ -334,6 +366,241 @@ class ScheduleViewModelTest {
                 lastAttemptStatus = attemptStatus,
             ),
         )
+    }
+
+    // ── Cache-podium test helpers ─────────────────────────────────────
+
+    private fun cacheScheduleSnapshot(season: Int) = ResourceSnapshot(
+        key = CacheResourceKeys.currentSeasonSchedule(season).value,
+        season = season,
+        payloadKind = CacheResourceKeys.currentSeasonSchedule(season).payloadKind,
+        payloadVersion = 1,
+        payloadJson = """
+        {
+          "season": $season,
+          "races": [{
+            "round": 1,
+            "raceName": "Bahrain GP",
+            "circuit": { "circuitId": "bahrain", "circuitName": "Bahrain", "circuitLength": "5412km" },
+            "schedule": {
+              "race": { "date": "2026-03-02", "time": "15:00:00Z" },
+              "qualy": { "date": "2026-03-02", "time": "12:00:00Z" },
+              "fp1": { "date": "2026-03-02", "time": "08:00:00Z" },
+              "fp2": { "date": "2026-03-02", "time": "09:30:00Z" },
+              "fp3": { "date": "2026-03-02", "time": "10:30:00Z" },
+              "sprintQualy": { "date": "2026-03-02", "time": "10:00:00Z" },
+              "sprintRace": { "date": "2026-03-02", "time": "11:00:00Z" }
+            }
+          }]
+        }
+        """.trimIndent(),
+        fetchedAtEpochMs = 1L,
+        staleAfterEpochMs = Long.MAX_VALUE,
+    )
+
+    private fun threeResultRaceBody(season: Int = 2026, round: Int = 1): String = """
+    {
+      "MRData": {
+        "RaceTable": {
+          "season": "$season",
+          "round": "$round",
+          "Races": [{
+            "season": "$season",
+            "round": "$round",
+            "raceName": "Bahrain GP",
+            "Circuit": { "circuitId": "bahrain", "circuitName": "Bahrain International Circuit", "Location": { "locality": "Sakhir", "country": "Bahrain" } },
+            "Results": [
+              {
+                "number": "33",
+                "position": "1",
+                "positionText": "1",
+                "points": "25",
+                "grid": "1",
+                "status": "Finished",
+                "Driver": { "driverId": "max_verstappen", "permanentNumber": "33", "code": "VER", "givenName": "Max", "familyName": "Verstappen" },
+                "Constructor": { "constructorId": "red_bull", "name": "Red Bull" },
+                "Time": { "millis": "5042252", "time": "1:24:04.252" },
+                "FastestLap": { "rank": "1", "lap": "10", "Time": { "time": "1:32.000" } }
+              },
+              {
+                "number": "11",
+                "position": "2",
+                "positionText": "2",
+                "points": "18",
+                "grid": "2",
+                "status": "Finished",
+                "Driver": { "driverId": "perez", "permanentNumber": "11", "code": "PER", "givenName": "Sergio", "familyName": "Pérez" },
+                "Constructor": { "constructorId": "red_bull", "name": "Red Bull" },
+                "Time": { "millis": "5080000", "time": "+22.457" }
+              },
+              {
+                "number": "55",
+                "position": "3",
+                "positionText": "3",
+                "points": "15",
+                "grid": "5",
+                "status": "Finished",
+                "Driver": { "driverId": "sainz", "permanentNumber": "55", "code": "SAI", "givenName": "Carlos", "familyName": "Sainz" },
+                "Constructor": { "constructorId": "ferrari", "name": "Ferrari" },
+                "Time": { "millis": "5120000", "time": "+45.000" }
+              }
+            ]
+          }]
+        }
+      }
+    }
+    """.trimIndent()
+
+    @Test
+    fun `loadPodium derives podium from cached race results when sessionResultsCache is provided`() = runTest {
+        val tempDir = tempFolder.newFolder()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val file = File(tempDir, "cache-state.json")
+        val store = SnapshotStore(
+            DataStoreFactory.create(
+                serializer = CacheStateSerializer,
+                corruptionHandler = ReplaceFileCorruptionHandler { CacheState.Default },
+                scope = scope,
+                produceFile = { file },
+            )
+        )
+
+        // Promote active season with a schedule that defines round 1 race start
+        store.promoteActiveSeason(2026, cacheScheduleSnapshot(2026))
+
+        val jsonConfig = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
+        val mockClient = HttpClient(MockEngine { request ->
+            val path = request.url.encodedPath
+            if (path.contains("/2026/1/results.json")) {
+                respond(
+                    content = threeResultRaceBody(),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                )
+            } else {
+                respondError(HttpStatusCode.NotFound)
+            }
+        }) {
+            expectSuccess = true
+            install(ContentNegotiation) { json(jsonConfig) }
+            defaultRequest { url(JOLPICA_BASE) }
+        }
+
+        // Clock set to well after race completion (race at 15:00Z, buffer 4h → 19:00Z)
+        val cacheClock = object : Clock {
+            override fun now(): Instant = Instant.parse("2026-03-02T20:00:00Z")
+        }
+
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = mockClient,
+            clock = cacheClock,
+            scope = backgroundScope,
+        )
+
+        // Pre-seed the cache by refreshing round 1 race result
+        val refreshResult = repo.refreshSessionResult(
+            2026, 1, SessionType.Race, RefreshReason.StaleOpen
+        )
+        assertEquals(RefreshResult.Success, refreshResult)
+
+        // Verify cached data is available
+        val cached = repo.observeSessionResult(2026, 1, SessionType.Race).first()
+        assertNotNull("Cached race result should exist after refresh", cached)
+        assertEquals("Max Verstappen", cached!!.data.raceResults.first().driverName)
+
+        var podiumUseCaseCalls = 0
+        val oneRaceSeason = SEASON.copy(
+            races = listOf(BAHRAIN),
+            completedGp = 1,
+        )
+        val vm = ScheduleViewModel(
+            getSeason = { Outcome.Success(oneRaceSeason) },
+            getRoundPodium = { _, _, _ ->
+                podiumUseCaseCalls++
+                Outcome.Success(podium(SEASON.races.first { it.round == 1 }))
+            },
+            sessionResultsCache = repo,
+        )
+
+        val collectJob = backgroundScope.launch { vm.uiState.collect {} }
+        val state = vm.uiState.first { uiState ->
+            val sections = uiState as ScheduleViewModel.UiState.Sections
+            sections.podiums[1] != null && sections.podiums[1] !is SectionUiState.Loading
+        } as ScheduleViewModel.UiState.Sections
+        val podium1 = state.podiums[1]
+        assertTrue(
+            "Podium[1] should be Content from cache, was ${podium1}",
+            podium1 is SectionUiState.Content
+        )
+        val content = (podium1 as SectionUiState.Content).data
+        assertEquals(3, content.topThree.size)
+        assertEquals("Max Verstappen", content.topThree[0].driverName)
+        assertEquals("Sergio Pérez", content.topThree[1].driverName)
+        assertEquals("Carlos Sainz", content.topThree[2].driverName)
+        // The getRoundPodium use case should not have been called for round 1
+        // because the podium came from the cached race result.
+        assertEquals("Round 1 podium came from cache, not the use case",
+            0, podiumUseCaseCalls)
+
+        collectJob.cancel()
+        scope.cancel()
+    }
+
+    @Test
+    fun `loadPodium does not fall back to direct podium network when cache gate says session not complete`() = runTest {
+        val tempDir = tempFolder.newFolder()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val file = File(tempDir, "cache-state.json")
+        val store = SnapshotStore(
+            DataStoreFactory.create(
+                serializer = CacheStateSerializer,
+                corruptionHandler = ReplaceFileCorruptionHandler { CacheState.Default },
+                scope = scope,
+                produceFile = { file },
+            )
+        )
+        store.promoteActiveSeason(2026, cacheScheduleSnapshot(2026))
+
+        var cacheNetworkCalls = 0
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = HttpClient(MockEngine {
+                cacheNetworkCalls++
+                respondError(HttpStatusCode.ServiceUnavailable)
+            }) {
+                expectSuccess = true
+                install(ContentNegotiation) { json(kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }) }
+                defaultRequest { url(JOLPICA_BASE) }
+            },
+            // Before the 15:00Z race start + 4h completion buffer.
+            clock = object : Clock {
+                override fun now(): Instant = Instant.parse("2026-03-02T16:00:00Z")
+            },
+            scope = backgroundScope,
+        )
+
+        var podiumUseCaseCalls = 0
+        val vm = ScheduleViewModel(
+            getSeason = { Outcome.Success(SEASON) },
+            getRoundPodium = { _, _, _ ->
+                podiumUseCaseCalls++
+                Outcome.Success(podium(BAHRAIN))
+            },
+            sessionResultsCache = repo,
+        )
+
+        val collectJob = backgroundScope.launch { vm.uiState.collect {} }
+        val state = vm.uiState.first { uiState ->
+            val sections = uiState as ScheduleViewModel.UiState.Sections
+            sections.podiums[1] != null && sections.podiums[1] !is SectionUiState.Loading
+        } as ScheduleViewModel.UiState.Sections
+        assertEquals("direct podium use case must not bypass the cache completion gate", 0, podiumUseCaseCalls)
+        assertTrue(state.podiums[1] is SectionUiState.Error)
+        assertEquals("Session not yet complete", (state.podiums[1] as SectionUiState.Error).message)
+
+        collectJob.cancel()
+        scope.cancel()
     }
 
 }

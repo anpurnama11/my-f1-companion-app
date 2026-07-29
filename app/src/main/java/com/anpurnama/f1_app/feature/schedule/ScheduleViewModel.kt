@@ -16,12 +16,15 @@ import com.anpurnama.f1_app.f1.GetRoundPodiumUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
 import com.anpurnama.f1_app.f1.RoundPodium
 import com.anpurnama.f1_app.f1.cache.SeasonScheduleCacheRepository
+import com.anpurnama.f1_app.f1.cache.SessionResultsCacheRepository
 import com.anpurnama.f1_app.f1.model.Season
+import com.anpurnama.f1_app.f1.model.SessionType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
@@ -44,6 +47,7 @@ class ScheduleViewModel(
     private val observeCachedSeason: Flow<CachedResource<Season>?>? = null,
     private val refreshCachedSeason: (suspend (RefreshReason) -> RefreshResult)? = null,
     private val nowEpochMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    private val sessionResultsCache: SessionResultsCacheRepository? = null,
 ) : ViewModel() {
 
     sealed interface UiState {
@@ -178,6 +182,24 @@ class ScheduleViewModel(
             podiumsState.value[round] is SectionUiState.Content
         ) return
         podiumsState.update { it + (round to SectionUiState.Loading) }
+
+        // Try cache-backed podium derivation when cache is available.
+        if (sessionResultsCache != null) {
+            val refreshResult = sessionResultsCache.refreshSessionResult(year, round, SessionType.Race,
+                if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)
+            val cachedRace = sessionResultsCache.observeSessionResult(year, round, SessionType.Race).first()
+            if (cachedRace != null && cachedRace.data.raceResults.isNotEmpty()) {
+                val sync = cachedRace.toSection(nowEpochMs()).sync
+                val podium = RoundPodium(cachedRace.data.raceResults.take(RoundPodium.PODIUM_SIZE))
+                podiumsState.update { it + (round to SectionUiState.Content(podium, sync)) }
+                return
+            }
+            if (refreshResult is RefreshResult.Failure) {
+                podiumsState.update { it + (round to SectionUiState.Error(refreshResult.message)) }
+                return
+            }
+        }
+
         podiumsState.update { it + (round to getRoundPodium(year, round, forceRefresh).toSection()) }
     }
 }
@@ -186,6 +208,7 @@ fun scheduleViewModelFactory(
     getSeason: GetSeasonUseCase,
     getRoundPodium: GetRoundPodiumUseCase,
     seasonScheduleCacheRepository: SeasonScheduleCacheRepository? = null,
+    sessionResultsCacheRepository: SessionResultsCacheRepository? = null,
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         ScheduleViewModel(
@@ -193,6 +216,7 @@ fun scheduleViewModelFactory(
             getRoundPodium = getRoundPodium::invoke,
             observeCachedSeason = seasonScheduleCacheRepository?.observeCurrentSeason(),
             refreshCachedSeason = seasonScheduleCacheRepository?.let { repo -> repo::refreshCurrentSeason },
+            sessionResultsCache = sessionResultsCacheRepository,
         )
     }
 }

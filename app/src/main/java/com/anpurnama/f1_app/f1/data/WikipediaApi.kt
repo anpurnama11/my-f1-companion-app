@@ -4,6 +4,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.utils.CacheControl
 import io.ktor.http.HttpHeaders
 import io.ktor.http.URLProtocol
 import io.ktor.http.path
@@ -127,16 +128,11 @@ private fun WikipediaSummaryDto.toSummary(): WikipediaSummary = WikipediaSummary
  * the `WikipediaSummary.title` field carries the canonical form
  * (e.g. `"Kimi Antonelli"`, not the input `"Andrea_Kimi_Antonelli"`).
  *
- * No `forceRefresh` flag — the existing `HttpCache` plugin covers
- * re-opens within the Wikipedia `max-age` (typically ~24h on the
- * summary endpoint). Pull-to-refresh on the detail screen
- * re-runs the use case, which re-calls this extension; the cache
- * hit is the expected path. The day-old content is still
- * effectively correct for biographical text. If a future ticket
- * needs force-refresh, add a `forceRefresh: Boolean = false`
- * parameter and the `Cache-Control: no-cache` header on truth —
- * the same shape as the f1api.dev extensions in
- * [`F1Api.kt`](F1Api.kt).
+ * When [forceRefresh] is true, the request carries
+ * `Cache-Control: no-cache` to bypass Ktor's HttpCache, matching
+ * the convention used in [F1Api.kt]. Pull-to-refresh on the
+ * detail screen calls with `forceRefresh = true`; stale-open
+ * refreshes call with the default `false`.
  *
  * The URL is built with `URLBuilder.path()` so the title segment
  * is RFC 3986 path-segment encoded. Unreserved characters
@@ -146,7 +142,10 @@ private fun WikipediaSummaryDto.toSummary(): WikipediaSummary = WikipediaSummary
  * `Andrea_Kimi_Antonelli`) and hyphens (e.g.
  * `Mercedes-Benz_in_Formula_One`); both pass through unchanged.
  */
-suspend fun HttpClient.getWikipediaSummary(title: String): WikipediaSummary {
+suspend fun HttpClient.getWikipediaSummary(
+    title: String,
+    forceRefresh: Boolean = false,
+): WikipediaSummary {
     val response = get {
         url {
             protocol = URLProtocol.HTTPS
@@ -158,6 +157,7 @@ suspend fun HttpClient.getWikipediaSummary(title: String): WikipediaSummary {
             path("api", "rest_v1", "page", "summary", title)
         }
         header(HttpHeaders.UserAgent, WIKIPEDIA_USER_AGENT)
+        if (forceRefresh) header(HttpHeaders.CacheControl, CacheControl.NO_CACHE)
     }
     return response.body<WikipediaSummaryDto>().toSummary()
 }

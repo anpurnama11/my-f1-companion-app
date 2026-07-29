@@ -57,8 +57,8 @@ lode/
       03-cache-current-season-schedule-end-to-end.md   # shipped — cached schedule + schedule-gated promotion/pruning
       04-cache-standings-and-catalogs-end-to-end.md    # shipped — cached standings/catalogs for Leaderboard/My Team/Homepage
       05-cache-next-race-session-end-to-end.md         # shipped — cached next race/session; widget cache remains separate
-      06-cache-session-results-and-race-enrichments.md # ready — cached session results, podium derivation, pitstops
-      07-cache-non-season-detail-resources.md          # ready — cached circuit metadata/most-wins/Wikipedia summaries
+      06-cache-session-results-and-race-enrichments.md # built — SessionResultsCacheRepository + cache-aware SessionResultViewModel and ScheduleViewModel podiums; historical fallback; 13 tests
+      07-cache-non-season-detail-resources.md          # built — NonSeasonResourcesCacheRepository + cache-aware CircuitViewModel; non-season survival; 9 tests; Wikipedia forceRefresh support
       08-wire-fixed-periodic-cache-sync.md             # ready — 12h WorkManager bundle through shared coordinator
       09-offline-cache-validation-and-rollout-hardening.md  # ready — JVM/manual validation gate
     f1app-build/tickets/
