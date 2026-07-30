@@ -275,7 +275,7 @@ class ScheduleViewModelTest {
             refreshCachedSeason = { reason ->
                 refreshReasons += reason
                 cachedSeason.value = cachedSeason(SEASON, RefreshAttemptStatus.Failed("offline"))
-                RefreshResult.Failure("offline")
+                RefreshResult.RetryableFailure("offline")
             },
             nowEpochMs = { 150L },
         )

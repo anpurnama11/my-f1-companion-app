@@ -495,7 +495,7 @@ class SessionResultsCacheRepositoryTest {
         // envelope. Failures are recorded per-key; the test is
         // asserting that ALL sessions in the window were attempted,
         // not that every attempt succeeded.
-        assertEquals(expectedSessions.size + 1, result.succeeded + result.failed)
+        assertEquals(expectedSessions.size + 1, result.entries.size)
         val snapshots = store.state.first().snapshots
         // The Race + Quali snapshots wrote through.
         assertTrue(CacheResourceKeys.sessionResults(2026, 1, SessionType.Race).value in snapshots)
@@ -548,7 +548,7 @@ class SessionResultsCacheRepositoryTest {
         // message for foreground callers; the bundle excludes early).
         assertEquals(0, result.entries.size)
         assertTrue(result.isEmpty)
-        assertEquals(false, result.isTotalFailure())
+        assertEquals(false, result.requiresRetry)
         // No snapshot is written for a future session.
         val cached = repo.observeSessionResult(2026, 1, SessionType.Race).first()
         assertNull("No snapshot should exist for a future session", cached)
@@ -572,7 +572,7 @@ class SessionResultsCacheRepositoryTest {
 
         assertEquals(0, result.entries.size)
         assertTrue(result.isEmpty)
-        assertEquals(false, result.isTotalFailure())
+        assertEquals(false, result.requiresRetry)
         // No new snapshots.
         assertEquals(1, store.state.first().snapshots.size) // only the schedule
         scope.cancel()
@@ -594,7 +594,7 @@ class SessionResultsCacheRepositoryTest {
         // failure — the bundle reports nothing to attempt so the
         // worker does not enter backoff retry.
         assertTrue(result.isEmpty)
-        assertEquals(false, result.isTotalFailure())
+        assertEquals(false, result.requiresRetry)
         scope.cancel()
     }
 

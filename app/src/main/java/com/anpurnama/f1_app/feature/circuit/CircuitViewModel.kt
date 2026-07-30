@@ -117,6 +117,12 @@ class CircuitViewModel(
                 is RefreshResult.Failure -> if (result.message != "Not the active season" &&
                     result.message != "No active season"
                 ) return
+                RefreshResult.Refreshed,
+                RefreshResult.SkippedFresh,
+                RefreshResult.Deferred,
+                is RefreshResult.RetryableFailure,
+                is RefreshResult.PermanentFailure,
+                -> return
             }
         }
         metadataState.value = SectionUiState.Loading
@@ -135,6 +141,12 @@ class CircuitViewModel(
                 is RefreshResult.Failure -> if (result.message != "Not the active season" &&
                     result.message != "No active season"
                 ) return
+                RefreshResult.Refreshed,
+                RefreshResult.SkippedFresh,
+                RefreshResult.Deferred,
+                is RefreshResult.RetryableFailure,
+                is RefreshResult.PermanentFailure,
+                -> return
             }
         }
         mostWinsState.value = SectionUiState.Loading

@@ -6,9 +6,10 @@ package com.anpurnama.f1_app.core.cache
  * periodic tick.
  *
  * A bundle is **best-effort**: per-resource failures are normal.
- * The worker only retries on a total infrastructure failure
- * (`succeeded == 0 && entries.isNotEmpty()`) so exponential backoff
- * does not amplify a partial outage.
+ * During the #67 expand step, migrated current-season outcomes and
+ * legacy session outcomes coexist. [requiresRetry] is the one worker
+ * policy: any migrated retryable failure wins; legacy failures retain
+ * their old retry-only-when-all-legacy-work-failed behavior until #68.
  *
  * Generic over the resource key string to keep this type in
  * `core/cache/` without leaking F1-specific concepts.
@@ -17,17 +18,17 @@ data class BundleRefreshResult(
     val entries: List<Entry>,
 ) {
     val isEmpty: Boolean get() = entries.isEmpty()
-    val succeeded: Int get() = entries.count { it.result is RefreshResult.Success }
-    val failed: Int get() = entries.count { it.result is RefreshResult.Failure }
+    val requiresRetry: Boolean
+        get() = entries.any { it.result is RefreshResult.RetryableFailure } ||
+            legacyTotalFailure()
 
-    /**
-     * True only when at least one resource was attempted and **none**
-     * succeeded. The worker uses this to decide between
-     * `Result.success()` (partial failure, keep going) and
-     * `Result.retry()` (transient infrastructure failure, defer to
-     * backoff).
-     */
-    fun isTotalFailure(): Boolean = entries.isNotEmpty() && succeeded == 0
+    private fun legacyTotalFailure(): Boolean {
+        val hasLegacyFailure = entries.any { it.result is RefreshResult.Failure }
+        val hasSuccessfulWrite = entries.any {
+            it.result is RefreshResult.Refreshed || it.result is RefreshResult.Success
+        }
+        return hasLegacyFailure && !hasSuccessfulWrite
+    }
 
     data class Entry(
         val key: String,

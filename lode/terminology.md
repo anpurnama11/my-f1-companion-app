@@ -10,6 +10,8 @@ Domain + project language. One term, one tight definition, rejected synonyms.
 
 **Outcome\<T\>** — sealed data-layer result type returned by use cases: `Success(data)`, `Failure(errorMessage)`, `Loading`. Lives at `core/Outcome.kt`. Stops at the VM boundary; composables never import it (ADR 0002). See: [practices.md](practices.md) §Outcome boundary.
 
+**RefreshResult** — cache-refresh report that distinguishes a persisted `Refreshed` payload, neutral `SkippedFresh`/`Deferred` work, and `RetryableFailure`/`PermanentFailure`; temporary legacy `Success`/`Failure` variants remain only for session and non-season resources pending issues #68/#69. Avoid: refresh status (ambiguous with `ContentSyncStatus`), network result (skips are not network attempts).
+
 **SectionUiState\<T\>** — VM→UI transport for a screen section: `Loading`, `Error(message)`, `Content(data, sync)`. Cache-aware `Content` carries `ContentSyncStatus` so stale/refreshing content stays visible (ADR 0018). See: [practices.md](practices.md) §Outcome boundary.
 
 **ContentSyncStatus** — non-destructive cache/refresh marker on `SectionUiState.Content`: `Fresh`, `Stale`, `Refreshing`, `RefreshFailed(message)`. Avoid: treating stale refresh as `Error`, which would blank valid cached content.

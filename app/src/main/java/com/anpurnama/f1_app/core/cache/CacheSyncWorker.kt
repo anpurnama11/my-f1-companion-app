@@ -32,14 +32,12 @@ import java.util.concurrent.TimeUnit
  * a transient schedule failure does not strand the worker.
  *
  * Worker result policy:
- * - `Result.success()` for any partial success (the bundle worked at
- *   least once), so the next 12h tick — not a retry — advances.
- * - `Result.retry()` only when **no** resource succeeded AND a refresh
- *   was attempted (e.g. total infrastructure failure: store I/O
- *   failure before any resource attempt, or a network/server outage
- *   that prevents every resource from reaching its normal per-resource
- *   failure boundary). WorkManager's exponential backoff then defers
- *   the retry.
+ * - `Result.retry()` when any migrated current-season resource reports
+ *   a retryable failure, even if other writes succeeded or snapshots
+ *   were fresh. Successful writes remain committed and TTL-skip later.
+ * - Fresh skips, deferred work, and permanent failures are neutral.
+ * - Session resources temporarily retain their legacy all-failed retry
+ *   policy until issue #68 migrates them.
  *
  * Resource selection is the repositories' `refreshCurrentSeasonBundle`
  * methods; this worker is orchestration only.
@@ -156,22 +154,10 @@ class CacheSyncWorker(
  * worker tick, return the [ListenableWorker.Result] WorkManager
  * should record.
  *
- * The three-way split is deliberate:
- * - **Empty** (off-season / no active season / no cached schedule /
- *   no plausibly-complete sessions): `Result.success()`. Nothing was
- *   attempted, so there is nothing to retry; the next 12h tick
- *   re-evaluates against fresh state. A "no active season" or "no
- *   schedule" entry is **not** recorded as a failure — that would
- *   loop WorkManager's backoff forever during the off-season and
- *   during the schedule-promotion gap.
- * - **At least one resource succeeded**: `Result.success()`. Partial
- *   or full success; the next 12h tick advances.
- * - **At least one resource was attempted and all failed**:
- *   `Result.retry()`. Transient infrastructure failure; WorkManager's
- *   exponential backoff defers the next attempt. Includes the
- *   "schedule refresh failed on a pre-promotion device" case, where
- *   the bundles returned empty (no active season yet) and the
- *   schedule entry is the only failed attempt.
+ * Empty and neutral-only aggregates advance to the next fixed tick.
+ * Any migrated retryable failure requests WorkManager backoff. The
+ * aggregate also preserves the pre-#68 legacy session rule: retry only
+ * when legacy failures have no successful write beside them.
  *
  * Exposed at the file level (not on the worker companion) so the
  * JVM unit tests can exercise the decision matrix without a
@@ -179,6 +165,6 @@ class CacheSyncWorker(
  */
 internal fun decideWorkerResult(aggregate: BundleRefreshResult): ListenableWorker.Result = when {
     aggregate.isEmpty -> ListenableWorker.Result.success()
-    aggregate.isTotalFailure() -> ListenableWorker.Result.retry()
+    aggregate.requiresRetry -> ListenableWorker.Result.retry()
     else -> ListenableWorker.Result.success()
 }

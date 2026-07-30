@@ -1,11 +1,14 @@
 # Offline data cache
 
-F1app's offline structured-data cache is a single-season, typed resource snapshot store backed by a Proto DataStore-style `CacheState.snapshots` map. The store foundation is built in `core/cache`: `CacheState`, `ResourceSnapshot`, `RefreshAttemptStatus`, `BundleRefreshResult`, `CacheStateSerializer`, and `SnapshotStore` provide durable JSON serialization, corruption-handler recovery, atomic snapshot writes, per-key observation with stable equality, failed-attempt metadata updates, a generic per-resource bundle aggregate (`BundleRefreshResult` with `isTotalFailure()` for worker retry decisions), and active-season promotion gated to the canonical `season:<year>:schedule` / `season.schedule` snapshot with season-scoped pruning. F1 resource contracts live in `f1/cache/CacheResourceKeys` as stable string keys for current-season schedule, next race/session, standings, catalogs, session results, pitstops, circuit metadata, circuit most-wins, and Wikipedia summaries. The UI reads durable structured API data from typed resource snapshots; Room `cached_resource` snapshot rows are a measured fallback only if payload volume, stale scans, write contention, or future indexed local queries prove the map substrate wrong. The cache is not a fully normalized F1 domain database unless screens need local joins, sorting, or filtering over fields inside payloads. Network refreshes validate payloads and write through the store, while Ktor `HttpCache` remains only a transport optimization. Season rollover is schedule-gated: only a valid f1api.dev `/current` schedule can promote a new active season. The store enforces the schedule resource contract (`season:<year>:schedule`, `season.schedule`) before that atomic promotion prunes old season-scoped standings, results, and catalogs immediately. Non-season resources such as circuit metadata, circuit most-wins, and Wikipedia summaries may remain because their keys are not tied to the active season.
+F1app's offline structured-data cache is a single-season, typed resource snapshot store backed by a Proto DataStore-style `CacheState.snapshots` map. The store foundation is built in `core/cache`: `CacheState`, `ResourceSnapshot`, `RefreshAttemptStatus`, `BundleRefreshResult`, `CacheStateSerializer`, and `SnapshotStore` provide durable JSON serialization, corruption-handler recovery, atomic snapshot writes, per-key observation with stable equality, failed-attempt metadata updates, a generic per-resource bundle aggregate (`BundleRefreshResult.requiresRetry` owns worker retry decisions), and active-season promotion gated to the canonical `season:<year>:schedule` / `season.schedule` snapshot with season-scoped pruning. F1 resource contracts live in `f1/cache/CacheResourceKeys` as stable string keys for current-season schedule, next race/session, standings, catalogs, session results, pitstops, circuit metadata, circuit most-wins, and Wikipedia summaries. The UI reads durable structured API data from typed resource snapshots; Room `cached_resource` snapshot rows are a measured fallback only if payload volume, stale scans, write contention, or future indexed local queries prove the map substrate wrong. The cache is not a fully normalized F1 domain database unless screens need local joins, sorting, or filtering over fields inside payloads. Network refreshes validate payloads and write through the store, while Ktor `HttpCache` remains only a transport optimization. Season rollover is schedule-gated: only a valid f1api.dev `/current` schedule can promote a new active season. The store enforces the schedule resource contract (`season:<year>:schedule`, `season.schedule`) before that atomic promotion prunes old season-scoped standings, results, and catalogs immediately. Non-season resources such as circuit metadata, circuit most-wins, and Wikipedia summaries may remain because their keys are not tied to the active season.
 
 The current-season schedule is cached end to end through
 `SeasonScheduleCacheRepository`. Homepage and Schedule observe
 `CachedResource<Season>` from the snapshot store and call
-`refreshCurrentSeason(StaleOpen|PullToRefresh)` for network attempts. Round
+`refreshCurrentSeason(StaleOpen|PullToRefresh)` for network attempts. A write
+returns `Refreshed`, a fresh TTL gate returns `SkippedFresh`, and classified
+failures preserve the compatible snapshot while recording failed-attempt
+metadata. Round
 detail observes the same cache only when the cached season matches the route
 `year`; it gates from the observed snapshot value, not from mutable UI state, so
 a delayed DataStore emission can still render cached content before network. It
@@ -38,11 +41,13 @@ recorded as a failed attempt and is not written under the old key. Homepage,
 Leaderboard, and My Team observe cached standings; Homepage also observes cached
 next race/session. My Team warms driver and team catalogs as production
 resources for picker/detail joins that need the season catalog generation. The
-Countdown widget still reads its separate typed-key `NextRaceCache`.
+Countdown widget still reads its separate typed-key `NextRaceCache`. These
+current-season resources use truthful outcomes; session-result/pitstop and
+non-season repositories retain legacy binary outcomes until issues #68/#69.
 
 ```kotlin
-currentResources.refreshDriverStandings(RefreshReason.StaleOpen)
-currentResources.refreshNextRace(RefreshReason.PullToRefresh)
+currentResources.refreshDriverStandings(RefreshReason.StaleOpen) // Refreshed or SkippedFresh
+currentResources.refreshNextRace(RefreshReason.PullToRefresh)    // always attempts
 // Empty race array decodes to CachedResource<NextRace?>(data = null, snapshot)
 ```
 

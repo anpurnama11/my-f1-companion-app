@@ -25,6 +25,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -80,7 +81,7 @@ class SeasonScheduleCacheRepositoryTest {
 
         val result = repo.refreshCurrentSeason(RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val state = store.state.first()
         assertEquals(2026, state.activeSeason)
         val snapshot = state.snapshots.getValue(CacheResourceKeys.currentSeasonSchedule(2026).value)
@@ -102,7 +103,7 @@ class SeasonScheduleCacheRepositoryTest {
         val failing = SeasonScheduleCacheRepository(store, client { respondError(HttpStatusCode.ServiceUnavailable) }, FixedClock(2_000))
         val result = failing.refreshCurrentSeason(RefreshReason.PullToRefresh)
 
-        assertEquals(RefreshResult.Failure("Server error (503)"), result)
+        assertEquals(RefreshResult.RetryableFailure("Server error (503)"), result)
         val cached = failing.observeCurrentSeason().first()!!
         assertEquals("Bahrain GP", cached.data.races.single().name)
         assertEquals(2_000L, cached.snapshot.lastAttemptEpochMs)
@@ -132,17 +133,65 @@ class SeasonScheduleCacheRepositoryTest {
     fun `overlapping refreshes share one network call`() = runTest {
         val (store, scope) = newStore()
         var calls = 0
+        val requestStarted = CompletableDeferred<Unit>()
+        val releaseRequest = CompletableDeferred<Unit>()
         val repo = SeasonScheduleCacheRepository(store, client {
             calls++
+            requestStarted.complete(Unit)
+            releaseRequest.await()
             jsonOk(scheduleBody(2026))
         }, FixedClock(1_000), scope = backgroundScope)
 
         val first = async { repo.refreshCurrentSeason(RefreshReason.StaleOpen) }
+        requestStarted.await()
         val second = async { repo.refreshCurrentSeason(RefreshReason.Periodic) }
+        releaseRequest.complete(Unit)
 
-        assertEquals(RefreshResult.Success, first.await())
-        assertEquals(RefreshResult.Success, second.await())
+        assertEquals(RefreshResult.Refreshed, first.await())
+        assertEquals(RefreshResult.Refreshed, second.await())
         assertEquals(1, calls)
+        scope.cancel()
+    }
+
+    @Test
+    fun `fresh TTL skip is reported without a network request`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, snapshot(2026).copy(staleAfterEpochMs = 2_000L))
+        var calls = 0
+        val repo = SeasonScheduleCacheRepository(store, client {
+            calls++
+            jsonOk(scheduleBody(2026))
+        }, FixedClock(1_000))
+
+        val result = repo.refreshCurrentSeason(RefreshReason.Periodic)
+
+        assertEquals(RefreshResult.SkippedFresh, result)
+        assertEquals(0, calls)
+        scope.cancel()
+    }
+
+    @Test
+    fun `HTTP 404 is permanent while HTTP 408 is retryable`() = runTest {
+        val (store, scope) = newStore()
+        val permanent = SeasonScheduleCacheRepository(
+            store,
+            client { respondError(HttpStatusCode.NotFound) },
+            FixedClock(1_000),
+        )
+        val retryable = SeasonScheduleCacheRepository(
+            store,
+            client { respondError(HttpStatusCode.RequestTimeout) },
+            FixedClock(2_000),
+        )
+
+        assertEquals(
+            RefreshResult.PermanentFailure("Request failed (404)"),
+            permanent.refreshCurrentSeason(RefreshReason.PullToRefresh),
+        )
+        assertEquals(
+            RefreshResult.RetryableFailure("Request failed (408)"),
+            retryable.refreshCurrentSeason(RefreshReason.PullToRefresh),
+        )
         scope.cancel()
     }
 

@@ -88,7 +88,7 @@ class CurrentSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshDriverStandings(RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observeDriverStandings().first()!!
         assertEquals(emptyList<Any>(), cached.data)
         assertEquals(CacheResourceKeys.driverStandings(2026).value, cached.snapshot.key)
@@ -111,7 +111,7 @@ class CurrentSeasonResourcesCacheRepositoryTest {
         )
         val result = failing.refreshDriverStandings(RefreshReason.PullToRefresh)
 
-        assertEquals(RefreshResult.Failure("Server error (503)"), result)
+        assertEquals(RefreshResult.RetryableFailure("Server error (503)"), result)
         val cached = failing.observeDriverStandings().first()!!
         assertEquals("Max Verstappen", cached.data.single().driverName)
         assertEquals(2_000L, cached.snapshot.lastAttemptEpochMs)
@@ -131,7 +131,7 @@ class CurrentSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshNextRace(RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observeNextRace().first()!!
         assertEquals(null, cached.data)
         assertEquals(CacheResourceKeys.nextRaceSession(2026).value, cached.snapshot.key)
@@ -150,7 +150,7 @@ class CurrentSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshNextRace(RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Failure("Invalid season.next-race-session payload"), result)
+        assertEquals(RefreshResult.RetryableFailure("Invalid season.next-race-session payload"), result)
         assertEquals(null, repo.observeNextRace().first())
         assertTrue(CacheResourceKeys.nextRaceSession(2026).value !in store.state.first().snapshots)
         scope.cancel()
@@ -173,8 +173,8 @@ class CurrentSeasonResourcesCacheRepositoryTest {
             clock = FixedClock(1_000),
         )
 
-        assertEquals(RefreshResult.Success, repo.refreshDriverCatalog(RefreshReason.StaleOpen))
-        assertEquals(RefreshResult.Success, repo.refreshTeamCatalog(RefreshReason.StaleOpen))
+        assertEquals(RefreshResult.Refreshed, repo.refreshDriverCatalog(RefreshReason.StaleOpen))
+        assertEquals(RefreshResult.Refreshed, repo.refreshTeamCatalog(RefreshReason.StaleOpen))
 
         assertTrue(CacheResourceKeys.driverCatalog(2026).value in store.state.first().snapshots)
         assertTrue(CacheResourceKeys.constructorCatalog(2026).value in store.state.first().snapshots)
@@ -199,7 +199,7 @@ class CurrentSeasonResourcesCacheRepositoryTest {
             clock = FixedClock(1_000),
         )
 
-        assertEquals(RefreshResult.Success, repo.refreshConstructorStandings(RefreshReason.StaleOpen))
+        assertEquals(RefreshResult.Refreshed, repo.refreshConstructorStandings(RefreshReason.StaleOpen))
 
         assertTrue(requestedUrl.endsWith("/2026/constructorStandings.json"))
         scope.cancel()
@@ -220,9 +220,8 @@ class CurrentSeasonResourcesCacheRepositoryTest {
         val result = repo.refreshCurrentSeasonBundle()
 
         assertEquals(5, result.entries.size)
-        assertEquals(5, result.succeeded)
-        assertEquals(0, result.failed)
-        assertEquals(false, result.isTotalFailure())
+        assertEquals(5, result.entries.count { it.result is RefreshResult.Refreshed })
+        assertEquals(false, result.requiresRetry)
         val snapshots = store.state.first().snapshots
         assertTrue(CacheResourceKeys.nextRaceSession(2026).value in snapshots)
         assertTrue(CacheResourceKeys.driverStandings(2026).value in snapshots)
@@ -252,11 +251,11 @@ class CurrentSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshCurrentSeasonBundle()
 
-        // 4 succeeded, 1 failed — partial failure.
+        // Four writes stand even though the retryable failure requires backoff.
         assertEquals(5, result.entries.size)
-        assertEquals(4, result.succeeded)
-        assertEquals(1, result.failed)
-        assertEquals(false, result.isTotalFailure())
+        assertEquals(4, result.entries.count { it.result is RefreshResult.Refreshed })
+        assertEquals(1, result.entries.count { it.result is RefreshResult.RetryableFailure })
+        assertEquals(true, result.requiresRetry)
         val snapshots = store.state.first().snapshots
         // The 4 successful resources wrote their snapshots.
         assertTrue(CacheResourceKeys.nextRaceSession(2026).value in snapshots)
@@ -281,9 +280,8 @@ class CurrentSeasonResourcesCacheRepositoryTest {
         val result = repo.refreshCurrentSeasonBundle()
 
         assertEquals(5, result.entries.size)
-        assertEquals(0, result.succeeded)
-        assertEquals(5, result.failed)
-        assertEquals(true, result.isTotalFailure())
+        assertEquals(5, result.entries.count { it.result is RefreshResult.RetryableFailure })
+        assertEquals(true, result.requiresRetry)
         // The pre-existing schedule snapshot survives; the five bundle
         // resources did not write any new snapshots.
         val snapshots = store.state.first().snapshots
@@ -312,7 +310,7 @@ class CurrentSeasonResourcesCacheRepositoryTest {
         val result = repo.refreshCurrentSeasonBundle()
 
         assertTrue(result.isEmpty)
-        assertEquals(false, result.isTotalFailure())
+        assertEquals(false, result.requiresRetry)
         // The five resource keys were never written.
         assertEquals(0, store.state.first().snapshots.size)
         scope.cancel()
@@ -350,7 +348,7 @@ class CurrentSeasonResourcesCacheRepositoryTest {
         // network call. PullToRefresh is the only reason that bypasses.
         val result = repo.refreshDriverStandings(RefreshReason.Periodic)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.SkippedFresh, result)
         assertEquals("Periodic must not refresh a fresh snapshot", 0, calls)
         scope.cancel()
     }
@@ -381,7 +379,7 @@ class CurrentSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshDriverStandings(RefreshReason.Periodic)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         assertEquals(1, calls)
         scope.cancel()
     }
@@ -412,8 +410,57 @@ class CurrentSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshDriverStandings(RefreshReason.PullToRefresh)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         assertEquals("PullToRefresh must always bypass the TTL gate", 1, calls)
+        scope.cancel()
+    }
+
+    @Test
+    fun `resource refresh without an active season is permanent for this invocation`() = runTest {
+        val (store, scope) = newStore()
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client { error("network must not run") },
+            clock = FixedClock(1_000),
+        )
+
+        val result = repo.refreshDriverStandings(RefreshReason.StaleOpen)
+
+        assertEquals(RefreshResult.PermanentFailure("No active season cache"), result)
+        scope.cancel()
+    }
+
+    @Test
+    fun `resource refresh reports retryable schedule discovery failure`() = runTest {
+        val (store, scope) = newStore()
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client { error("resource network must not run") },
+            clock = FixedClock(1_000),
+            refreshScheduleIfMissing = {
+                RefreshResult.RetryableFailure("schedule offline")
+            },
+        )
+
+        val result = repo.refreshDriverStandings(RefreshReason.StaleOpen)
+
+        assertEquals(RefreshResult.RetryableFailure("schedule offline"), result)
+        scope.cancel()
+    }
+
+    @Test
+    fun `HTTP 404 resource refresh is permanent`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026))
+        val repo = CurrentSeasonResourcesCacheRepository(
+            store = store,
+            client = client { respondError(HttpStatusCode.NotFound) },
+            clock = FixedClock(1_000),
+        )
+
+        val result = repo.refreshDriverStandings(RefreshReason.PullToRefresh)
+
+        assertEquals(RefreshResult.PermanentFailure("Request failed (404)"), result)
         scope.cancel()
     }
 

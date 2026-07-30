@@ -103,6 +103,12 @@ class SessionResultViewModel(
                 is RefreshResult.Failure -> if (result.message != "Not the active season" &&
                     result.message != "No active season"
                 ) return
+                RefreshResult.Refreshed,
+                RefreshResult.SkippedFresh,
+                RefreshResult.Deferred,
+                is RefreshResult.RetryableFailure,
+                is RefreshResult.PermanentFailure,
+                -> return
             }
         }
         resultState.value = SectionUiState.Loading
@@ -121,6 +127,12 @@ class SessionResultViewModel(
                 is RefreshResult.Failure -> if (result.message != "Not the active season" &&
                     result.message != "No active season"
                 ) return
+                RefreshResult.Refreshed,
+                RefreshResult.SkippedFresh,
+                RefreshResult.Deferred,
+                is RefreshResult.RetryableFailure,
+                is RefreshResult.PermanentFailure,
+                -> return
             }
         }
         pitstopState.value = SectionUiState.Loading

@@ -2,17 +2,17 @@ package com.anpurnama.f1_app.f1.cache
 
 import com.anpurnama.f1_app.core.cache.CachedResource
 import com.anpurnama.f1_app.core.cache.RefreshAttemptStatus
+import com.anpurnama.f1_app.core.cache.RefreshFailureClassifier
 import com.anpurnama.f1_app.core.cache.RefreshReason
 import com.anpurnama.f1_app.core.cache.RefreshResult
 import com.anpurnama.f1_app.core.cache.ResourceSnapshot
 import com.anpurnama.f1_app.core.cache.SnapshotStore
+import com.anpurnama.f1_app.core.cache.failureMessageOrNull
 import com.anpurnama.f1_app.f1.data.SeasonResponseDto
 import com.anpurnama.f1_app.f1.data.getCurrent
 import com.anpurnama.f1_app.f1.model.Season
 import com.anpurnama.f1_app.f1.toSeason
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.ServerResponseException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
@@ -52,7 +52,7 @@ class SeasonScheduleCacheRepository(
         // active-season promotion authority, so the worker also uses
         // this gate — a fresh schedule is a fresh schedule.
         if (reason !is RefreshReason.PullToRefresh && currentCachedSeason()?.isStale(clock.now().toEpochMilliseconds()) == false) {
-            return RefreshResult.Success
+            return RefreshResult.SkippedFresh
         }
         val existing = mutex.withLock {
             inFlight?.takeIf { it.isActive } ?: scope.async {
@@ -76,9 +76,10 @@ class SeasonScheduleCacheRepository(
             val dto = client.getCurrent(forceRefresh = reason is RefreshReason.PullToRefresh)
             val season = dto.toSeason()
             if (!season.isValidCurrentSchedule()) {
-                val message = "Invalid current-season schedule"
-                recordFailure(attemptedAt, message)
-                return RefreshResult.Failure(message)
+                return fail(
+                    attemptedAt,
+                    RefreshResult.RetryableFailure("Invalid current-season schedule"),
+                )
             }
             val key = CacheResourceKeys.currentSeasonSchedule(season.year)
             val snapshot = ResourceSnapshot(
@@ -93,19 +94,20 @@ class SeasonScheduleCacheRepository(
                 lastAttemptStatus = RefreshAttemptStatus.Succeeded,
             )
             store.promoteActiveSeason(season.year, snapshot)
-            RefreshResult.Success
-        } catch (e: ClientRequestException) {
-            fail(attemptedAt, "Request failed (${e.response.status.value})")
-        } catch (e: ServerResponseException) {
-            fail(attemptedAt, "Server error (${e.response.status.value})")
-        } catch (e: Exception) {
-            fail(attemptedAt, e.message ?: "Network error")
+            RefreshResult.Refreshed
+        } catch (throwable: Throwable) {
+            fail(attemptedAt, RefreshFailureClassifier.classify(throwable))
         }
     }
 
-    private suspend fun fail(attemptedAt: Long, message: String): RefreshResult.Failure {
-        recordFailure(attemptedAt, message)
-        return RefreshResult.Failure(message)
+    private suspend fun fail(attemptedAt: Long, result: RefreshResult): RefreshResult {
+        val message = requireNotNull(result.failureMessageOrNull)
+        return try {
+            recordFailure(attemptedAt, message)
+            result
+        } catch (throwable: Throwable) {
+            RefreshFailureClassifier.classify(throwable)
+        }
     }
 
     private suspend fun recordFailure(attemptedAt: Long, message: String) {

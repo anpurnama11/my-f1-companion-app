@@ -9,6 +9,7 @@ import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.core.cache.CachedResource
 import com.anpurnama.f1_app.core.cache.RefreshReason
 import com.anpurnama.f1_app.core.cache.RefreshResult
+import com.anpurnama.f1_app.core.cache.failureMessageOrNull
 import com.anpurnama.f1_app.core.ui.ContentSyncStatus
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.core.ui.toSection
@@ -151,7 +152,10 @@ class RoundViewModel(
                 seasonState.value = SectionUiState.Loading
             }
             val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)
-            if (result is RefreshResult.Success) {
+            if (result is RefreshResult.Refreshed ||
+                result is RefreshResult.SkippedFresh ||
+                result is RefreshResult.Success
+            ) {
                 val refreshed = observeCachedSeason.first()
                 if (refreshed?.data?.year == year) {
                     seasonState.value = refreshed.toSection(now().toEpochMilliseconds())
@@ -159,12 +163,13 @@ class RoundViewModel(
                     loadYearSpecificSeason(forceRefresh)
                 }
             }
-            if (result is RefreshResult.Failure) {
+            val failureMessage = result.failureMessageOrNull
+            if (failureMessage != null) {
                 val current = seasonState.value
                 seasonState.value = if (current is SectionUiState.Content) {
-                    current.copy(sync = ContentSyncStatus.RefreshFailed(result.message))
+                    current.copy(sync = ContentSyncStatus.RefreshFailed(failureMessage))
                 } else {
-                    SectionUiState.Error(result.message)
+                    SectionUiState.Error(failureMessage)
                 }
             }
             return

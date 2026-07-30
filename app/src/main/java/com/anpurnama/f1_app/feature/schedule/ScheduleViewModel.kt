@@ -9,8 +9,9 @@ import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.core.cache.CachedResource
 import com.anpurnama.f1_app.core.cache.RefreshReason
 import com.anpurnama.f1_app.core.cache.RefreshResult
-import com.anpurnama.f1_app.core.ui.ContentSyncStatus
+import com.anpurnama.f1_app.core.cache.failureMessageOrNull
 import com.anpurnama.f1_app.core.ui.SectionUiState
+import com.anpurnama.f1_app.core.ui.refreshCachedSection
 import com.anpurnama.f1_app.core.ui.toSection
 import com.anpurnama.f1_app.f1.GetRoundPodiumUseCase
 import com.anpurnama.f1_app.f1.GetSeasonUseCase
@@ -121,24 +122,10 @@ class ScheduleViewModel(
     private suspend fun loadSeason(forceRefresh: Boolean) {
         val refresh = refreshCachedSeason
         if (observeCachedSeason != null && refresh != null) {
-            if (seasonState.value is SectionUiState.Content) {
-                seasonState.value = (seasonState.value as SectionUiState.Content<Season>).copy(sync = ContentSyncStatus.Refreshing)
-            } else {
-                seasonState.value = SectionUiState.Loading
-            }
-            val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)
-            if (result is RefreshResult.Success && seasonState.value is SectionUiState.Content) {
-                seasonState.value = (seasonState.value as SectionUiState.Content<Season>).copy(sync = ContentSyncStatus.Fresh)
-            }
-            if (result is RefreshResult.Failure) {
-                val current = seasonState.value
-                if (current is SectionUiState.Content) {
-                    seasonState.value = current.copy(sync = ContentSyncStatus.RefreshFailed(result.message))
-                } else {
-                    seasonState.value = SectionUiState.Error(result.message)
-                    yearState.value = 0
-                    podiumsState.value = emptyMap()
-                }
+            val result = seasonState.refreshCachedSection(forceRefresh, refresh)
+            if (result.failureMessageOrNull != null && seasonState.value !is SectionUiState.Content) {
+                yearState.value = 0
+                podiumsState.value = emptyMap()
             }
             return
         }

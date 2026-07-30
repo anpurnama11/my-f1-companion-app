@@ -87,10 +87,10 @@ class LeaderboardViewModelTest {
             observeCachedDrivers = cachedDrivers,
             refreshCachedDrivers = { reason ->
                 assertEquals(RefreshReason.StaleOpen, reason)
-                RefreshResult.Failure("offline")
+                RefreshResult.RetryableFailure("offline")
             },
             observeCachedConstructors = cachedConstructors,
-            refreshCachedConstructors = { RefreshResult.Success },
+            refreshCachedConstructors = { RefreshResult.SkippedFresh },
             nowEpochMs = { 1_000L },
         )
 

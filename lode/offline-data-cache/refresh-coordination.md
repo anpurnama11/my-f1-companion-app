@@ -20,24 +20,26 @@ network for stale (or missing) snapshots, plus any force-refresh the user
 initiates. The session bundle's eligibility filter
 is a coarse ±48h discovery hint; the per-session plausibly-complete gate
 (start + per-session buffer) is the authoritative filter, so a future session
-inside the window is still excluded. Success and failure remain resource-scoped;
+inside the window is still excluded. Outcomes remain resource-scoped;
 partial failures record attempt metadata and never roll back successful writes
 or delete old payloads. Foreground and worker refreshes share per-resource
 single-flight gates.
 
-Worker result policy (the retry decision is a deliberate three-way split, not
-a binary on failure):
+Worker result policy during the current-season expansion:
 - **Empty bundle** (off-season, no active season, no cached schedule, no
   plausibly-complete sessions in window) → `Result.success()`. Nothing was
   attempted, so there is nothing to retry. The next 12h tick re-evaluates
   against fresh state. A "no active season" or "no schedule" entry is
   **not** recorded as a failure — that would loop WorkManager's backoff
   forever during the off-season and during the schedule-promotion gap.
-- **At least one resource succeeded** → `Result.success()`. Partial or
-  full success; the next 12h tick advances.
-- **At least one resource was attempted and all failed** →
-  `Result.retry()`. Transient infrastructure failure; WorkManager's
-  exponential backoff defers the next attempt.
+- **Any migrated `RetryableFailure`** → `Result.retry()`, even beside
+  `Refreshed` or `SkippedFresh`. Successful writes remain committed and skip
+  on the retry while fresh.
+- **Only `SkippedFresh`, `Deferred`, or `PermanentFailure`** →
+  `Result.success()`. These outcomes are neutral for immediate retry.
+- **Legacy session outcomes** retain the prior rule: legacy failures retry only
+  when no `Refreshed` or legacy `Success` appears in the aggregate. Issue #68
+  removes this branch; issue #69 removes the legacy variants.
 
 ```kotlin
 // core/cache/CacheSyncWorker.kt — platform worker, NOT in f1/.
@@ -48,34 +50,33 @@ a binary on failure):
 class CacheSyncWorker(...) : CoroutineWorker(...) {
     override suspend fun doWork(): Result {
         val wiring = (applicationContext as F1App).wiring
-        // 1. Atomic active-season promotion (schedule = rollover guard).
-        //    The schedule entry is included in the aggregate so a
-        //    failed schedule on a pre-promotion device is not
-        //    mis-classified as off-season.
         val schedule = BundleRefreshResult(listOf(
             BundleRefreshResult.Entry("season-schedule",
                 runCatching {
                     wiring.seasonScheduleCacheRepository.refreshCurrentSeason(RefreshReason.Periodic)
-                }.getOrElse { RefreshResult.Failure(it.message ?: "Schedule refresh error") }),
+                }.getOrElse(RefreshFailureClassifier::classify)),
         ))
         val now = Clock.System.now()
-        // 2. Next race + standings + catalogs bundle.
         val resources = runCatching {
             wiring.currentSeasonResourcesCacheRepository.refreshCurrentSeasonBundle()
-        }.getOrElse { /* wrap as BundleRefreshResult.Failure */ }
-        // 3. Plausibly-complete session result + pitstop bundle.
+        }.getOrElse { error ->
+            BundleRefreshResult(listOf(BundleRefreshResult.Entry("current-season-resources-bundle", RefreshFailureClassifier.classify(error))))
+        }
         val sessions = runCatching {
             wiring.sessionResultsCacheRepository.refreshCurrentSeasonBundle(now)
-        }.getOrElse { /* wrap as BundleRefreshResult.Failure */ }
+        }.getOrElse { error ->
+            BundleRefreshResult(listOf(BundleRefreshResult.Entry("current-season-sessions-bundle",
+                RefreshResult.Failure(error.message ?: "Bundle refresh error")))) // legacy all-throwable wrapper: #68
+        }
         return decideWorkerResult(schedule + resources + sessions)
     }
 }
 
 // Pure decision extracted for testability (no WorkManager harness needed).
 internal fun decideWorkerResult(aggregate: BundleRefreshResult): ListenableWorker.Result = when {
-    aggregate.isEmpty -> Result.success()                  // off-season re-eval
-    aggregate.isTotalFailure() -> Result.retry()           // transient infra failure
-    else -> Result.success()                               // partial or full success
+    aggregate.isEmpty -> Result.success()
+    aggregate.requiresRetry -> Result.retry()
+    else -> Result.success()
 }
 
 fun CurrentSeasonResourcesCacheRepository.refreshCurrentSeasonBundle(): BundleRefreshResult {
@@ -96,9 +97,9 @@ fun SessionResultsCacheRepository.refreshCurrentSeasonBundle(now: Instant): Bund
 }
 
 data class BundleRefreshResult(val entries: List<Entry>) {
-    val succeeded: Int get() = entries.count { it.result is RefreshResult.Success }
-    val failed: Int get() = entries.count { it.result is RefreshResult.Failure }
-    fun isTotalFailure(): Boolean = entries.isNotEmpty() && succeeded == 0
+    val requiresRetry: Boolean
+        get() = entries.any { it.result is RefreshResult.RetryableFailure } ||
+            legacyTotalFailure()
     data class Entry(val key: String, val result: RefreshResult)
     companion object { val Empty: BundleRefreshResult = BundleRefreshResult(emptyList()) }
 }

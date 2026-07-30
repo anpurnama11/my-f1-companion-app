@@ -4,10 +4,12 @@ import com.anpurnama.f1_app.core.cache.BundleRefreshResult
 import com.anpurnama.f1_app.core.cache.CacheResourceKey
 import com.anpurnama.f1_app.core.cache.CachedResource
 import com.anpurnama.f1_app.core.cache.RefreshAttemptStatus
+import com.anpurnama.f1_app.core.cache.RefreshFailureClassifier
 import com.anpurnama.f1_app.core.cache.RefreshReason
 import com.anpurnama.f1_app.core.cache.RefreshResult
 import com.anpurnama.f1_app.core.cache.ResourceSnapshot
 import com.anpurnama.f1_app.core.cache.SnapshotStore
+import com.anpurnama.f1_app.core.cache.failureMessageOrNull
 import com.anpurnama.f1_app.f1.data.CurrentDriversResponseDto
 import com.anpurnama.f1_app.f1.data.CurrentTeamsResponseDto
 import com.anpurnama.f1_app.f1.data.JolpicaConstructorStandingsResponseDto
@@ -25,13 +27,10 @@ import com.anpurnama.f1_app.f1.toConstructorStandings
 import com.anpurnama.f1_app.f1.toDriverStandings
 import com.anpurnama.f1_app.f1.toNextRace
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.ServerResponseException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -141,7 +140,7 @@ class CurrentSeasonResourcesCacheRepository(
         )
         val entries = resources.map { (key, refresh) ->
             val result = runCatching { refresh(RefreshReason.Periodic) }
-                .getOrElse { e -> RefreshResult.Failure(e.message ?: "Bundle refresh error") }
+                .getOrElse(RefreshFailureClassifier::classify)
             BundleRefreshResult.Entry(key = key, result = result)
         }
         return BundleRefreshResult(entries)
@@ -166,17 +165,20 @@ class CurrentSeasonResourcesCacheRepository(
         fetch: suspend (forceRefresh: Boolean, activeSeason: Int) -> Dto,
         validate: (Dto, activeSeason: Int) -> Boolean,
     ): RefreshResult {
-        val activeSeason = activeSeason() ?: run {
-            refreshScheduleIfMissing?.invoke(RefreshReason.StaleOpen)
-            activeSeason()
-        } ?: return RefreshResult.Failure("No active season cache")
-        val key = keyForSeason(activeSeason)
+        var activeSeason = activeSeason()
+        if (activeSeason == null) {
+            val discovery = refreshScheduleIfMissing?.invoke(RefreshReason.StaleOpen)
+            activeSeason = activeSeason()
+            if (activeSeason == null && discovery?.failureMessageOrNull != null) return discovery
+        }
+        val resolvedSeason = activeSeason ?: return RefreshResult.PermanentFailure("No active season cache")
+        val key = keyForSeason(resolvedSeason)
         if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(clock.now().toEpochMilliseconds()) == false) {
-            return RefreshResult.Success
+            return RefreshResult.SkippedFresh
         }
         val existing = mutex.withLock {
             inFlight[key.value]?.takeIf { it.isActive } ?: scope.async {
-                runRefresh(activeSeason, key, serializer, reason, fetch, validate)
+                runRefresh(resolvedSeason, key, serializer, reason, fetch, validate)
             }.also { deferred ->
                 inFlight[key.value] = deferred
             }
@@ -202,9 +204,11 @@ class CurrentSeasonResourcesCacheRepository(
         return try {
             val dto = fetch(reason is RefreshReason.PullToRefresh, activeSeason)
             if (!validate(dto, activeSeason)) {
-                val message = "Invalid ${key.payloadKind} payload"
-                recordFailure(key, attemptedAt, message)
-                return RefreshResult.Failure(message)
+                return fail(
+                    key,
+                    attemptedAt,
+                    RefreshResult.RetryableFailure("Invalid ${key.payloadKind} payload"),
+                )
             }
             store.writeSnapshot(
                 ResourceSnapshot(
@@ -219,21 +223,24 @@ class CurrentSeasonResourcesCacheRepository(
                     lastAttemptStatus = RefreshAttemptStatus.Succeeded,
                 )
             )
-            RefreshResult.Success
-        } catch (e: ClientRequestException) {
-            fail(key, attemptedAt, "Request failed (${e.response.status.value})")
-        } catch (e: ServerResponseException) {
-            fail(key, attemptedAt, "Server error (${e.response.status.value})")
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            fail(key, attemptedAt, e.message ?: "Network error")
+            RefreshResult.Refreshed
+        } catch (throwable: Throwable) {
+            fail(key, attemptedAt, RefreshFailureClassifier.classify(throwable))
         }
     }
 
-    private suspend fun fail(key: CacheResourceKey, attemptedAt: Long, message: String): RefreshResult.Failure {
-        recordFailure(key, attemptedAt, message)
-        return RefreshResult.Failure(message)
+    private suspend fun fail(
+        key: CacheResourceKey,
+        attemptedAt: Long,
+        result: RefreshResult,
+    ): RefreshResult {
+        val message = requireNotNull(result.failureMessageOrNull)
+        return try {
+            recordFailure(key, attemptedAt, message)
+            result
+        } catch (throwable: Throwable) {
+            RefreshFailureClassifier.classify(throwable)
+        }
     }
 
     private suspend fun recordFailure(key: CacheResourceKey, attemptedAt: Long, message: String) {

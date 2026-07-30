@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.lifecycle.ViewModelProvider
 import com.anpurnama.f1_app.core.cache.BundleRefreshResult
+import com.anpurnama.f1_app.core.cache.RefreshFailureClassifier
 import com.anpurnama.f1_app.core.cache.RefreshReason
 import com.anpurnama.f1_app.core.cache.RefreshResult
 import com.anpurnama.f1_app.feature.circuit.circuitViewModelFactory as circuitFactory
@@ -235,9 +236,7 @@ class Wiring(context: Context) {
 
     internal suspend fun refreshCurrentSeasonScheduleForPeriodic(): RefreshResult = runCatching {
         seasonScheduleCacheRepository.refreshCurrentSeason(RefreshReason.Periodic)
-    }.getOrElse { e ->
-        RefreshResult.Failure(e.message ?: "Schedule refresh error")
-    }
+    }.getOrElse(RefreshFailureClassifier::classify)
 
     internal suspend fun refreshCurrentSeasonResourcesBundleForPeriodicSync(): BundleRefreshResult = runCatching {
         currentSeasonResourcesCacheRepository.refreshCurrentSeasonBundle()
@@ -246,7 +245,7 @@ class Wiring(context: Context) {
             listOf(
                 BundleRefreshResult.Entry(
                     key = "current-season-resources-bundle",
-                    result = RefreshResult.Failure(e.message ?: "Bundle refresh error"),
+                    result = RefreshFailureClassifier.classify(e),
                 ),
             ),
         )

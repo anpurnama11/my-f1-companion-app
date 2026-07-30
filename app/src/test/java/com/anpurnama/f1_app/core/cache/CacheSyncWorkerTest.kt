@@ -1,6 +1,7 @@
 package com.anpurnama.f1_app.core.cache
 
 import androidx.work.BackoffPolicy
+import androidx.work.ListenableWorker
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequest
 import org.junit.Assert.assertEquals
@@ -87,163 +88,69 @@ class CacheSyncWorkerTest {
     }
 
     @Test
-    fun `bundle result empty result is not a total failure`() {
-        // CacheSyncWorker treats an empty bundle as success so the
-        // next 12h tick can re-evaluate. The [BundleRefreshResult]
-        // helper must reflect that.
-        val empty = com.anpurnama.f1_app.core.cache.BundleRefreshResult.Empty
-        assertTrue(empty.isEmpty)
-        assertEquals(false, empty.isTotalFailure())
+    fun `decideWorkerResult success on empty and neutral bundles`() {
+        val neutral = BundleRefreshResult(
+            listOf(
+                BundleRefreshResult.Entry("fresh", RefreshResult.SkippedFresh),
+                BundleRefreshResult.Entry("future", RefreshResult.Deferred),
+            ),
+        )
+
+        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(BundleRefreshResult.Empty))
+        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(neutral))
     }
 
     @Test
-    fun `empty bundle signals the worker to advance to the next tick without retry`() {
-        // Documents the worker decision matrix:
-        //   - empty bundle (off-season / pre-promotion / no
-        //     eligible sessions) → Result.success(): nothing to
-        //     retry, the next 12h tick re-evaluates against fresh
-        //     state.
-        //   - non-empty bundle with at least one success →
-        //     Result.success(): partial or full success, advance.
-        //   - non-empty bundle with no successes →
-        //     Result.retry(): transient infrastructure failure,
-        //     defer to exponential backoff.
-        val empty = com.anpurnama.f1_app.core.cache.BundleRefreshResult.Empty
-        val offSeason = empty
-        val partialSuccess = com.anpurnama.f1_app.core.cache.BundleRefreshResult(
+    fun `decideWorkerResult retries mixed refreshed skipped and retryable outcomes`() {
+        val mixed = BundleRefreshResult(
             listOf(
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "k1",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Failure("503"),
-                ),
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "k2",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Success,
-                ),
+                BundleRefreshResult.Entry("written", RefreshResult.Refreshed),
+                BundleRefreshResult.Entry("fresh", RefreshResult.SkippedFresh),
+                BundleRefreshResult.Entry("offline", RefreshResult.RetryableFailure("503")),
             ),
         )
-        val totalFailure = com.anpurnama.f1_app.core.cache.BundleRefreshResult(
-            listOf(
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "k1",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Failure("503"),
-                ),
-            ),
-        )
-        // Off-season: empty, not a total failure, worker returns success.
-        assertEquals(false, offSeason.isTotalFailure())
-        assertTrue(offSeason.isEmpty)
-        // Partial success: not a total failure, worker returns success.
-        assertEquals(false, partialSuccess.isTotalFailure())
-        assertEquals(1, partialSuccess.succeeded)
-        // Total failure: worker returns retry.
-        assertEquals(true, totalFailure.isTotalFailure())
+
+        assertEquals(ListenableWorker.Result.retry(), decideWorkerResult(mixed))
     }
 
     @Test
-    fun `decideWorkerResult success on empty bundle`() {
-        // Off-season / no active season / no schedule / no
-        // eligible sessions — nothing to attempt, advance the tick.
-        val result = com.anpurnama.f1_app.core.cache.decideWorkerResult(
-            com.anpurnama.f1_app.core.cache.BundleRefreshResult.Empty,
+    fun `decideWorkerResult does not retry permanent failures`() {
+        val permanent = BundleRefreshResult(
+            listOf(
+                BundleRefreshResult.Entry("bad-request", RefreshResult.PermanentFailure("404")),
+                BundleRefreshResult.Entry("fresh", RefreshResult.SkippedFresh),
+            ),
         )
-        assertEquals(androidx.work.ListenableWorker.Result.success(), result)
+
+        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(permanent))
     }
 
     @Test
-    fun `decideWorkerResult success on partial success`() {
-        val partial = com.anpurnama.f1_app.core.cache.BundleRefreshResult(
+    fun `legacy session failures retain total-failure retry behavior during expansion`() {
+        val legacyOnlyFailure = BundleRefreshResult(
+            listOf(BundleRefreshResult.Entry("session", RefreshResult.Failure("503"))),
+        )
+        val legacyPartialSuccess = BundleRefreshResult(
             listOf(
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "k1",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Failure("503"),
-                ),
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "k2",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Success,
-                ),
+                BundleRefreshResult.Entry("session", RefreshResult.Failure("503")),
+                BundleRefreshResult.Entry("pitstop", RefreshResult.Success),
             ),
         )
-        val result = com.anpurnama.f1_app.core.cache.decideWorkerResult(partial)
-        assertEquals(androidx.work.ListenableWorker.Result.success(), result)
+
+        assertEquals(ListenableWorker.Result.retry(), decideWorkerResult(legacyOnlyFailure))
+        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(legacyPartialSuccess))
     }
 
     @Test
-    fun `decideWorkerResult retry on total failure including schedule-only failure`() {
-        // The fix for the no-active-season / no-schedule
-        // misclassification: a single failed schedule entry on a
-        // pre-promotion device is the schedule entry plus empty
-        // bundles — the aggregate is one failed entry, so the worker
-        // retries rather than silently succeeding. A transient
-        // schedule failure must trigger backoff, not be mistaken
-        // for off-season.
-        val scheduleOnlyFailure = com.anpurnama.f1_app.core.cache.BundleRefreshResult(
+    fun `legacy session failure beside a migrated write retains prior partial-success behavior`() {
+        val transitionalMixed = BundleRefreshResult(
             listOf(
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "season-schedule",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Failure(
-                        "Server error (503)",
-                    ),
-                ),
+                BundleRefreshResult.Entry("schedule", RefreshResult.Refreshed),
+                BundleRefreshResult.Entry("session", RefreshResult.Failure("503")),
             ),
         )
-        val result = com.anpurnama.f1_app.core.cache.decideWorkerResult(scheduleOnlyFailure)
-        assertEquals(androidx.work.ListenableWorker.Result.retry(), result)
+
+        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(transitionalMixed))
     }
 
-    @Test
-    fun `decideWorkerResult success when the schedule failed but the bundles succeeded`() {
-        // A failed schedule on a device with an existing active
-        // season does not strand the worker: the bundles still
-        // operate against the existing active season and the
-        // schedule failure is recorded as attempt metadata only.
-        val partial = com.anpurnama.f1_app.core.cache.BundleRefreshResult(
-            listOf(
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "season-schedule",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Failure(
-                        "Server error (503)",
-                    ),
-                ),
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "k1",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Success,
-                ),
-            ),
-        )
-        val result = com.anpurnama.f1_app.core.cache.decideWorkerResult(partial)
-        assertEquals(androidx.work.ListenableWorker.Result.success(), result)
-    }
-
-    @Test
-    fun `bundle result with only failures is a total failure`() {
-        val onlyFailures = com.anpurnama.f1_app.core.cache.BundleRefreshResult(
-            listOf(
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "k1",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Failure("503"),
-                ),
-            ),
-        )
-        assertEquals(true, onlyFailures.isTotalFailure())
-    }
-
-    @Test
-    fun `bundle result with at least one success is not a total failure`() {
-        val partial = com.anpurnama.f1_app.core.cache.BundleRefreshResult(
-            listOf(
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "k1",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Failure("503"),
-                ),
-                com.anpurnama.f1_app.core.cache.BundleRefreshResult.Entry(
-                    key = "k2",
-                    result = com.anpurnama.f1_app.core.cache.RefreshResult.Success,
-                ),
-            ),
-        )
-        assertEquals(false, partial.isTotalFailure())
-        assertEquals(1, partial.succeeded)
-        assertEquals(1, partial.failed)
-    }
 }

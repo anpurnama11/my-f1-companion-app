@@ -9,7 +9,6 @@ import com.anpurnama.f1_app.core.Outcome
 import com.anpurnama.f1_app.core.cache.CachedResource
 import com.anpurnama.f1_app.core.cache.RefreshReason
 import com.anpurnama.f1_app.core.cache.RefreshResult
-import com.anpurnama.f1_app.core.ui.ContentSyncStatus
 import com.anpurnama.f1_app.core.ui.SectionUiState
 import com.anpurnama.f1_app.core.ui.refreshCachedSection
 import com.anpurnama.f1_app.core.ui.toSection
@@ -176,23 +175,7 @@ class HomepageViewModel(
     private suspend fun loadSeason(forceRefresh: Boolean) {
         val refresh = refreshCachedSeason
         if (observeCachedSeason != null && refresh != null) {
-            if (season.value is SectionUiState.Content) {
-                season.value = (season.value as SectionUiState.Content<Season>).copy(sync = ContentSyncStatus.Refreshing)
-            } else {
-                season.value = SectionUiState.Loading
-            }
-            val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)
-            if (result is RefreshResult.Success && season.value is SectionUiState.Content) {
-                season.value = (season.value as SectionUiState.Content<Season>).copy(sync = ContentSyncStatus.Fresh)
-            }
-            if (result is RefreshResult.Failure) {
-                val current = season.value
-                season.value = if (current is SectionUiState.Content) {
-                    current.copy(sync = ContentSyncStatus.RefreshFailed(result.message))
-                } else {
-                    SectionUiState.Error(result.message)
-                }
-            }
+            season.refreshCachedSection(forceRefresh, refresh)
             return
         }
         season.value = SectionUiState.Loading

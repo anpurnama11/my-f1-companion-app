@@ -242,7 +242,7 @@ class RoundViewModelTest {
                 Outcome.Success(ROUND_SEASON_2024)
             },
             observeCachedSeason = MutableStateFlow(cachedSeason(ROUND_SEASON_2026)),
-            refreshCachedSeason = { RefreshResult.Failure("should not refresh current cache") },
+            refreshCachedSeason = { RefreshResult.PermanentFailure("should not refresh current cache") },
         )
 
         val job = startCollecting(vm)
@@ -271,7 +271,7 @@ class RoundViewModelTest {
             observeCachedSeason = cachedSeason,
             refreshCachedSeason = { reason ->
                 refreshReasons += reason
-                RefreshResult.Success
+                RefreshResult.Refreshed
             },
         )
 
@@ -304,7 +304,7 @@ class RoundViewModelTest {
             },
             refreshCachedSeason = { reason ->
                 refreshReasons += reason
-                RefreshResult.Success
+                RefreshResult.SkippedFresh
             },
         )
 
@@ -334,7 +334,7 @@ class RoundViewModelTest {
             observeCachedSeason = cachedSeason,
             refreshCachedSeason = {
                 cachedSeason.value = cachedSeason(ROUND_SEASON_2026.copy(year = 2027))
-                RefreshResult.Success
+                RefreshResult.Refreshed
             },
         )
 
