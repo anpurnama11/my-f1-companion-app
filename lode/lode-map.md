@@ -36,6 +36,7 @@ lode/
   specs/
     f1app.md                         # problem + solution + user stories
     data-layer.md                    # architecture, data sources, API client, caching, navigation, schedule
+    cache-correctness-hardening.md   # truthful refresh outcomes, payload compatibility, recovery, and coverage
     screens.md                       # screen contracts: deep links, round detail, favorites, countdown, enrichments
     build.md                         # design system, package layout, release, signing, build floor
     testing.md                       # testing decisions, out-of-scope, further notes
