@@ -6,10 +6,10 @@ package com.anpurnama.f1_app.core.cache
  * periodic tick.
  *
  * A bundle is **best-effort**: per-resource failures are normal.
- * During the #67 expand step, migrated current-season outcomes and
- * legacy session outcomes coexist. [requiresRetry] is the one worker
- * policy: any migrated retryable failure wins; legacy failures retain
- * their old retry-only-when-all-legacy-work-failed behavior until #68.
+ * [requiresRetry] is the one worker policy: any retryable failure wins;
+ * refreshed, fresh-skipped, deferred, and permanent outcomes are neutral.
+ * Legacy variants remain in the shared type for non-season resources but
+ * no longer participate in the current-season worker aggregate.
  *
  * Generic over the resource key string to keep this type in
  * `core/cache/` without leaking F1-specific concepts.
@@ -19,16 +19,7 @@ data class BundleRefreshResult(
 ) {
     val isEmpty: Boolean get() = entries.isEmpty()
     val requiresRetry: Boolean
-        get() = entries.any { it.result is RefreshResult.RetryableFailure } ||
-            legacyTotalFailure()
-
-    private fun legacyTotalFailure(): Boolean {
-        val hasLegacyFailure = entries.any { it.result is RefreshResult.Failure }
-        val hasSuccessfulWrite = entries.any {
-            it.result is RefreshResult.Refreshed || it.result is RefreshResult.Success
-        }
-        return hasLegacyFailure && !hasSuccessfulWrite
-    }
+        get() = entries.any { it.result is RefreshResult.RetryableFailure }
 
     data class Entry(
         val key: String,

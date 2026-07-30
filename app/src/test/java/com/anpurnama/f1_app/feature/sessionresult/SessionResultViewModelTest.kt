@@ -107,7 +107,7 @@ class SessionResultViewModelTest {
             observeCachedResult = cachedResult,
             refreshCachedResult = { reason ->
                 capturedReason = reason
-                RefreshResult.Failure("network error")
+                RefreshResult.RetryableFailure("network error")
             },
         )
         // Seed stale cached content
@@ -128,6 +128,30 @@ class SessionResultViewModelTest {
     }
 
     @Test
+    fun `pitstop retryable failure preserves cached enrichment with RefreshFailed sync`() = runTest {
+        val cachedPitstop = MutableStateFlow<CachedResource<FastestPitstop?>?>(
+            CachedResource(PITSTOP, snapshot("session-results.pitstops", staleAfter = 1L)),
+        )
+        val vm = SessionResultViewModel(
+            year = 2026, round = 1, session = SessionType.Race,
+            getSessionResult = { _, _, _, _ -> Outcome.Success(RACE_RESULT) },
+            getFastestPitstop = { _, _, _ -> Outcome.Failure("fallback should not be called") },
+            observeCachedPitstop = cachedPitstop,
+            refreshCachedPitstop = { RefreshResult.RetryableFailure("offline") },
+        )
+
+        vm.uiState.take(2).toList()
+        testScheduler.advanceUntilIdle()
+        vm.refresh()
+        testScheduler.advanceUntilIdle()
+
+        val content = vm.uiState.value.pitstop as? SectionUiState.Content
+            ?: throw AssertionError("cached pitstop should remain Content")
+        assertEquals(PITSTOP, content.data)
+        assertEquals(ContentSyncStatus.RefreshFailed("offline"), content.sync)
+    }
+
+    @Test
     fun `historical season with cache fallback falls through to direct network`() = runTest {
         val cachedResult = MutableStateFlow<CachedResource<SessionResult>?>(null)
         var directNetworkCalled = false
@@ -139,7 +163,7 @@ class SessionResultViewModelTest {
             },
             getFastestPitstop = null,
             observeCachedResult = cachedResult,
-            refreshCachedResult = { RefreshResult.Failure("Not the active season") },
+            refreshCachedResult = { RefreshResult.PermanentFailure("Not the active season") },
         )
 
         vm.uiState.take(2).toList()
@@ -152,7 +176,7 @@ class SessionResultViewModelTest {
     }
 
     @Test
-    fun `not-yet-complete cached refresh shows Error without direct fallback`() = runTest {
+    fun `unrelated permanent failure does not trigger historical direct fallback`() = runTest {
         var directNetworkCalled = false
         val vm = SessionResultViewModel(
             year = 2026, round = 1, session = SessionType.Race,
@@ -162,7 +186,53 @@ class SessionResultViewModelTest {
             },
             getFastestPitstop = null,
             observeCachedResult = MutableStateFlow<CachedResource<SessionResult>?>(null),
-            refreshCachedResult = { RefreshResult.Failure("Session not yet complete") },
+            refreshCachedResult = { RefreshResult.PermanentFailure("Request failed (404)") },
+        )
+
+        vm.uiState.take(2).toList()
+        testScheduler.advanceUntilIdle()
+
+        assertTrue("404 must not route around the cache repository", !directNetworkCalled)
+        assertEquals(
+            "Request failed (404)",
+            (vm.uiState.value.result as SectionUiState.Error).message,
+        )
+    }
+
+    @Test
+    fun `deferred refresh preserves existing cached session content`() = runTest {
+        val cachedResult = MutableStateFlow<CachedResource<SessionResult>?>(
+            CachedResource(RACE_RESULT, snapshot("session-results.race", staleAfter = 1L)),
+        )
+        val vm = SessionResultViewModel(
+            year = 2026, round = 1, session = SessionType.Race,
+            getSessionResult = { _, _, _, _ -> Outcome.Failure("fallback should not be called") },
+            getFastestPitstop = null,
+            observeCachedResult = cachedResult,
+            refreshCachedResult = { RefreshResult.Deferred },
+        )
+
+        vm.uiState.take(2).toList()
+        testScheduler.advanceUntilIdle()
+
+        val content = vm.uiState.value.result as? SectionUiState.Content
+            ?: throw AssertionError("cached session should remain Content")
+        assertEquals("Max Verstappen", content.data.raceResults.first().driverName)
+        assertEquals(ContentSyncStatus.Stale, content.sync)
+    }
+
+    @Test
+    fun `deferred cached refresh shows unavailable Error without direct fallback`() = runTest {
+        var directNetworkCalled = false
+        val vm = SessionResultViewModel(
+            year = 2026, round = 1, session = SessionType.Race,
+            getSessionResult = { _, _, _, _ ->
+                directNetworkCalled = true
+                Outcome.Success(RACE_RESULT)
+            },
+            getFastestPitstop = null,
+            observeCachedResult = MutableStateFlow<CachedResource<SessionResult>?>(null),
+            refreshCachedResult = { RefreshResult.Deferred },
         )
 
         vm.uiState.take(2).toList()

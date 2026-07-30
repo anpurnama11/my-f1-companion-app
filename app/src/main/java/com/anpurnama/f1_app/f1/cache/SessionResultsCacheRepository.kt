@@ -4,10 +4,12 @@ import com.anpurnama.f1_app.core.cache.BundleRefreshResult
 import com.anpurnama.f1_app.core.cache.CacheResourceKey
 import com.anpurnama.f1_app.core.cache.CachedResource
 import com.anpurnama.f1_app.core.cache.RefreshAttemptStatus
+import com.anpurnama.f1_app.core.cache.RefreshFailureClassifier
 import com.anpurnama.f1_app.core.cache.RefreshReason
 import com.anpurnama.f1_app.core.cache.RefreshResult
 import com.anpurnama.f1_app.core.cache.ResourceSnapshot
 import com.anpurnama.f1_app.core.cache.SnapshotStore
+import com.anpurnama.f1_app.core.cache.failureMessageOrNull
 import com.anpurnama.f1_app.f1.CarNumberTranslator
 import com.anpurnama.f1_app.f1.data.CurrentDriversResponseDto
 import com.anpurnama.f1_app.f1.data.JolpicaAlphaResultsResponseDto
@@ -30,9 +32,6 @@ import com.anpurnama.f1_app.f1.toRoundResults
 import com.anpurnama.f1_app.f1.toSeason
 import com.anpurnama.f1_app.f1.toSessionResult
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.ServerResponseException
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
@@ -61,7 +60,7 @@ import kotlinx.serialization.json.Json
  * session from the cached schedule snapshot, and only makes a network
  * call if the session should have finished (start + per-session buffer).
  * Sessions in the future skip the network call and return
- * [RefreshResult.Success] without overwriting any existing cached
+ * [RefreshResult.Deferred] without overwriting any existing cached
  * content. This avoids caching empty or partial API responses for
  * sessions that have not yet run.
  *
@@ -124,7 +123,7 @@ class SessionResultsCacheRepository(
         // the write so the ViewModel's explicit fallback handles the direct request.
         val active = store.state.first().activeSeason
         if (active == null || season != active) {
-            return RefreshResult.Failure(
+            return RefreshResult.PermanentFailure(
                 if (active == null) "No active season" else "Not the active season"
             )
         }
@@ -132,23 +131,11 @@ class SessionResultsCacheRepository(
                 clock.now().toEpochMilliseconds()
             ) == false
         ) {
-            return RefreshResult.Success
+            return RefreshResult.SkippedFresh
         }
         // Session plausibly-complete gate: skip network for future sessions.
         if (!isSessionPlausiblyComplete(season, round, session)) {
-            // If we already have cached content, keep it. If not, report the
-            // gated state to callers so they do not bypass the completion gate
-            // through a direct fallback network path.
-            val existing = currentSnapshot(key)
-            if (existing != null) {
-                return RefreshResult.Success
-            }
-            // No cached content and session not yet complete: record the
-            // attempt and surface a non-network failure/empty state.
-            val message = "Session not yet complete"
-            store.recordAttempt(key, clock.now().toEpochMilliseconds(),
-                RefreshAttemptStatus.Failed(message))
-            return RefreshResult.Failure(message)
+            return RefreshResult.Deferred
         }
         return singleFlightRefresh(key.value) {
             runSessionResultRefresh(season, round, session, key, reason)
@@ -168,7 +155,7 @@ class SessionResultsCacheRepository(
         // the write so the ViewModel's explicit fallback handles the direct request.
         val active = store.state.first().activeSeason
         if (active == null || season != active) {
-            return RefreshResult.Failure(
+            return RefreshResult.PermanentFailure(
                 if (active == null) "No active season" else "Not the active season"
             )
         }
@@ -176,7 +163,7 @@ class SessionResultsCacheRepository(
                 clock.now().toEpochMilliseconds()
             ) == false
         ) {
-            return RefreshResult.Success
+            return RefreshResult.SkippedFresh
         }
         return singleFlightRefresh(key.value) {
             runPitstopRefresh(season, round, key, reason)
@@ -197,9 +184,8 @@ class SessionResultsCacheRepository(
      * the same bundle.
      *
      * Per-resource failures are caught and recorded in the returned
-     * [BundleRefreshResult] — the gate's "Session not yet complete" is
-     * a normal `RefreshResult.Failure` and is **not** an exception, so
-     * a future session surfaces as a `failed` entry, not a missing one.
+     * [BundleRefreshResult]. Deferred and fresh-skipped entries are neutral;
+     * retryable failures request worker backoff even beside successful writes.
      *
      * Used by `CacheSyncWorker` on its 12-hour tick. The per-resource
      * single-flight gate still applies, so an overlapping foreground
@@ -227,7 +213,7 @@ class SessionResultsCacheRepository(
                     session = candidate.session,
                     reason = RefreshReason.Periodic,
                 )
-            }.getOrElse { e -> RefreshResult.Failure(e.message ?: "Bundle refresh error") }
+            }.getOrElse(RefreshFailureClassifier::classify)
             BundleRefreshResult.Entry(key = key, result = result)
         } + candidates.filter { it.session == SessionType.Race }.map { candidate ->
             val key = CacheResourceKeys.pitstops(activeSeason, candidate.round).value
@@ -237,7 +223,7 @@ class SessionResultsCacheRepository(
                     round = candidate.round,
                     reason = RefreshReason.Periodic,
                 )
-            }.getOrElse { e -> RefreshResult.Failure(e.message ?: "Bundle refresh error") }
+            }.getOrElse(RefreshFailureClassifier::classify)
             BundleRefreshResult.Entry(key = key, result = result)
         }
         return BundleRefreshResult(entries)
@@ -318,45 +304,46 @@ class SessionResultsCacheRepository(
                 SessionType.Race -> {
                     val dto = client.getJolpicaRaceResults(season, round,
                         forceRefresh = reason is RefreshReason.PullToRefresh)
+                    if (dto.mrData.raceTable.races.firstOrNull()?.results.isNullOrEmpty()) {
+                        return RefreshResult.Deferred
+                    }
                     store.writeSnapshot(buildSnapshot(key, attemptedAt,
                         JolpicaRaceResultsResponseDto.serializer(), dto))
-                    RefreshResult.Success
+                    RefreshResult.Refreshed
                 }
                 SessionType.Quali -> {
                     val dto = client.getJolpicaQualifying(season, round,
                         forceRefresh = reason is RefreshReason.PullToRefresh)
+                    if (dto.mrData.raceTable.races.firstOrNull()?.qualifyingResults.isNullOrEmpty()) {
+                        return RefreshResult.Deferred
+                    }
                     store.writeSnapshot(buildSnapshot(key, attemptedAt,
                         JolpicaQualifyingResponseDto.serializer(), dto))
-                    RefreshResult.Success
+                    RefreshResult.Refreshed
                 }
                 SessionType.FP1, SessionType.FP2, SessionType.FP3,
                 SessionType.Sprint, SessionType.SprintQuali -> {
                     val roundId = client.getJolpicaAlphaRoundId(season, round,
                         forceRefresh = reason is RefreshReason.PullToRefresh)
-                        ?: return fail(key, attemptedAt, "Session is unavailable")
+                        ?: return RefreshResult.Deferred
                     val filter = session.toAlphaFilter()
                     val dto = client.getJolpicaAlphaResults(roundId, filter,
                         forceRefresh = reason is RefreshReason.PullToRefresh)
+                    if (dto.data.results.isEmpty()) return RefreshResult.Deferred
                     store.writeSnapshot(buildSnapshot(key, attemptedAt,
                         JolpicaAlphaResultsResponseDto.serializer(), dto))
-                    RefreshResult.Success
+                    RefreshResult.Refreshed
                 }
             }
         } catch (e: IllegalArgumentException) {
             // Alpha filter guard throws for unsupported filters.
             if (e.message == "Invalid session filter") {
-                fail(key, attemptedAt, "Session is unavailable")
+                fail(key, attemptedAt, RefreshResult.PermanentFailure("Session is unavailable"))
             } else {
-                fail(key, attemptedAt, e.message ?: "Deserialization error")
+                throw e
             }
-        } catch (e: ClientRequestException) {
-            fail(key, attemptedAt, "Request failed (${e.response.status.value})")
-        } catch (e: ServerResponseException) {
-            fail(key, attemptedAt, "Server error (${e.response.status.value})")
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            fail(key, attemptedAt, e.message ?: "Network error")
+        } catch (throwable: Throwable) {
+            fail(key, attemptedAt, RefreshFailureClassifier.classify(throwable))
         }
     }
 
@@ -374,15 +361,9 @@ class SessionResultsCacheRepository(
                 forceRefresh = reason is RefreshReason.PullToRefresh)
             store.writeSnapshot(buildSnapshot(key, attemptedAt,
                 JolpicaPitStopsResponseDto.serializer(), dto))
-            RefreshResult.Success
-        } catch (e: ClientRequestException) {
-            fail(key, attemptedAt, "Request failed (${e.response.status.value})")
-        } catch (e: ServerResponseException) {
-            fail(key, attemptedAt, "Server error (${e.response.status.value})")
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            fail(key, attemptedAt, e.message ?: "Network error")
+            RefreshResult.Refreshed
+        } catch (throwable: Throwable) {
+            fail(key, attemptedAt, RefreshFailureClassifier.classify(throwable))
         }
     }
 
@@ -436,10 +417,15 @@ class SessionResultsCacheRepository(
     private suspend fun fail(
         key: CacheResourceKey,
         attemptedAt: Long,
-        message: String,
-    ): RefreshResult.Failure {
-        store.recordAttempt(key, attemptedAt, RefreshAttemptStatus.Failed(message))
-        return RefreshResult.Failure(message)
+        result: RefreshResult,
+    ): RefreshResult {
+        val message = requireNotNull(result.failureMessageOrNull)
+        return try {
+            store.recordAttempt(key, attemptedAt, RefreshAttemptStatus.Failed(message))
+            result
+        } catch (throwable: Throwable) {
+            RefreshFailureClassifier.classify(throwable)
+        }
     }
 
     private suspend fun currentSnapshot(key: CacheResourceKey): CachedResource<Unit>? =

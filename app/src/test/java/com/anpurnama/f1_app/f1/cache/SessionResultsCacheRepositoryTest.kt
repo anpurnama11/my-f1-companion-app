@@ -45,6 +45,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
 
 class SessionResultsCacheRepositoryTest {
     @get:Rule val tempFolder = TemporaryFolder()
@@ -134,6 +135,14 @@ class SessionResultsCacheRepositoryTest {
     }
     """.trimIndent()
 
+    private fun emptyQualifyingBody() = """
+    {
+      "MRData": {
+        "RaceTable": { "season": "2026", "round": "1", "Races": [] }
+      }
+    }
+    """.trimIndent()
+
     private fun pitstopsBody(season: Int = 2026, round: Int = 1) = """
     {
       "MRData": {
@@ -170,6 +179,32 @@ class SessionResultsCacheRepositoryTest {
           "car_number": 12,
           "components": {}
         }]
+      }
+    }
+    """.trimIndent()
+
+    private fun alphaRoundsBody() = """
+    {
+      "data": [{ "id": "round_001", "number": 1, "name": "Bahrain GP" }]
+    }
+    """.trimIndent()
+
+    private fun emptyAlphaRoundsBody() = """{ "data": [] }"""
+
+    private fun emptyAlphaResultsBody() = """
+    {
+      "data": {
+        "season": { "year": 2026 },
+        "round": { "number": 1, "name": "Bahrain GP" },
+        "results": []
+      }
+    }
+    """.trimIndent()
+
+    private fun emptyRaceResultsBody() = """
+    {
+      "MRData": {
+        "RaceTable": { "season": "2026", "round": "1", "Races": [] }
       }
     }
     """.trimIndent()
@@ -220,7 +255,7 @@ class SessionResultsCacheRepositoryTest {
     // ── Race result tests ──────────────────────────────────────────────
 
     @Test
-    fun `race result refresh writes snapshot and returns success`() = runTest {
+    fun `race result refresh writes snapshot and returns refreshed`() = runTest {
         val (store, scope) = newStore()
         store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
         val repo = SessionResultsCacheRepository(
@@ -231,7 +266,7 @@ class SessionResultsCacheRepositoryTest {
 
         val result = repo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observeSessionResult(2026, 1, SessionType.Race).first()!!
         assertEquals("Max Verstappen", cached.data.raceResults.single().driverName)
         assertEquals("1:32.000", cached.data.fastestLap?.time)
@@ -240,7 +275,29 @@ class SessionResultsCacheRepositoryTest {
     }
 
     @Test
-    fun `qualifying result refresh writes snapshot and returns success`() = runTest {
+    fun `fresh session result returns skipped fresh without another request`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
+        var requests = 0
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { requests++; jsonOk(raceResultsBody()) },
+            clock = FixedClock(raceCompleteEpochMs),
+        )
+
+        assertEquals(
+            RefreshResult.Refreshed,
+            repo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.StaleOpen),
+        )
+        val result = repo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.Periodic)
+
+        assertEquals(RefreshResult.SkippedFresh, result)
+        assertEquals(1, requests)
+        scope.cancel()
+    }
+
+    @Test
+    fun `qualifying result refresh writes snapshot and returns refreshed`() = runTest {
         val (store, scope) = newStore()
         store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
         val repo = SessionResultsCacheRepository(
@@ -251,10 +308,98 @@ class SessionResultsCacheRepositoryTest {
 
         val result = repo.refreshSessionResult(2026, 1, SessionType.Quali, RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observeSessionResult(2026, 1, SessionType.Quali).first()!!
         assertEquals("max_verstappen", cached.data.qualifyingResults.single().driverId)
         assertEquals("1:29.000", cached.data.qualifyingResults.single().q3)
+        scope.cancel()
+    }
+
+    @Test
+    fun `empty qualifying payload returns deferred without a snapshot`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { jsonOk(emptyQualifyingBody()) },
+            clock = FixedClock(raceCompleteEpochMs),
+        )
+
+        val result = repo.refreshSessionResult(2026, 1, SessionType.Quali, RefreshReason.StaleOpen)
+
+        assertEquals(RefreshResult.Deferred, result)
+        assertNull(repo.observeSessionResult(2026, 1, SessionType.Quali).first())
+        scope.cancel()
+    }
+
+    @Test
+    fun `missing alpha round id returns deferred without requesting results`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
+        var requests = 0
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { requests++; jsonOk(emptyAlphaRoundsBody()) },
+            clock = FixedClock(raceCompleteEpochMs),
+        )
+
+        val result = repo.refreshSessionResult(2026, 1, SessionType.FP1, RefreshReason.StaleOpen)
+
+        assertEquals(RefreshResult.Deferred, result)
+        assertEquals(1, requests)
+        assertNull(repo.observeSessionResult(2026, 1, SessionType.FP1).first())
+        scope.cancel()
+    }
+
+    @Test
+    fun `empty alpha results return deferred without a snapshot`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { request ->
+                if (request.url.encodedPath.contains("/core/rounds/")) jsonOk(alphaRoundsBody())
+                else jsonOk(emptyAlphaResultsBody())
+            },
+            clock = FixedClock(raceCompleteEpochMs),
+        )
+
+        val result = repo.refreshSessionResult(2026, 1, SessionType.Sprint, RefreshReason.StaleOpen)
+
+        assertEquals(RefreshResult.Deferred, result)
+        assertNull(repo.observeSessionResult(2026, 1, SessionType.Sprint).first())
+        scope.cancel()
+    }
+
+    @Test
+    fun `alpha session result families write snapshots and return refreshed`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { request ->
+                if (request.url.encodedPath.contains("/core/rounds/")) jsonOk(alphaRoundsBody())
+                else jsonOk(alphaPracticeBody())
+            },
+            clock = FixedClock(raceCompleteEpochMs),
+        )
+
+        val sessions = listOf(
+            SessionType.FP1,
+            SessionType.FP2,
+            SessionType.FP3,
+            SessionType.SprintQuali,
+            SessionType.Sprint,
+        )
+
+        sessions.forEach { session ->
+            assertEquals(
+                "$session should persist a completed result",
+                RefreshResult.Refreshed,
+                repo.refreshSessionResult(2026, 1, session, RefreshReason.StaleOpen),
+            )
+            assertNotNull(repo.observeSessionResult(2026, 1, session).first())
+        }
         scope.cancel()
     }
 
@@ -276,13 +421,97 @@ class SessionResultsCacheRepositoryTest {
         )
         val result = failingRepo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.PullToRefresh)
 
-        assertEquals(RefreshResult.Failure("Server error (503)"), result)
+        assertEquals(RefreshResult.RetryableFailure("Server error (503)"), result)
         // Cached data remains visible
         val cached = failingRepo.observeSessionResult(2026, 1, SessionType.Race).first()!!
         assertEquals("Max Verstappen", cached.data.raceResults.single().driverName)
         // Attempt metadata updated
         assertEquals(RefreshAttemptStatus.Failed("Server error (503)"), cached.snapshot.lastAttemptStatus)
         assertTrue((cached.snapshot.lastAttemptEpochMs ?: 0) > raceCompleteEpochMs)
+        scope.cancel()
+    }
+
+    @Test
+    fun `completed session with unpublished empty results returns deferred and preserves cache`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
+        SessionResultsCacheRepository(
+            store = store,
+            client = client { jsonOk(raceResultsBody()) },
+            clock = FixedClock(raceCompleteEpochMs),
+        ).refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.StaleOpen)
+        val before = store.state.first().snapshots[
+            CacheResourceKeys.sessionResults(2026, 1, SessionType.Race).value
+        ]!!
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { jsonOk(emptyRaceResultsBody()) },
+            clock = FixedClock(raceCompleteEpochMs + 1_000),
+        )
+
+        val result = repo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.PullToRefresh)
+
+        assertEquals(RefreshResult.Deferred, result)
+        val after = store.state.first().snapshots[before.key]!!
+        assertEquals(before, after)
+        assertEquals("Max Verstappen", repo.observeSessionResult(2026, 1, SessionType.Race).first()!!.data.raceResults.single().driverName)
+        scope.cancel()
+    }
+
+    @Test
+    fun `session 404 is permanent and does not create cached content`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { respondError(HttpStatusCode.NotFound) },
+            clock = FixedClock(raceCompleteEpochMs),
+        )
+
+        val result = repo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.StaleOpen)
+
+        assertEquals(RefreshResult.PermanentFailure("Request failed (404)"), result)
+        assertNull(repo.observeSessionResult(2026, 1, SessionType.Race).first())
+        scope.cancel()
+    }
+
+    @Test
+    fun `unrelated illegal argument exception propagates`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
+        val expected = IllegalArgumentException("broken invariant")
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { throw expected },
+            clock = FixedClock(raceCompleteEpochMs),
+        )
+
+        val actual = runCatching {
+            repo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.StaleOpen)
+        }.exceptionOrNull()
+
+        assertTrue(actual is IllegalArgumentException)
+        assertEquals("broken invariant", actual?.message)
+        scope.cancel()
+    }
+
+    @Test
+    fun `cancellation exception propagates`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026, raceBody = true))
+        val expected = CancellationException("cancelled")
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { throw expected },
+            clock = FixedClock(raceCompleteEpochMs),
+        )
+
+        val actual = runCatching {
+            repo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.StaleOpen)
+        }.exceptionOrNull()
+
+        assertTrue(actual is CancellationException)
+        assertEquals("cancelled", actual?.message)
         scope.cancel()
     }
 
@@ -333,7 +562,7 @@ class SessionResultsCacheRepositoryTest {
 
         val result = repo.refreshPitstops(2026, 1, RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observePitstops(2026, 1).first()!!
         assertNotNull(cached.data)
         assertEquals("max_verstappen", cached.data?.driverId)
@@ -353,14 +582,38 @@ class SessionResultsCacheRepositoryTest {
 
         val result = repo.refreshPitstops(2026, 1, RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observePitstops(2026, 1).first()!!
         assertNull(cached.data)
         scope.cancel()
     }
 
     @Test
-    fun `future session gate skips network and reports not yet complete when no cache exists`() = runTest {
+    fun `retryable pitstop failure preserves the compatible cached enrichment`() = runTest {
+        val (store, scope) = newStore()
+        store.promoteActiveSeason(2026, scheduleSnapshot(2026))
+        SessionResultsCacheRepository(
+            store = store,
+            client = client { jsonOk(pitstopsBody()) },
+            clock = FixedClock(1_000),
+        ).refreshPitstops(2026, 1, RefreshReason.StaleOpen)
+        val repo = SessionResultsCacheRepository(
+            store = store,
+            client = client { respondError(HttpStatusCode.ServiceUnavailable) },
+            clock = FixedClock(2_000),
+        )
+
+        val result = repo.refreshPitstops(2026, 1, RefreshReason.PullToRefresh)
+
+        assertEquals(RefreshResult.RetryableFailure("Server error (503)"), result)
+        val cached = repo.observePitstops(2026, 1).first()!!
+        assertEquals("max_verstappen", cached.data?.driverId)
+        assertEquals(RefreshAttemptStatus.Failed("Server error (503)"), cached.snapshot.lastAttemptStatus)
+        scope.cancel()
+    }
+
+    @Test
+    fun `future session gate returns deferred without recording a failed attempt`() = runTest {
         val (store, scope) = newStore()
         // Schedule says race at 15:00Z, buffer for race is 4h → complete after 19:00Z.
         val futureClock = FixedClock( /* 14:00Z — race hasn't started yet */ beforeRaceEpochMs)
@@ -373,9 +626,13 @@ class SessionResultsCacheRepositoryTest {
 
         val result = repo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.StaleOpen)
 
-        // Should skip network (no snapshot written) and tell callers not to bypass the gate.
-        assertEquals(RefreshResult.Failure("Session not yet complete"), result)
+        assertEquals(RefreshResult.Deferred, result)
         assertNull(repo.observeSessionResult(2026, 1, SessionType.Race).first())
+        assertNull(
+            store.state.first().snapshots[
+                CacheResourceKeys.sessionResults(2026, 1, SessionType.Race).value
+            ],
+        )
         scope.cancel()
     }
 
@@ -403,7 +660,7 @@ class SessionResultsCacheRepositoryTest {
         val result = repo2.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.PullToRefresh)
 
         // Gate should skip the network (no 503), preserve cached content
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Deferred, result)
         val cached = repo2.observeSessionResult(2026, 1, SessionType.Race).first()!!
         assertEquals("Max Verstappen", cached.data.raceResults.single().driverName)
         scope.cancel()
@@ -437,8 +694,8 @@ class SessionResultsCacheRepositoryTest {
         val result1 = results[0]
         val result2 = results[1]
 
-        assertEquals(RefreshResult.Success, result1)
-        assertEquals(RefreshResult.Success, result2)
+        assertEquals(RefreshResult.Refreshed, result1)
+        assertEquals(RefreshResult.Refreshed, result2)
         // Only one network request should have been made
         assertEquals(1, callCount)
         scope.cancel()
@@ -457,7 +714,7 @@ class SessionResultsCacheRepositoryTest {
 
         val result = repo.refreshSessionResult(2026, 1, SessionType.Race, RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         assertNotNull(repo.observeSessionResult(2026, 1, SessionType.Race).first())
         scope.cancel()
     }
@@ -487,19 +744,22 @@ class SessionResultsCacheRepositoryTest {
             SessionType.Quali, SessionType.Race,
         )
         assertEquals(expectedSessions.size + 1, result.entries.size)
-        // Race + Quali hit the Jolpica standard endpoints, which the
-        // race-results body satisfies. FP1 / SQ / SR hit the alpha
-        // path (needs `getJolpicaAlphaRoundId` first) and will fail
-        // with a parsed `null` roundId. The race pitstop also fails
-        // because the mock returns the race body, not the pitstop
-        // envelope. Failures are recorded per-key; the test is
-        // asserting that ALL sessions in the window were attempted,
-        // not that every attempt succeeded.
-        assertEquals(expectedSessions.size + 1, result.entries.size)
+        val outcomesByKey = result.entries.associate { it.key to it.result }
+        val expectedSessionKeys = expectedSessions.associate { session ->
+            CacheResourceKeys.sessionResults(2026, 1, session).value to
+                if (session == SessionType.Race) RefreshResult.Refreshed else RefreshResult.Deferred
+        }
+        assertEquals(
+            expectedSessionKeys + (CacheResourceKeys.pitstops(2026, 1).value to RefreshResult.Refreshed),
+            outcomesByKey,
+        )
+        // Race writes a result snapshot. Quali and alpha sessions defer because
+        // the race envelope contains no matching rows/round id. Pitstops treat
+        // that envelope as a valid empty list and write a null enrichment.
         val snapshots = store.state.first().snapshots
-        // The Race + Quali snapshots wrote through.
         assertTrue(CacheResourceKeys.sessionResults(2026, 1, SessionType.Race).value in snapshots)
-        assertTrue(CacheResourceKeys.sessionResults(2026, 1, SessionType.Quali).value in snapshots)
+        assertTrue(CacheResourceKeys.sessionResults(2026, 1, SessionType.Quali).value !in snapshots)
+        assertTrue(CacheResourceKeys.pitstops(2026, 1).value in snapshots)
         scope.cancel()
     }
 

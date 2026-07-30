@@ -42,8 +42,8 @@ Leaderboard, and My Team observe cached standings; Homepage also observes cached
 next race/session. My Team warms driver and team catalogs as production
 resources for picker/detail joins that need the season catalog generation. The
 Countdown widget still reads its separate typed-key `NextRaceCache`. These
-current-season resources use truthful outcomes; session-result/pitstop and
-non-season repositories retain legacy binary outcomes until issues #68/#69.
+current-season resources, session results, and pitstops use truthful outcomes;
+only non-season repositories retain legacy binary outcomes until issue #69.
 
 ```kotlin
 currentResources.refreshDriverStandings(RefreshReason.StaleOpen) // Refreshed or SkippedFresh
@@ -97,12 +97,23 @@ match the online path; if the catalog is absent or malformed, rows degrade to
 the alpha opaque ids instead of failing. Session refreshes are gated by a
 plausibly-complete check that reads the cached schedule snapshot: the network call is skipped when the session start +
 per-session buffer (Race 4h, Quali 2h, Sprint 2h, SQuali 1.5h, FP 1.5h) is in
-the future. If no cached result exists for a gated future session, the refresh
-returns `RefreshResult.Failure("Session not yet complete")` so screens render a
-non-loading unavailable/error row and do not bypass the gate through direct network
-fallbacks. Missing or malformed schedule data always allows the fetch. Empty
-pitstop payloads cache as null FastestPitstop (empty enrichment is valid).
-Single-flight per-resource key includes (season, round, session).
+the future. Future sessions, missing alpha round publication, and empty
+session-result payloads return neutral `Deferred` without mutating attempt
+metadata or replacing cached content; uncached Session Result and Schedule
+podium consumers render these as not-yet-complete instead of bypassing the gate
+through direct network fallbacks. Completed non-empty writes return `Refreshed`,
+fresh snapshots return `SkippedFresh`, and shared HTTP classification returns
+`RetryableFailure` or `PermanentFailure`. Retryable failures record attempt
+metadata while preserving compatible cached results and pitstop enrichment.
+Missing or malformed schedule data still allows the fetch. Empty pitstop
+payloads cache as null FastestPitstop (empty enrichment is valid). Single-flight
+per-resource key includes (season, round, session).
+
+```kotlin
+val result = sessions.refreshSessionResult(2026, 1, SessionType.Race, reason)
+// Deferred leaves the prior snapshot unchanged; RetryableFailure records only
+// attempt metadata; Refreshed is the only result that replaces the payload.
+```
 
 Non-season detail resources (circuit metadata, circuit most-wins, Wikipedia
 summaries) are cached through `NonSeasonResourcesCacheRepository`. Circuit

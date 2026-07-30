@@ -469,10 +469,11 @@ class ScheduleViewModelTest {
         store.promoteActiveSeason(2026, cacheScheduleSnapshot(2026))
 
         val jsonConfig = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
+        var failRaceRequests = false
         val mockClient = HttpClient(MockEngine { request ->
             val path = request.url.encodedPath
             if (path.contains("/2026/1/results.json")) {
-                respond(
+                if (failRaceRequests) respondError(HttpStatusCode.ServiceUnavailable) else respond(
                     content = threeResultRaceBody(),
                     status = HttpStatusCode.OK,
                     headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
@@ -502,7 +503,7 @@ class ScheduleViewModelTest {
         val refreshResult = repo.refreshSessionResult(
             2026, 1, SessionType.Race, RefreshReason.StaleOpen
         )
-        assertEquals(RefreshResult.Success, refreshResult)
+        assertEquals(RefreshResult.Refreshed, refreshResult)
 
         // Verify cached data is available
         val cached = repo.observeSessionResult(2026, 1, SessionType.Race).first()
@@ -542,6 +543,16 @@ class ScheduleViewModelTest {
         // because the podium came from the cached race result.
         assertEquals("Round 1 podium came from cache, not the use case",
             0, podiumUseCaseCalls)
+
+        failRaceRequests = true
+        vm.loadPodium(year = 2026, round = 1, forceRefresh = true)
+        testScheduler.runCurrent()
+        val afterFailure = vm.uiState.value as ScheduleViewModel.UiState.Sections
+        val preserved = afterFailure.podiums[1] as? SectionUiState.Content
+            ?: throw AssertionError("cached podium should survive retryable failure, got ${afterFailure.podiums[1]}")
+        assertEquals("Max Verstappen", preserved.data.topThree[0].driverName)
+        assertEquals(ContentSyncStatus.RefreshFailed("Server error (503)"), preserved.sync)
+        assertEquals("retryable cache failure must not trigger direct podium fallback", 0, podiumUseCaseCalls)
 
         collectJob.cancel()
         scope.cancel()
