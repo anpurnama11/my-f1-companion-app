@@ -3,7 +3,6 @@ package com.anpurnama.f1_app.core.di
 import android.content.Context
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.lifecycle.ViewModelProvider
 import com.anpurnama.f1_app.core.cache.BundleRefreshResult
 import com.anpurnama.f1_app.core.cache.RefreshReason
@@ -21,6 +20,7 @@ import com.anpurnama.f1_app.core.cache.CacheState
 import com.anpurnama.f1_app.core.cache.CacheStateSchemaMigration
 import com.anpurnama.f1_app.core.cache.CacheStateSerializer
 import com.anpurnama.f1_app.core.cache.SnapshotStore
+import com.anpurnama.f1_app.core.cache.createPreferencesDataStore
 import com.anpurnama.f1_app.core.network.HttpClientFactory
 import com.anpurnama.f1_app.feature.favorites.FavoritesCache
 import com.anpurnama.f1_app.widget.countdown.data.NextRaceCache
@@ -136,11 +136,11 @@ class Wiring(context: Context) {
 
     private val favoritesCache: FavoritesCache by lazy {
         FavoritesCache(
-            PreferenceDataStoreFactory.create {
+            createPreferencesDataStore(
                 File(File(appContext.filesDir, "datastore"), "favorites.preferences_pb").apply {
                     parentFile?.mkdirs()
                 }
-            }
+            )
         )
     }
 
@@ -151,11 +151,11 @@ class Wiring(context: Context) {
      */
     internal val nextRaceCache: NextRaceCache by lazy {
         NextRaceCache(
-            PreferenceDataStoreFactory.create {
+            createPreferencesDataStore(
                 File(File(appContext.filesDir, "datastore"), "next_race.preferences_pb").apply {
                     parentFile?.mkdirs()
                 }
-            }
+            )
         )
     }
 

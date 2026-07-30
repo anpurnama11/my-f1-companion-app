@@ -31,6 +31,19 @@ import kotlinx.coroutines.flow.map
  * **No timestamps other than `lastSyncedMillis`.** The widget has no
  * chronometer, so a per-field "when was this set" is unnecessary.
  * The single `lastSyncedMillis` covers the worker's adaptive gate.
+ *
+ * **Corruption recovery.** The DataStore is constructed by
+ * [com.anpurnama.f1_app.core.cache.createPreferencesDataStore] with a
+ * `ReplaceFileCorruptionHandler` that returns `emptyPreferences`.
+ * Parser-detected corruption (truncated protobuf, foreign payload,
+ * schema drift) reads back as `null` from [snapshot] / [observe],
+ * which the widget reducer maps to the documented no-data state
+ * ([com.anpurnama.f1_app.widget.countdown.CountdownState.NoRaceData]).
+ * The widget remains placeable; the next successful [write] /
+ * [writeOffSeason] from the worker repopulates the cache and the
+ * widget repaints. Ordinary `IOException`s (permission denied, full
+ * disk, etc.) are not `CorruptionException`s and therefore propagate
+ * — the corruption policy does not erase arbitrary I/O failures.
  */
 class NextRaceCache(private val dataStore: DataStore<Preferences>) {
 

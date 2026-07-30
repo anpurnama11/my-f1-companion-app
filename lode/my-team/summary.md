@@ -63,6 +63,20 @@ Checking uniqueness only against ViewModel state is insufficient: two rapid
 cross-slot writes can both observe the old snapshot. Persistent invariants must
 be checked inside the serialized `DataStore.edit` transaction.
 
+## `FavoritesCache` storage layer
+
+The DataStore is constructed by `createPreferencesDataStore(file)` in
+`core/cache/PreferencesCacheFactory.kt` — the same internal helper `Wiring`
+uses, with a `ReplaceFileCorruptionHandler { emptyPreferences() }`. A
+parser-detected corruption (truncated protobuf, foreign payload, schema drift)
+recovers to an empty `Favorites` — the same shape the first-launch seed treats
+as "needs default picks" — and the next `setDriver*` / `setTeam` / `seedIfEmpty`
+overwrites the file. Ordinary `IOException`s (permission denied, full disk,
+etc.) are not `CorruptionException`s and therefore propagate; the corruption
+policy does not erase arbitrary I/O failures. Same contract as `NextRaceCache`
+(see [../widget/countdown.md](../widget/countdown.md)); the spec is
+[../specs/cache-correctness-hardening.md](../specs/cache-correctness-hardening.md).
+
 Related: [terminology](../terminology.md), [project practices](../practices.md),
 [favorites decision](https://github.com/anpurnama11/my-f1-companion-app/issues/42),
 and [build ticket](https://github.com/anpurnama11/my-f1-companion-app/issues/12).

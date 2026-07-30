@@ -148,6 +148,18 @@ One atomic `edit` per write. Same `Wiring` instance held by the application, the
 and the Glance widget — one DataStore, one source of truth, file under
 `filesDir/datastore/next_race.preferences_pb`.
 
+**Corruption recovery.** The DataStore is constructed by
+`createPreferencesDataStore(file)` in `core/cache/PreferencesCacheFactory.kt` —
+the same internal helper `Wiring` uses, with a
+`ReplaceFileCorruptionHandler { emptyPreferences() }`. A parser-detected
+corruption read returns a `null` snapshot, which the widget reducer maps to
+`CountdownState.NoRaceData`; the widget remains placeable and the worker's next
+successful `write` / `writeOffSeason` repopulates it. Ordinary `IOException`s
+(permission denied, full disk, etc.) are not `CorruptionException`s and
+propagate — the corruption policy does not erase arbitrary I/O failures. Same
+contract as `FavoritesCache` (see [../my-team/summary.md](../my-team/summary.md));
+the spec is [../specs/cache-correctness-hardening.md](../specs/cache-correctness-hardening.md).
+
 [1]: ../../app/src/main/java/com/anpurnama/f1_app/widget/countdown/CountdownWorker.kt
 
 ## Cross-references

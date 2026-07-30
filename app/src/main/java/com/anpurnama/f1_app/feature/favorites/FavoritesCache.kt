@@ -21,9 +21,19 @@ import kotlinx.coroutines.flow.map
  * yet. Partial seed — if the user already filled one slot, the seed fills
  * the rest, never clobbers.
  *
- * Held by `Wiring` (built from a `PreferenceDataStoreFactory.create { file }`
- * under `context.preferencesDataStoreFile("favorites")`). The test harness
- * uses a temp file via the same factory; no `Context` needed at the cache
+ * **Corruption recovery.** The DataStore is constructed by
+ * [com.anpurnama.f1_app.core.cache.createPreferencesDataStore] with a
+ * `ReplaceFileCorruptionHandler` that returns `emptyPreferences`. When the
+ * on-disk protobuf cannot be parsed (e.g. truncated write, foreign
+ * payload, schema drift), the handler is invoked and the cache reads as
+ * an empty [Favorites] — the same shape the first-launch seed treats as
+ * "needs default picks". The next `setDriver*` / `setTeam` / `seedIfEmpty`
+ * overwrites the file. Ordinary `IOException`s (permission denied, full
+ * disk, etc.) are not `CorruptionException`s and therefore propagate —
+ * the corruption policy does not erase arbitrary I/O failures.
+ *
+ * Held by `Wiring`; the test harness uses the same construction helper
+ * against a JUnit `TemporaryFolder`. No `Context` needed at the cache
  * surface.
  */
 class FavoritesCache(private val dataStore: DataStore<Preferences>) {
