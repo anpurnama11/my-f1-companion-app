@@ -7,14 +7,16 @@ never copied blindly.
 
 ## Dependency injection (no framework)
 
-- All dependencies wired manually in `Wiring(context: Context)`, created by the
-  custom `Application` (`F1App`) during `onCreate()`. No Hilt, Koin,
-  CompositionLocal.
+- All dependencies wired manually in `Wiring(context: Context)`. The custom
+  `Application` (`F1App`) creates one `Wiring` during `onCreate()`, but the
+  dependencies inside `Wiring` are `by lazy` so each screen/worker/widget pays
+  only for the slice it first touches. No Hilt, Koin, CompositionLocal.
 - Infrastructure (Ktor `HttpClient` CIO, `HttpCache` ~10MB file storage,
   `DataStore`) is private to `Wiring`.
 - Use cases, cache repositories, `SnapshotStore`, and `FavoritesCache` stay
-  private to `Wiring`; `httpClient` remains `internal` because Coil shares it,
-  and `nextRaceCache` remains `internal` because the Glance widget reads it.
+  private lazy properties on `Wiring`; `httpClient` remains an `internal` lazy
+  property because Coil shares it, and `nextRaceCache` remains an `internal`
+  lazy property because the Glance widget reads it.
 - ViewModels are constructed via `viewModelFactory { initializer { ... } }`
   inside per-feature `*ViewModelFactory` functions. `Wiring` exposes one
   feature-level factory method per screen route, such as

@@ -63,85 +63,101 @@ class Wiring(context: Context) {
 
     private val appContext: Context = context.applicationContext
 
-    internal val httpClient: HttpClient = HttpClientFactory.create(appContext)
+    internal val httpClient: HttpClient by lazy { HttpClientFactory.create(appContext) }
 
-    private val getSeasonUseCase: GetSeasonUseCase = GetSeasonUseCase(httpClient)
-    private val getNextRaceUseCase: GetNextRaceUseCase = GetNextRaceUseCase(httpClient)
-    private val getDriversStandings: GetDriversStandingsUseCase = GetDriversStandingsUseCase(httpClient)
-    private val getConstructorsStandings: GetConstructorsStandingsUseCase = GetConstructorsStandingsUseCase(httpClient)
-    private val getDriverDetail: GetDriverDetailUseCase = GetDriverDetailUseCase(httpClient)
-    private val getTeamDetail: GetTeamDetailUseCase = GetTeamDetailUseCase(httpClient)
-    private val getRoundResults: GetRoundResultsUseCase = GetRoundResultsUseCase(httpClient)
-    private val getRoundQualifying: GetRoundQualifyingUseCase = GetRoundQualifyingUseCase(httpClient)
-    private val getRoundPodium: GetRoundPodiumUseCase = GetRoundPodiumUseCase(getRoundResults)
-    private val getPracticeResult: GetPracticeResultUseCase = GetPracticeResultUseCase(httpClient)
-    private val getSprintResult: GetSprintResultUseCase = GetSprintResultUseCase(httpClient)
-    private val getSprintQualifyingResult: GetSprintQualifyingResultUseCase = GetSprintQualifyingResultUseCase(httpClient)
-    private val getSessionResult: GetSessionResultUseCase = GetSessionResultUseCase(
-        getRoundResults = getRoundResults,
-        getRoundQualifying = getRoundQualifying,
-        getPractice = getPracticeResult,
-        getSprint = getSprintResult,
-        getSprintQualifying = getSprintQualifyingResult,
-    )
-    private val getFastestPitstop: GetFastestPitstopUseCase = GetFastestPitstopUseCase(httpClient)
-    private val getCircuit: GetCircuitUseCase = GetCircuitUseCase(httpClient)
-    private val getCircuitMostWins: GetCircuitMostWinsUseCase = GetCircuitMostWinsUseCase(httpClient)
+    private val getSeasonUseCase: GetSeasonUseCase by lazy { GetSeasonUseCase(httpClient) }
+    private val getNextRaceUseCase: GetNextRaceUseCase by lazy { GetNextRaceUseCase(httpClient) }
+    private val getDriversStandings: GetDriversStandingsUseCase by lazy { GetDriversStandingsUseCase(httpClient) }
+    private val getConstructorsStandings: GetConstructorsStandingsUseCase by lazy { GetConstructorsStandingsUseCase(httpClient) }
+    private val getDriverDetail: GetDriverDetailUseCase by lazy { GetDriverDetailUseCase(httpClient) }
+    private val getTeamDetail: GetTeamDetailUseCase by lazy { GetTeamDetailUseCase(httpClient) }
+    private val getRoundResults: GetRoundResultsUseCase by lazy { GetRoundResultsUseCase(httpClient) }
+    private val getRoundQualifying: GetRoundQualifyingUseCase by lazy { GetRoundQualifyingUseCase(httpClient) }
+    private val getRoundPodium: GetRoundPodiumUseCase by lazy { GetRoundPodiumUseCase(getRoundResults) }
+    private val getPracticeResult: GetPracticeResultUseCase by lazy { GetPracticeResultUseCase(httpClient) }
+    private val getSprintResult: GetSprintResultUseCase by lazy { GetSprintResultUseCase(httpClient) }
+    private val getSprintQualifyingResult: GetSprintQualifyingResultUseCase by lazy { GetSprintQualifyingResultUseCase(httpClient) }
+    private val getSessionResult: GetSessionResultUseCase by lazy {
+        GetSessionResultUseCase(
+            getRoundResults = getRoundResults,
+            getRoundQualifying = getRoundQualifying,
+            getPractice = getPracticeResult,
+            getSprint = getSprintResult,
+            getSprintQualifying = getSprintQualifyingResult,
+        )
+    }
+    private val getFastestPitstop: GetFastestPitstopUseCase by lazy { GetFastestPitstopUseCase(httpClient) }
+    private val getCircuit: GetCircuitUseCase by lazy { GetCircuitUseCase(httpClient) }
+    private val getCircuitMostWins: GetCircuitMostWinsUseCase by lazy { GetCircuitMostWinsUseCase(httpClient) }
 
-    private val snapshotStore: SnapshotStore = SnapshotStore(
-        DataStoreFactory.create(
-            serializer = CacheStateSerializer,
-            corruptionHandler = ReplaceFileCorruptionHandler { CacheState.Default },
-            migrations = listOf(CacheStateSchemaMigration),
-            produceFile = {
-                File(File(appContext.filesDir, "datastore"), "cache-state.json").apply {
+    private val snapshotStore: SnapshotStore by lazy {
+        SnapshotStore(
+            DataStoreFactory.create(
+                serializer = CacheStateSerializer,
+                corruptionHandler = ReplaceFileCorruptionHandler { CacheState.Default },
+                migrations = listOf(CacheStateSchemaMigration),
+                produceFile = {
+                    File(File(appContext.filesDir, "datastore"), "cache-state.json").apply {
+                        parentFile?.mkdirs()
+                    }
+                },
+            )
+        )
+    }
+
+    private val seasonScheduleCacheRepository: SeasonScheduleCacheRepository by lazy {
+        SeasonScheduleCacheRepository(
+            store = snapshotStore,
+            client = httpClient,
+        )
+    }
+
+    private val currentSeasonResourcesCacheRepository: CurrentSeasonResourcesCacheRepository by lazy {
+        CurrentSeasonResourcesCacheRepository(
+            store = snapshotStore,
+            client = httpClient,
+            refreshScheduleIfMissing = seasonScheduleCacheRepository::refreshCurrentSeason,
+        )
+    }
+
+    private val sessionResultsCacheRepository: SessionResultsCacheRepository by lazy {
+        SessionResultsCacheRepository(
+            store = snapshotStore,
+            client = httpClient,
+        )
+    }
+
+    private val nonSeasonResourcesCacheRepository: NonSeasonResourcesCacheRepository by lazy {
+        NonSeasonResourcesCacheRepository(
+            store = snapshotStore,
+            client = httpClient,
+        )
+    }
+
+    private val favoritesCache: FavoritesCache by lazy {
+        FavoritesCache(
+            PreferenceDataStoreFactory.create {
+                File(File(appContext.filesDir, "datastore"), "favorites.preferences_pb").apply {
                     parentFile?.mkdirs()
                 }
-            },
-        )
-    )
-
-    private val seasonScheduleCacheRepository: SeasonScheduleCacheRepository = SeasonScheduleCacheRepository(
-        store = snapshotStore,
-        client = httpClient,
-    )
-
-    private val currentSeasonResourcesCacheRepository: CurrentSeasonResourcesCacheRepository = CurrentSeasonResourcesCacheRepository(
-        store = snapshotStore,
-        client = httpClient,
-        refreshScheduleIfMissing = seasonScheduleCacheRepository::refreshCurrentSeason,
-    )
-
-    private val sessionResultsCacheRepository: SessionResultsCacheRepository = SessionResultsCacheRepository(
-        store = snapshotStore,
-        client = httpClient,
-    )
-
-    private val nonSeasonResourcesCacheRepository: NonSeasonResourcesCacheRepository = NonSeasonResourcesCacheRepository(
-        store = snapshotStore,
-        client = httpClient,
-    )
-
-    private val favoritesCache: FavoritesCache = FavoritesCache(
-        PreferenceDataStoreFactory.create {
-            File(File(appContext.filesDir, "datastore"), "favorites.preferences_pb").apply {
-                parentFile?.mkdirs()
             }
-        }
-    )
+        )
+    }
 
     /**
      * Typed-key DataStore for the Countdown widget. Same `Wiring`
      * instance is held by the application, the worker, and the
      * Glance widget — one DataStore, one source of truth.
      */
-    internal val nextRaceCache: NextRaceCache = NextRaceCache(
-        PreferenceDataStoreFactory.create {
-            File(File(appContext.filesDir, "datastore"), "next_race.preferences_pb").apply {
-                parentFile?.mkdirs()
+    internal val nextRaceCache: NextRaceCache by lazy {
+        NextRaceCache(
+            PreferenceDataStoreFactory.create {
+                File(File(appContext.filesDir, "datastore"), "next_race.preferences_pb").apply {
+                    parentFile?.mkdirs()
+                }
             }
-        }
-    )
+        )
+    }
 
 
     fun homepageViewModelFactory(): ViewModelProvider.Factory = homepageFactory(
