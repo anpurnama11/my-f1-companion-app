@@ -126,7 +126,7 @@ class CacheSyncWorkerTest {
     }
 
     @Test
-    fun `legacy session failures retain total-failure retry behavior during expansion`() {
+    fun `legacy outcomes are neutral after session bundle migration`() {
         val legacyOnlyFailure = BundleRefreshResult(
             listOf(BundleRefreshResult.Entry("session", RefreshResult.Failure("503"))),
         )
@@ -137,7 +137,7 @@ class CacheSyncWorkerTest {
             ),
         )
 
-        assertEquals(ListenableWorker.Result.retry(), decideWorkerResult(legacyOnlyFailure))
+        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(legacyOnlyFailure))
         assertEquals(ListenableWorker.Result.success(), decideWorkerResult(legacyPartialSuccess))
     }
 

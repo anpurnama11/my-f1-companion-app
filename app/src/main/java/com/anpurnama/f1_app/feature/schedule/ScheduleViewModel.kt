@@ -181,14 +181,38 @@ class ScheduleViewModel(
                 podiumsState.update { it + (round to SectionUiState.Content(podium, sync)) }
                 return
             }
-            if (refreshResult is RefreshResult.Failure) {
-                podiumsState.update { it + (round to SectionUiState.Error(refreshResult.message)) }
-                return
+            when (refreshResult) {
+                RefreshResult.Deferred -> {
+                    podiumsState.update { it + (round to SectionUiState.Error("Session not yet complete")) }
+                    return
+                }
+                is RefreshResult.RetryableFailure -> {
+                    podiumsState.update { it + (round to SectionUiState.Error(refreshResult.message)) }
+                    return
+                }
+                is RefreshResult.PermanentFailure -> if (!refreshResult.isCurrentSeasonBoundary()) {
+                    podiumsState.update { it + (round to SectionUiState.Error(refreshResult.message)) }
+                    return
+                }
+                is RefreshResult.Failure -> if (!refreshResult.isCurrentSeasonBoundary()) {
+                    podiumsState.update { it + (round to SectionUiState.Error(refreshResult.message)) }
+                    return
+                }
+                RefreshResult.Refreshed,
+                RefreshResult.SkippedFresh,
+                RefreshResult.Success,
+                -> Unit
             }
         }
 
         podiumsState.update { it + (round to getRoundPodium(year, round, forceRefresh).toSection()) }
     }
+}
+
+private fun RefreshResult.isCurrentSeasonBoundary(): Boolean = when (this) {
+    is RefreshResult.Failure -> message == "Not the active season" || message == "No active season"
+    is RefreshResult.PermanentFailure -> message == "Not the active season" || message == "No active season"
+    else -> false
 }
 
 fun scheduleViewModelFactory(

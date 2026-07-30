@@ -258,7 +258,7 @@ class Wiring(context: Context) {
             listOf(
                 BundleRefreshResult.Entry(
                     key = "current-season-sessions-bundle",
-                    result = RefreshResult.Failure(e.message ?: "Bundle refresh error"),
+                    result = RefreshFailureClassifier.classify(e),
                 ),
             ),
         )

@@ -50,10 +50,11 @@ Current-season structured cache is partially shipped: schedule, Homepage next
 race/session, driver/constructor standings, and current driver/team catalogs are
 durable DataStore snapshots. Homepage, Leaderboard, and My Team render cached
 content through `SectionUiState.Content(data, sync)` so stale or failed refreshes
-do not blank the last good payload. Those current-season refreshes distinguish
-persisted writes, fresh skips, deferred work, retryable failures, and permanent
-failures; session and non-season resources retain temporary legacy outcomes for
-issues #68/#69. The Countdown widget cache remains separate.
+do not blank the last good payload. Those current-season refreshes, including
+session results and pitstops, distinguish persisted writes, fresh skips,
+deferred work, retryable failures, and permanent failures; only non-season
+resources retain temporary legacy outcomes for issue #69. The Countdown widget
+cache remains separate.
 
 **Multi-backstack (revision 2):** each tab has its own persistent
 `NavBackStack` — switching tabs no longer destroys ViewModels.

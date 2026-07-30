@@ -37,9 +37,8 @@ Worker result policy during the current-season expansion:
   on the retry while fresh.
 - **Only `SkippedFresh`, `Deferred`, or `PermanentFailure`** →
   `Result.success()`. These outcomes are neutral for immediate retry.
-- **Legacy session outcomes** retain the prior rule: legacy failures retry only
-  when no `Refreshed` or legacy `Success` appears in the aggregate. Issue #68
-  removes this branch; issue #69 removes the legacy variants.
+- Legacy variants remain for non-season foreground resources until issue #69;
+  they do not participate in the current-season worker aggregate.
 
 ```kotlin
 // core/cache/CacheSyncWorker.kt — platform worker, NOT in f1/.
@@ -66,7 +65,7 @@ class CacheSyncWorker(...) : CoroutineWorker(...) {
             wiring.sessionResultsCacheRepository.refreshCurrentSeasonBundle(now)
         }.getOrElse { error ->
             BundleRefreshResult(listOf(BundleRefreshResult.Entry("current-season-sessions-bundle",
-                RefreshResult.Failure(error.message ?: "Bundle refresh error")))) // legacy all-throwable wrapper: #68
+                RefreshFailureClassifier.classify(error))))
         }
         return decideWorkerResult(schedule + resources + sessions)
     }
@@ -98,8 +97,7 @@ fun SessionResultsCacheRepository.refreshCurrentSeasonBundle(now: Instant): Bund
 
 data class BundleRefreshResult(val entries: List<Entry>) {
     val requiresRetry: Boolean
-        get() = entries.any { it.result is RefreshResult.RetryableFailure } ||
-            legacyTotalFailure()
+        get() = entries.any { it.result is RefreshResult.RetryableFailure }
     data class Entry(val key: String, val result: RefreshResult)
     companion object { val Empty: BundleRefreshResult = BundleRefreshResult(emptyList()) }
 }

@@ -32,12 +32,10 @@ import java.util.concurrent.TimeUnit
  * a transient schedule failure does not strand the worker.
  *
  * Worker result policy:
- * - `Result.retry()` when any migrated current-season resource reports
- *   a retryable failure, even if other writes succeeded or snapshots
- *   were fresh. Successful writes remain committed and TTL-skip later.
+ * - `Result.retry()` when any current-season resource reports a retryable
+ *   failure, even if other writes succeeded or snapshots were fresh.
+ *   Successful writes remain committed and TTL-skip later.
  * - Fresh skips, deferred work, and permanent failures are neutral.
- * - Session resources temporarily retain their legacy all-failed retry
- *   policy until issue #68 migrates them.
  *
  * Resource selection is the repositories' `refreshCurrentSeasonBundle`
  * methods; this worker is orchestration only.
@@ -155,9 +153,8 @@ class CacheSyncWorker(
  * should record.
  *
  * Empty and neutral-only aggregates advance to the next fixed tick.
- * Any migrated retryable failure requests WorkManager backoff. The
- * aggregate also preserves the pre-#68 legacy session rule: retry only
- * when legacy failures have no successful write beside them.
+ * Any retryable failure requests WorkManager backoff. Deferred,
+ * fresh-skipped, permanent, and temporary legacy outcomes are neutral.
  *
  * Exposed at the file level (not on the worker companion) so the
  * JVM unit tests can exercise the decision matrix without a
