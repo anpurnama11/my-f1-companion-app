@@ -1,0 +1,2 @@
+*.bat text eol=lf
+*.cmd text eol=lf
