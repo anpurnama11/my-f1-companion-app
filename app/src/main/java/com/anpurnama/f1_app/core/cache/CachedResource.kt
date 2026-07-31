@@ -20,16 +20,11 @@ sealed interface RefreshResult {
     data class RetryableFailure(val message: String) : RefreshResult
     data class PermanentFailure(val message: String) : RefreshResult
 
-    // Transitional outcomes owned by #68 (session resources) and #69
-    // (non-season resources and final removal).
-    data object Success : RefreshResult
-    data class Failure(val message: String) : RefreshResult
 }
 
 val RefreshResult.failureMessageOrNull: String?
     get() = when (this) {
         is RefreshResult.RetryableFailure -> message
         is RefreshResult.PermanentFailure -> message
-        is RefreshResult.Failure -> message
         else -> null
     }

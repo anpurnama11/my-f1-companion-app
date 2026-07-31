@@ -153,8 +153,7 @@ class RoundViewModel(
             }
             val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)
             if (result is RefreshResult.Refreshed ||
-                result is RefreshResult.SkippedFresh ||
-                result is RefreshResult.Success
+                result is RefreshResult.SkippedFresh
             ) {
                 val refreshed = observeCachedSeason.first()
                 if (refreshed?.data?.year == year) {

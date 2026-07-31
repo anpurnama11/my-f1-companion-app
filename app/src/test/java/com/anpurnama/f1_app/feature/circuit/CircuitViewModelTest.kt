@@ -152,7 +152,7 @@ class CircuitViewModelTest {
             getCircuit = { _, _ -> Outcome.Failure("should not be called") },
             getCircuitMostWins = { _, _ -> Outcome.Failure("should not be called") },
             observeCachedMetadata = cachedFlow,
-            refreshCachedMetadata = { RefreshResult.Success },
+            refreshCachedMetadata = { RefreshResult.Refreshed },
             observeCachedMostWins = null,
             refreshCachedMostWins = null,
         )
@@ -173,7 +173,7 @@ class CircuitViewModelTest {
     @Test
     fun `cache refresh failure preserves cached content with RefreshFailed sync`() = runTest {
         val cachedFlow = MutableStateFlow<CachedResource<CircuitDetail>?>(null)
-        var refreshResultValue: RefreshResult = RefreshResult.Success
+        var refreshResultValue: RefreshResult = RefreshResult.Refreshed
         var refreshReason: RefreshReason = RefreshReason.StaleOpen
         val vm = CircuitViewModel(
             circuitId = "bahrain",
@@ -192,7 +192,7 @@ class CircuitViewModelTest {
         testScheduler.advanceUntilIdle()
 
         // Now trigger a stale-refresh that fails
-        refreshResultValue = RefreshResult.Failure("offline")
+        refreshResultValue = RefreshResult.RetryableFailure("offline")
         vm.refresh()
         testScheduler.advanceUntilIdle()
 
@@ -201,6 +201,38 @@ class CircuitViewModelTest {
         assertEquals(ContentSyncStatus.RefreshFailed("offline"), metaContent.sync)
         assertEquals("Bahrain International Circuit", metaContent.data.name)
         assertEquals(RefreshReason.PullToRefresh, refreshReason)
+    }
+
+    @Test
+    fun `cached sections remain independent when only metadata refresh fails`() = runTest {
+        val cachedMetadata = MutableStateFlow<CachedResource<CircuitDetail>?>(
+            CachedResource(METADATA, snapshot("circuit.metadata")),
+        )
+        val cachedMostWins = MutableStateFlow<CachedResource<CircuitMostWins>?>(
+            CachedResource(WINS, snapshot("circuit.most-wins")),
+        )
+        val vm = CircuitViewModel(
+            circuitId = "bahrain",
+            getCircuit = { _, _ -> Outcome.Failure("metadata fallback should not be called") },
+            getCircuitMostWins = { _, _ -> Outcome.Failure("most-wins fallback should not be called") },
+            observeCachedMetadata = cachedMetadata,
+            refreshCachedMetadata = { RefreshResult.RetryableFailure("metadata offline") },
+            observeCachedMostWins = cachedMostWins,
+            refreshCachedMostWins = { RefreshResult.Refreshed },
+        )
+
+        vm.uiState.take(2).toList()
+        testScheduler.advanceUntilIdle()
+        vm.refresh()
+        testScheduler.advanceUntilIdle()
+
+        val loaded = vm.uiState.value as CircuitViewModel.UiState.Sections
+        val metadata = loaded.metadata as SectionUiState.Content
+        val mostWins = loaded.mostWins as SectionUiState.Content
+        assertEquals(ContentSyncStatus.RefreshFailed("metadata offline"), metadata.sync)
+        assertEquals(METADATA, metadata.data)
+        assertEquals(ContentSyncStatus.Fresh, mostWins.sync)
+        assertEquals(WINS, mostWins.data)
     }
 
     @Test

@@ -63,7 +63,7 @@ lode/
     0017-offline-refresh-coordination.md  # foreground per-resource; background best-effort current-season bundle; per-resource single-flight + schedule-gated rollover
     0018-cache-status-on-section-content.md  # SectionUiState.Content carries Fresh/Stale/Refreshing/RefreshFailed sync status
     0019-offline-cache-uses-datastore-snapshots.md  # Proto DataStore CacheState.snapshots; Room only on measured scale/query/contention tripwires
-    0020-current-season-truthful-refresh-outcomes.md # five truthful current-season outcomes; legacy boundary for #68/#69
+    0020-current-season-truthful-refresh-outcomes.md # five truthful outcomes across current-season and non-season resources
   release/
     build-and-signing.md           # release buildType, signing, R8 (AGP 9 DSL), versioning, output (ticket 15)
   repository/

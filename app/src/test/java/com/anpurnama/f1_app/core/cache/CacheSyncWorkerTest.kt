@@ -126,31 +126,19 @@ class CacheSyncWorkerTest {
     }
 
     @Test
-    fun `legacy outcomes are neutral after session bundle migration`() {
-        val legacyOnlyFailure = BundleRefreshResult(
-            listOf(BundleRefreshResult.Entry("session", RefreshResult.Failure("503"))),
+    fun `permanent and deferred outcomes are neutral after session bundle migration`() {
+        val permanentOnly = BundleRefreshResult(
+            listOf(BundleRefreshResult.Entry("session", RefreshResult.PermanentFailure("404"))),
         )
-        val legacyPartialSuccess = BundleRefreshResult(
+        val deferredWithPermanent = BundleRefreshResult(
             listOf(
-                BundleRefreshResult.Entry("session", RefreshResult.Failure("503")),
-                BundleRefreshResult.Entry("pitstop", RefreshResult.Success),
+                BundleRefreshResult.Entry("session", RefreshResult.Deferred),
+                BundleRefreshResult.Entry("pitstop", RefreshResult.PermanentFailure("404")),
             ),
         )
 
-        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(legacyOnlyFailure))
-        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(legacyPartialSuccess))
-    }
-
-    @Test
-    fun `legacy session failure beside a migrated write retains prior partial-success behavior`() {
-        val transitionalMixed = BundleRefreshResult(
-            listOf(
-                BundleRefreshResult.Entry("schedule", RefreshResult.Refreshed),
-                BundleRefreshResult.Entry("session", RefreshResult.Failure("503")),
-            ),
-        )
-
-        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(transitionalMixed))
+        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(permanentOnly))
+        assertEquals(ListenableWorker.Result.success(), decideWorkerResult(deferredWithPermanent))
     }
 
 }

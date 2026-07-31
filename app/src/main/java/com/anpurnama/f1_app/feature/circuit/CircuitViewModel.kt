@@ -108,22 +108,8 @@ class CircuitViewModel(
     private suspend fun loadMetadata(forceRefresh: Boolean) {
         val refresh = refreshCachedMetadata
         if (observeCachedMetadata != null && refresh != null) {
-            val result = metadataState.refreshCachedSection(forceRefresh, refresh)
-            // Fall through to direct network only when the cache explicitly
-            // indicates it cannot serve this resource (not the active season).
-            // A generic refresh failure must keep the error state.
-            when (result) {
-                is RefreshResult.Success -> return
-                is RefreshResult.Failure -> if (result.message != "Not the active season" &&
-                    result.message != "No active season"
-                ) return
-                RefreshResult.Refreshed,
-                RefreshResult.SkippedFresh,
-                RefreshResult.Deferred,
-                is RefreshResult.RetryableFailure,
-                is RefreshResult.PermanentFailure,
-                -> return
-            }
+            metadataState.refreshCachedSection(forceRefresh, refresh)
+            return
         }
         metadataState.value = SectionUiState.Loading
         metadataState.value = getCircuit(circuitId, forceRefresh).toSection()
@@ -132,22 +118,8 @@ class CircuitViewModel(
     private suspend fun loadMostWins(forceRefresh: Boolean) {
         val refresh = refreshCachedMostWins
         if (observeCachedMostWins != null && refresh != null) {
-            val result = mostWinsState.refreshCachedSection(forceRefresh, refresh)
-            // Fall through to direct network only when the cache explicitly
-            // indicates it cannot serve this resource (not the active season).
-            // A generic refresh failure must keep the error state.
-            when (result) {
-                is RefreshResult.Success -> return
-                is RefreshResult.Failure -> if (result.message != "Not the active season" &&
-                    result.message != "No active season"
-                ) return
-                RefreshResult.Refreshed,
-                RefreshResult.SkippedFresh,
-                RefreshResult.Deferred,
-                is RefreshResult.RetryableFailure,
-                is RefreshResult.PermanentFailure,
-                -> return
-            }
+            mostWinsState.refreshCachedSection(forceRefresh, refresh)
+            return
         }
         mostWinsState.value = SectionUiState.Loading
         mostWinsState.value = getCircuitMostWins(circuitId, forceRefresh).toSection()

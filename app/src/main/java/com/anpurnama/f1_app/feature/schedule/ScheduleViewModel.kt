@@ -194,13 +194,8 @@ class ScheduleViewModel(
                     podiumsState.update { it + (round to SectionUiState.Error(refreshResult.message)) }
                     return
                 }
-                is RefreshResult.Failure -> if (!refreshResult.isCurrentSeasonBoundary()) {
-                    podiumsState.update { it + (round to SectionUiState.Error(refreshResult.message)) }
-                    return
-                }
                 RefreshResult.Refreshed,
                 RefreshResult.SkippedFresh,
-                RefreshResult.Success,
                 -> Unit
             }
         }
@@ -210,7 +205,6 @@ class ScheduleViewModel(
 }
 
 private fun RefreshResult.isCurrentSeasonBoundary(): Boolean = when (this) {
-    is RefreshResult.Failure -> message == "Not the active season" || message == "No active season"
     is RefreshResult.PermanentFailure -> message == "Not the active season" || message == "No active season"
     else -> false
 }

@@ -26,13 +26,16 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -46,6 +49,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class NonSeasonResourcesCacheRepositoryTest {
     @get:Rule val tempFolder = TemporaryFolder()
 
@@ -110,13 +114,50 @@ class NonSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshCircuitMetadata("bahrain", RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observeCircuitMetadata("bahrain").first()!!
         assertEquals("Bahrain International Circuit", cached.data.name)
         assertEquals(5.412, cached.data.circuitLengthKm, 0.001)
         assertEquals(15, cached.data.numberOfCorners)
         assertEquals("1:31.447", cached.data.lapRecord?.time)
         // lapRecord is non-null in the test fixture — attribution fields are present
+        scope.cancel()
+    }
+
+    @Test
+    fun `fresh circuit metadata skips the request with a neutral outcome`() = runTest {
+        val (store, scope) = newStore()
+        var callCount = 0
+        val repo = NonSeasonResourcesCacheRepository(
+            store = store,
+            client = client {
+                callCount++
+                jsonOk(circuitMetadataBody())
+            },
+            clock = FixedClock(1_000),
+        )
+
+        assertEquals(RefreshResult.Refreshed,
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.StaleOpen))
+        assertEquals(RefreshResult.SkippedFresh,
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.StaleOpen))
+        assertEquals(1, callCount)
+        scope.cancel()
+    }
+
+    @Test
+    fun `non-season refresh classifies not-found as permanent`() = runTest {
+        val (store, scope) = newStore()
+        val repo = NonSeasonResourcesCacheRepository(
+            store = store,
+            client = client { respondError(HttpStatusCode.NotFound) },
+            clock = FixedClock(1_000),
+        )
+
+        assertEquals(
+            RefreshResult.PermanentFailure("Request failed (404)"),
+            repo.refreshWikipediaSummary("Missing_Page", RefreshReason.PullToRefresh),
+        )
         scope.cancel()
     }
 
@@ -137,7 +178,7 @@ class NonSeasonResourcesCacheRepositoryTest {
         )
         val result = failingRepo.refreshCircuitMetadata("bahrain", RefreshReason.PullToRefresh)
 
-        assertEquals(RefreshResult.Failure("Server error (503)"), result)
+        assertEquals(RefreshResult.RetryableFailure("Server error (503)"), result)
         val cached = failingRepo.observeCircuitMetadata("bahrain").first()!!
         assertEquals("Bahrain International Circuit", cached.data.name)
         assertEquals(RefreshAttemptStatus.Failed("Server error (503)"), cached.snapshot.lastAttemptStatus)
@@ -188,7 +229,7 @@ class NonSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshCircuitMostWins("bahrain", RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observeCircuitMostWins("bahrain").first()!!
         assertEquals("max_verstappen", cached.data.topDriver?.driverId)
         assertEquals(2, cached.data.topDriver?.wins)
@@ -217,7 +258,7 @@ class NonSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshCircuitMostWins("new_circuit", RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observeCircuitMostWins("new_circuit").first()!!
         assertNull(cached.data.topDriver)
         assertNull(cached.data.topTeam)
@@ -248,7 +289,7 @@ class NonSeasonResourcesCacheRepositoryTest {
 
         val result = repo.refreshWikipediaSummary("Max_Verstappen", RefreshReason.StaleOpen)
 
-        assertEquals(RefreshResult.Success, result)
+        assertEquals(RefreshResult.Refreshed, result)
         val cached = repo.observeWikipediaSummary("Max_Verstappen").first()!!
         assertEquals("Max Verstappen", cached.data.title)
         assertEquals("Dutch racing driver", cached.data.description)
@@ -258,34 +299,148 @@ class NonSeasonResourcesCacheRepositoryTest {
     }
 
     @Test
-    fun `single-flight deduplicates concurrent circuit metadata refreshes`() = runTest {
+    fun `pull-to-refresh joiners of stale-open share one forced follow-up`() = runTest {
         val (store, scope) = newStore()
-        var callCount = 0
+        val firstRequestStarted = CompletableDeferred<Unit>()
+        val releaseFirstRequest = CompletableDeferred<Unit>()
+        val forceRefreshRequests = mutableListOf<Boolean>()
+        var activeRequests = 0
+        var maximumConcurrentRequests = 0
         val repo = NonSeasonResourcesCacheRepository(
             store = store,
-            client = client {
-                callCount++
-                kotlinx.coroutines.delay(100)
+            client = client { request ->
+                val forceRefresh = request.headers[HttpHeaders.CacheControl] == "no-cache"
+                forceRefreshRequests += forceRefresh
+                activeRequests++
+                maximumConcurrentRequests = maxOf(maximumConcurrentRequests, activeRequests)
+                if (forceRefreshRequests.size == 1) {
+                    firstRequestStarted.complete(Unit)
+                    releaseFirstRequest.await()
+                }
+                activeRequests--
+                if (forceRefresh) {
+                    respondError(HttpStatusCode.ServiceUnavailable)
+                } else {
+                    jsonOk(circuitMetadataBody())
+                }
+            },
+            clock = FixedClock(1_000),
+            scope = backgroundScope,
+        )
+
+        val staleOpen = async {
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.StaleOpen)
+        }
+        firstRequestStarted.await()
+        val pullToRefresh = async {
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.PullToRefresh)
+        }
+        val secondPullToRefresh = async {
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.PullToRefresh)
+        }
+        runCurrent()
+
+        assertEquals(listOf(false), forceRefreshRequests)
+        releaseFirstRequest.complete(Unit)
+
+        assertEquals(
+            RefreshResult.RetryableFailure("Server error (503)"),
+            staleOpen.await(),
+        )
+        assertEquals(
+            RefreshResult.RetryableFailure("Server error (503)"),
+            pullToRefresh.await(),
+        )
+        assertEquals(
+            RefreshResult.RetryableFailure("Server error (503)"),
+            secondPullToRefresh.await(),
+        )
+        assertEquals(listOf(false, true), forceRefreshRequests)
+        assertEquals(1, maximumConcurrentRequests)
+        scope.cancel()
+    }
+
+    @Test
+    fun `pull-to-refresh already in flight coalesces stale-open without a follow-up`() = runTest {
+        val (store, scope) = newStore()
+        val firstRequestStarted = CompletableDeferred<Unit>()
+        val releaseFirstRequest = CompletableDeferred<Unit>()
+        val forceRefreshRequests = mutableListOf<Boolean>()
+        val repo = NonSeasonResourcesCacheRepository(
+            store = store,
+            client = client { request ->
+                forceRefreshRequests += request.headers[HttpHeaders.CacheControl] == "no-cache"
+                firstRequestStarted.complete(Unit)
+                releaseFirstRequest.await()
                 jsonOk(circuitMetadataBody())
             },
             clock = FixedClock(1_000),
+            scope = backgroundScope,
         )
 
-        // Concurrent refreshes
-        val results = mutableListOf<RefreshResult>()
-        val job1 = launch {
-            results.add(repo.refreshCircuitMetadata("bahrain", RefreshReason.StaleOpen))
+        val pullToRefresh = async {
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.PullToRefresh)
         }
-        val job2 = launch {
-            results.add(repo.refreshCircuitMetadata("bahrain", RefreshReason.PullToRefresh))
+        firstRequestStarted.await()
+        val staleOpen = async {
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.StaleOpen)
         }
-        joinAll(job1, job2)
-        val result1 = results[0]
-        val result2 = results[1]
+        runCurrent()
 
-        assertEquals(RefreshResult.Success, result1)
-        assertEquals(RefreshResult.Success, result2)
-        assertEquals(1, callCount)
+        assertEquals(listOf(true), forceRefreshRequests)
+        releaseFirstRequest.complete(Unit)
+
+        assertEquals(RefreshResult.Refreshed, pullToRefresh.await())
+        assertEquals(RefreshResult.Refreshed, staleOpen.await())
+        assertEquals(listOf(true), forceRefreshRequests)
+        scope.cancel()
+    }
+
+    @Test
+    fun `cancelling one waiter does not clear shared refresh for later joiners`() = runTest {
+        val (store, scope) = newStore()
+        val firstRequestStarted = CompletableDeferred<Unit>()
+        val releaseFirstRequest = CompletableDeferred<Unit>()
+        val forceRefreshRequests = mutableListOf<Boolean>()
+        val repo = NonSeasonResourcesCacheRepository(
+            store = store,
+            client = client { request ->
+                forceRefreshRequests += request.headers[HttpHeaders.CacheControl] == "no-cache"
+                firstRequestStarted.complete(Unit)
+                releaseFirstRequest.await()
+                jsonOk(circuitMetadataBody())
+            },
+            clock = FixedClock(1_000),
+            scope = backgroundScope,
+        )
+
+        val owner = async {
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.StaleOpen)
+        }
+        firstRequestStarted.await()
+        val cancelledWaiter = async(start = CoroutineStart.UNDISPATCHED) {
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.StaleOpen)
+        }
+        runCurrent()
+        cancelledWaiter.cancel()
+        cancelledWaiter.join()
+
+        val laterJoiner = async {
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.StaleOpen)
+        }
+        runCurrent()
+        assertEquals(listOf(false), forceRefreshRequests)
+
+        releaseFirstRequest.complete(Unit)
+
+        assertEquals(RefreshResult.Refreshed, owner.await())
+        assertEquals(RefreshResult.Refreshed, laterJoiner.await())
+        assertEquals(listOf(false), forceRefreshRequests)
+        assertEquals(
+            RefreshResult.Refreshed,
+            repo.refreshCircuitMetadata("bahrain", RefreshReason.PullToRefresh),
+        )
+        assertEquals(listOf(false, true), forceRefreshRequests)
         scope.cancel()
     }
 
@@ -306,7 +461,7 @@ class NonSeasonResourcesCacheRepositoryTest {
         )
         val result = failingRepo.refreshWikipediaSummary("Max_Verstappen", RefreshReason.PullToRefresh)
 
-        assertEquals(RefreshResult.Failure("Server error (503)"), result)
+        assertEquals(RefreshResult.RetryableFailure("Server error (503)"), result)
         val cached = failingRepo.observeWikipediaSummary("Max_Verstappen").first()!!
         assertEquals("Max Verstappen", cached.data.title)
         assertEquals(RefreshAttemptStatus.Failed("Server error (503)"), cached.snapshot.lastAttemptStatus)

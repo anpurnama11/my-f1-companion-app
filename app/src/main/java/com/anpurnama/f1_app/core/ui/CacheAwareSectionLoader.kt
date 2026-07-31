@@ -18,7 +18,6 @@ suspend fun <T> MutableStateFlow<SectionUiState<T>>.refreshCachedSection(
     return when (val result = refresh(if (forceRefresh) RefreshReason.PullToRefresh else RefreshReason.StaleOpen)) {
         RefreshResult.Refreshed,
         RefreshResult.SkippedFresh,
-        RefreshResult.Success,
         -> {
             if (value is SectionUiState.Content) {
                 @Suppress("UNCHECKED_CAST")
@@ -32,7 +31,6 @@ suspend fun <T> MutableStateFlow<SectionUiState<T>>.refreshCachedSection(
         }
         is RefreshResult.RetryableFailure,
         is RefreshResult.PermanentFailure,
-        is RefreshResult.Failure,
         -> {
             val after = value
             value = if (after is SectionUiState.Content) {
