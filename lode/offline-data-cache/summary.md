@@ -41,9 +41,10 @@ recorded as a failed attempt and is not written under the old key. Homepage,
 Leaderboard, and My Team observe cached standings; Homepage also observes cached
 next race/session. My Team warms driver and team catalogs as production
 resources for picker/detail joins that need the season catalog generation. The
-Countdown widget still reads its separate typed-key `NextRaceCache`. These
-current-season resources, session results, and pitstops use truthful outcomes;
-only non-season repositories retain legacy binary outcomes until issue #69.
+Countdown widget still reads its separate typed-key `NextRaceCache`. The
+current-season resources, session results, pitstops, circuit details, and
+Wikipedia summaries use the same truthful five-outcome contract. The shared
+refresh result has no legacy binary success/failure variants.
 
 ```kotlin
 currentResources.refreshDriverStandings(RefreshReason.StaleOpen) // Refreshed or SkippedFresh

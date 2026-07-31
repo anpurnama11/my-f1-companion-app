@@ -7,13 +7,14 @@ Status: accepted
 The cache previously returned `Success` both after persisting a network payload
 and after skipping a fresh snapshot. WorkManager therefore could not distinguish
 network evidence from a TTL decision, and a successful sibling write could hide
-a retryable current-season failure. Non-season migration remains separately
-owned by GitHub issue #69.
+a retryable failure. The same ambiguity existed in non-season foreground
+resources.
 
 ## Decision
 
-Current-season schedule, next-session, standings, catalogs, session results,
-and pitstops return five truthful outcomes. One classifier maps HTTP
+All structured resources — current-season schedule, next-session, standings,
+catalogs, session results, pitstops, circuit details, and Wikipedia summaries —
+return five truthful outcomes. One classifier maps HTTP
 408/429/5xx, timeout, connectivity, storage I/O, and malformed successful
 payloads to `RetryableFailure`; other HTTP 4xx responses are
 `PermanentFailure`. Unknown programmer failures and coroutine cancellation
@@ -28,8 +29,6 @@ sealed interface RefreshResult {
     data object Deferred : RefreshResult
     data class RetryableFailure(val message: String) : RefreshResult
     data class PermanentFailure(val message: String) : RefreshResult
-    data object Success : RefreshResult // temporary non-season: #69
-    data class Failure(val message: String) : RefreshResult // temporary non-season: #69
 }
 ```
 
@@ -49,11 +48,10 @@ flowchart TD
 
 ## Why
 
-This is the smallest staged contract that makes current-season orchestration
-honest without pre-implementing later tickets. Keeping one `requiresRetry`
-aggregate avoids parallel old/new bundle APIs. Legacy `Success`/`Failure`
-remain only for non-season resources; issue #69 migrates those resources and
-removes both variants.
+This is the smallest contract that makes foreground and background
+orchestration honest without parallel old/new bundle APIs. Keeping one
+`requiresRetry` aggregate means a retryable failure remains visible beside
+successful writes while fresh skips stay neutral.
 
 ## Consequences
 
@@ -63,7 +61,8 @@ removes both variants.
   preserves cached content, while an uncached consumer may show unavailable.
 - A retry can coexist with successful writes; TTL gates prevent rewriting those
   fresh siblings during backoff.
-- Exhaustive legacy UI branches remain only as compatibility handling for the
-  non-season repositories owned by issue #69.
+- Circuit Detail maps each non-season refresh through the same cache-aware
+  section loader, so metadata and most-wins content fail independently without
+  a direct-network fallback that could erase cached content.
 
 Related: [../offline-data-cache/refresh-coordination.md](../offline-data-cache/refresh-coordination.md), [../offline-data-cache/summary.md](../offline-data-cache/summary.md), [../specs/cache-correctness-hardening.md](../specs/cache-correctness-hardening.md).

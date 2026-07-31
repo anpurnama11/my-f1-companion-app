@@ -23,7 +23,9 @@ is a coarse ±48h discovery hint; the per-session plausibly-complete gate
 inside the window is still excluded. Outcomes remain resource-scoped;
 partial failures record attempt metadata and never roll back successful writes
 or delete old payloads. Foreground and worker refreshes share per-resource
-single-flight gates.
+single-flight gates; if a pull-to-refresh joins weaker in-flight work, the
+repository records the stronger demand and runs one sequential forced
+follow-up before the joining pull-to-refresh completes.
 
 Worker result policy during the current-season expansion:
 - **Empty bundle** (off-season, no active season, no cached schedule, no
@@ -37,8 +39,9 @@ Worker result policy during the current-season expansion:
   on the retry while fresh.
 - **Only `SkippedFresh`, `Deferred`, or `PermanentFailure`** →
   `Result.success()`. These outcomes are neutral for immediate retry.
-- Legacy variants remain for non-season foreground resources until issue #69;
-  they do not participate in the current-season worker aggregate.
+- Non-season foreground resources use the same five-outcome contract as
+  current-season resources; no binary success/failure compatibility variants
+  remain in production.
 
 ```kotlin
 // core/cache/CacheSyncWorker.kt — platform worker, NOT in f1/.
@@ -228,7 +231,7 @@ flowchart TD
 - The schedule refresh is included in the worker's aggregate so a failed schedule on a pre-promotion device (no active season yet) is not silently mis-classified as off-season; that scenario retries, it does not enter the empty-bundle success path.
 - Bundle refresh is orchestration only: every payload keeps its own resource key, metadata, validation, and failure boundary.
 - Bundle scope is current-season structured data for supported surfaces, not historical archives or remote images; session result endpoints are only refreshed once plausibly complete.
-- Foreground and worker refreshes coalesce through a per-resource single-flight gate.
+- Foreground and worker refreshes coalesce through a per-resource single-flight gate. A pull-to-refresh joining weaker work escalates that flight to one sequential forced follow-up; all joining pull callers receive the forced attempt's outcome.
 - Pull-to-refresh bypasses TTL and the Ktor transport cache but still writes through the snapshot store and preserves visible cached content.
 - Cache-aware screens use `SectionUiState.Content(data, sync)` for every cached-payload state; stale, refreshing, and failed refreshes never become full-section errors.
 - A failed refresh never deletes the last good payload; it updates attempt metadata.

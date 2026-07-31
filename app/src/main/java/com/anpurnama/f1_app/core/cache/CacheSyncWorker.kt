@@ -154,7 +154,7 @@ class CacheSyncWorker(
  *
  * Empty and neutral-only aggregates advance to the next fixed tick.
  * Any retryable failure requests WorkManager backoff. Deferred,
- * fresh-skipped, permanent, and temporary legacy outcomes are neutral.
+ * fresh-skipped, deferred, and permanent outcomes are neutral.
  *
  * Exposed at the file level (not on the worker companion) so the
  * JVM unit tests can exercise the decision matrix without a

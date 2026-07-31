@@ -99,8 +99,6 @@ class SessionResultViewModel(
             // A generic refresh failure (network error, server error) must keep
             // the error state and not trigger a second request.
             when (result) {
-                is RefreshResult.Success -> return
-                is RefreshResult.Failure -> if (!result.isCurrentSeasonBoundary()) return
                 is RefreshResult.PermanentFailure -> if (!result.isCurrentSeasonBoundary()) return
                 RefreshResult.Deferred -> {
                     if (resultState.value !is SectionUiState.Content) {
@@ -126,8 +124,6 @@ class SessionResultViewModel(
             // indicates it cannot serve this resource (not the active season).
             // A generic refresh failure must keep the error state.
             when (result) {
-                is RefreshResult.Success -> return
-                is RefreshResult.Failure -> if (!result.isCurrentSeasonBoundary()) return
                 is RefreshResult.PermanentFailure -> if (!result.isCurrentSeasonBoundary()) return
                 RefreshResult.Deferred -> {
                     if (pitstopState.value !is SectionUiState.Content) {
@@ -149,7 +145,6 @@ class SessionResultViewModel(
 private const val SessionNotCompleteMessage = "Session not yet complete"
 
 private fun RefreshResult.isCurrentSeasonBoundary(): Boolean = when (this) {
-    is RefreshResult.Failure -> message == "Not the active season" || message == "No active season"
     is RefreshResult.PermanentFailure -> message == "Not the active season" || message == "No active season"
     else -> false
 }

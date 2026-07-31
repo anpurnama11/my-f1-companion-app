@@ -3,10 +3,12 @@ package com.anpurnama.f1_app.f1.cache
 import com.anpurnama.f1_app.core.cache.CacheResourceKey
 import com.anpurnama.f1_app.core.cache.CachedResource
 import com.anpurnama.f1_app.core.cache.RefreshAttemptStatus
+import com.anpurnama.f1_app.core.cache.RefreshFailureClassifier
 import com.anpurnama.f1_app.core.cache.RefreshReason
 import com.anpurnama.f1_app.core.cache.RefreshResult
 import com.anpurnama.f1_app.core.cache.ResourceSnapshot
 import com.anpurnama.f1_app.core.cache.SnapshotStore
+import com.anpurnama.f1_app.core.cache.failureMessageOrNull
 import com.anpurnama.f1_app.f1.data.CircuitDetailResponseDto
 import com.anpurnama.f1_app.f1.data.CircuitWinnersResponseDto
 import com.anpurnama.f1_app.f1.data.WikipediaSummary
@@ -18,9 +20,8 @@ import com.anpurnama.f1_app.f1.model.CircuitMostWins
 import com.anpurnama.f1_app.f1.toCircuitDetail
 import com.anpurnama.f1_app.f1.toCircuitMostWins
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.ServerResponseException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
@@ -55,7 +56,7 @@ class NonSeasonResourcesCacheRepository(
     private val staleAfterMs: Long = TwentyFourHoursMs,
 ) {
     private val mutex = Mutex()
-    private val inFlight = mutableMapOf<String, Deferred<RefreshResult>>()
+    private val inFlight = mutableMapOf<String, RefreshFlight>()
 
     // ── Circuit metadata ───────────────────────────────────────────────
 
@@ -73,31 +74,15 @@ class NonSeasonResourcesCacheRepository(
         reason: RefreshReason,
     ): RefreshResult {
         val key = CacheResourceKeys.circuitMetadata(f1apiCircuitId)
-        if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(
-                clock.now().toEpochMilliseconds()
-            ) == false
-        ) {
-            return RefreshResult.Success
-        }
-        return singleFlightRefresh(key.value) {
-            val attemptedAt = clock.now().toEpochMilliseconds()
-            try {
-                val dto = client.getCircuit(f1apiCircuitId,
-                    forceRefresh = reason is RefreshReason.PullToRefresh)
-                if (dto.circuit.isEmpty()) {
-                    return@singleFlightRefresh fail(key, attemptedAt, "Circuit $f1apiCircuitId not found")
-                }
+        return refresh(key, reason, { forceRefresh ->
+            client.getCircuit(f1apiCircuitId, forceRefresh)
+        }) { attemptedAt, dto ->
+            if (dto.circuit.isEmpty()) {
+                RefreshResult.PermanentFailure("Circuit $f1apiCircuitId not found")
+            } else {
                 store.writeSnapshot(buildSnapshot(key, attemptedAt,
                     CircuitDetailResponseDto.serializer(), dto))
-                RefreshResult.Success
-            } catch (e: ClientRequestException) {
-                fail(key, attemptedAt, "Request failed (${e.response.status.value})")
-            } catch (e: ServerResponseException) {
-                fail(key, attemptedAt, "Server error (${e.response.status.value})")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                fail(key, attemptedAt, e.message ?: "Network error")
+                RefreshResult.Refreshed
             }
         }
     }
@@ -114,29 +99,12 @@ class NonSeasonResourcesCacheRepository(
         reason: RefreshReason,
     ): RefreshResult {
         val key = CacheResourceKeys.circuitMostWins(f1apiCircuitId)
-        if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(
-                clock.now().toEpochMilliseconds()
-            ) == false
-        ) {
-            return RefreshResult.Success
-        }
-        return singleFlightRefresh(key.value) {
-            val attemptedAt = clock.now().toEpochMilliseconds()
-            try {
-                val dto = client.getCircuitWinners(f1apiCircuitId,
-                    forceRefresh = reason is RefreshReason.PullToRefresh)
-                store.writeSnapshot(buildSnapshot(key, attemptedAt,
-                    CircuitWinnersResponseDto.serializer(), dto))
-                RefreshResult.Success
-            } catch (e: ClientRequestException) {
-                fail(key, attemptedAt, "Request failed (${e.response.status.value})")
-            } catch (e: ServerResponseException) {
-                fail(key, attemptedAt, "Server error (${e.response.status.value})")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                fail(key, attemptedAt, e.message ?: "Network error")
-            }
+        return refresh(key, reason, { forceRefresh ->
+            client.getCircuitWinners(f1apiCircuitId, forceRefresh)
+        }) { attemptedAt, dto ->
+            store.writeSnapshot(buildSnapshot(key, attemptedAt,
+                CircuitWinnersResponseDto.serializer(), dto))
+            RefreshResult.Refreshed
         }
     }
 
@@ -152,28 +120,43 @@ class NonSeasonResourcesCacheRepository(
         reason: RefreshReason,
     ): RefreshResult {
         val key = CacheResourceKeys.wikipediaSummary(pageTitle)
+        return refresh(key, reason, { forceRefresh ->
+            client.getWikipediaSummary(pageTitle, forceRefresh)
+        }) { attemptedAt, summary ->
+            store.writeSnapshot(buildSnapshot(key, attemptedAt,
+                WikipediaSummary.serializer(), summary))
+            RefreshResult.Refreshed
+        }
+    }
+
+    private suspend fun <Dto> refresh(
+        key: CacheResourceKey,
+        reason: RefreshReason,
+        fetch: suspend (Boolean) -> Dto,
+        persist: suspend (Long, Dto) -> RefreshResult,
+    ): RefreshResult {
         if (reason !is RefreshReason.PullToRefresh && currentSnapshot(key)?.isStale(
                 clock.now().toEpochMilliseconds()
             ) == false
         ) {
-            return RefreshResult.Success
+            return RefreshResult.SkippedFresh
         }
-        return singleFlightRefresh(key.value) {
+        return singleFlightRefresh(key.value, reason is RefreshReason.PullToRefresh) { forceRefresh ->
             val attemptedAt = clock.now().toEpochMilliseconds()
             try {
-                val summary = client.getWikipediaSummary(pageTitle,
-                    forceRefresh = reason is RefreshReason.PullToRefresh)
-                store.writeSnapshot(buildSnapshot(key, attemptedAt,
-                    WikipediaSummary.serializer(), summary))
-                RefreshResult.Success
-            } catch (e: ClientRequestException) {
-                fail(key, attemptedAt, "Request failed (${e.response.status.value})")
-            } catch (e: ServerResponseException) {
-                fail(key, attemptedAt, "Server error (${e.response.status.value})")
+                val result = persist(
+                    attemptedAt,
+                    fetch(forceRefresh),
+                )
+                if (result.failureMessageOrNull != null) {
+                    fail(key, attemptedAt, result)
+                } else {
+                    result
+                }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                fail(key, attemptedAt, e.message ?: "Network error")
+            } catch (throwable: Throwable) {
+                fail(key, attemptedAt, RefreshFailureClassifier.classify(throwable))
             }
         }
     }
@@ -195,10 +178,15 @@ class NonSeasonResourcesCacheRepository(
     private suspend fun fail(
         key: CacheResourceKey,
         attemptedAt: Long,
-        message: String,
-    ): RefreshResult.Failure {
-        store.recordAttempt(key, attemptedAt, RefreshAttemptStatus.Failed(message))
-        return RefreshResult.Failure(message)
+        result: RefreshResult,
+    ): RefreshResult {
+        val message = requireNotNull(result.failureMessageOrNull)
+        return try {
+            store.recordAttempt(key, attemptedAt, RefreshAttemptStatus.Failed(message))
+            result
+        } catch (throwable: Throwable) {
+            RefreshFailureClassifier.classify(throwable)
+        }
     }
 
     private suspend fun currentSnapshot(key: CacheResourceKey): CachedResource<Unit>? =
@@ -207,20 +195,65 @@ class NonSeasonResourcesCacheRepository(
     /** Atomic lookup-or-create for the given [keyValue]. */
     private suspend fun singleFlightRefresh(
         keyValue: String,
-        block: suspend () -> RefreshResult,
+        forceRefresh: Boolean,
+        block: suspend (Boolean) -> RefreshResult,
     ): RefreshResult {
-        val deferred = mutex.withLock {
-            inFlight[keyValue]?.takeIf { it.isActive }
-                ?: scope.async { block() }
-                    .also { inFlight[keyValue] = it }
+        val flight = mutex.withLock {
+            inFlight[keyValue]?.takeIf { it.deferred.isActive }?.also { existing ->
+                if (forceRefresh && !existing.forceRefresh) {
+                    existing.forceFollowUpRequested = true
+                }
+            } ?: startFlightLocked(keyValue, forceRefresh, block)
         }
-        return try {
-            deferred.await()
-        } finally {
-            mutex.withLock {
-                if (inFlight[keyValue] === deferred) inFlight.remove(keyValue)
+
+        return flight.deferred.await()
+    }
+
+    /** Creates and publishes a flight while [mutex] is held. */
+    private fun startFlightLocked(
+        keyValue: String,
+        forceRefresh: Boolean,
+        block: suspend (Boolean) -> RefreshResult,
+    ): RefreshFlight {
+        val flight = RefreshFlight(forceRefresh)
+        flight.deferred = scope.async(start = CoroutineStart.LAZY) {
+            runFlight(keyValue, flight, block)
+        }
+        inFlight[keyValue] = flight
+        flight.deferred.start()
+        return flight
+    }
+
+    private suspend fun runFlight(
+        keyValue: String,
+        flight: RefreshFlight,
+        block: suspend (Boolean) -> RefreshResult,
+    ): RefreshResult = try {
+        val result = block(flight.forceRefresh)
+        val followUp = mutex.withLock {
+            if (inFlight[keyValue] !== flight) {
+                null
+            } else if (!flight.forceRefresh && flight.forceFollowUpRequested) {
+                startFlightLocked(keyValue, forceRefresh = true, block)
+            } else {
+                inFlight.remove(keyValue)
+                null
             }
         }
+        followUp?.deferred?.await() ?: result
+    } finally {
+        // Cleanup belongs to the producer so a cancelled waiter cannot clear
+        // a still-running shared request or its forced successor.
+        mutex.withLock {
+            if (inFlight[keyValue] === flight) inFlight.remove(keyValue)
+        }
+    }
+
+    private class RefreshFlight(
+        val forceRefresh: Boolean,
+    ) {
+        var forceFollowUpRequested: Boolean = false
+        lateinit var deferred: Deferred<RefreshResult>
     }
 
     private fun <Dto> buildSnapshot(

@@ -8,8 +8,7 @@ package com.anpurnama.f1_app.core.cache
  * A bundle is **best-effort**: per-resource failures are normal.
  * [requiresRetry] is the one worker policy: any retryable failure wins;
  * refreshed, fresh-skipped, deferred, and permanent outcomes are neutral.
- * Legacy variants remain in the shared type for non-season resources but
- * no longer participate in the current-season worker aggregate.
+ * Every cache resource uses the same five-outcome refresh contract.
  *
  * Generic over the resource key string to keep this type in
  * `core/cache/` without leaking F1-specific concepts.

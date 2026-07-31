@@ -220,10 +220,11 @@ stateDiagram-v2
 
 ## Further Notes
 
-The existing debug JVM suite passes, but it does not cover the incorrect
-fresh-skip aggregation, unsupported payload versions, preference corruption,
-or mixed-strength single-flight behavior. Passing tests therefore describe the
-current implementation, not completion of this spec.
+The existing debug JVM suite covers fresh-skip aggregation and mixed-strength
+single-flight behavior for non-season resources. Unsupported payload versions
+and preference corruption remain outside this focused hardening coverage.
+Passing tests therefore describe the current implementation, not completion
+of every item in this spec.
 
 This work hardens the existing architecture rather than introducing a new one.
 If measurements eventually trip the Room fallback, that substrate change is a

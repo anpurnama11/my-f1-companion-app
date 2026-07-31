@@ -83,7 +83,7 @@ class SessionResultViewModelTest {
             getSessionResult = { _, _, _, _ -> Outcome.Failure("should not be called") },
             getFastestPitstop = null,
             observeCachedResult = cachedResult,
-            refreshCachedResult = { RefreshResult.Success },
+            refreshCachedResult = { RefreshResult.Refreshed },
         )
         cachedResult.value = CachedResource(RACE_RESULT, snapshot("session-results.race"))
 
